@@ -69,6 +69,19 @@
                     </select>
                 </div>
 
+                  <div class="mb-3">
+                    <label class="form-label">Χρέωση Ραντεβού (€)</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="total_price"
+                        class="form-control"
+                    >
+                    <small class="text-muted">
+                        Αν το αφήσετε κενό, θα χρησιμοποιηθεί η χρέωση του επαγγελματία.
+                    </small>
+                </div>
+
                 <div class="mb-3">
                     <label class="form-label">Σημειώσεις</label>
                     <textarea name="notes" class="form-control" rows="3">{{ old('notes') }}</textarea>

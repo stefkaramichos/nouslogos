@@ -78,11 +78,11 @@
                         </option>
                     </select>
                 </div>
-
+{{-- 
                 <div class="mb-3">
                     <label class="form-label">Σημειώσεις</label>
                     <textarea name="notes" class="form-control" rows="3">{{ old('notes', $payment->notes ?? '') }}</textarea>
-                </div>
+                </div> --}}
 
                 <button class="btn btn-primary">Αποθήκευση</button>
                 <a href="{{ route('appointments.index') }}" class="btn btn-secondary">Ακύρωση</a>

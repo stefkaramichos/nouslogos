@@ -97,7 +97,7 @@
 
                 {{-- Συνολικό ποσό --}}
                 <div class="mb-3">
-                    <label class="form-label">Συνολικό Ποσό (€)</label>
+                    <label class="form-label">Χρέωση Ραντεβού (€)</label>
                     <input
                         type="number"
                         step="0.01"
