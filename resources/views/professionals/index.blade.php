@@ -4,11 +4,37 @@
 
 @section('content')
     <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <span>Λίστα Επαγγελματιών</span>
-            <a href="{{ route('professionals.create') }}" class="btn btn-primary btn-sm">
-                + Προσθήκη Επαγγελματία
-            </a>
+        <div class="card-header">
+
+            <div class="d-flex justify-content-between align-items-center">
+                <span>Λίστα Επαγγελματιών</span>
+
+                <a href="{{ route('professionals.create') }}" class="btn btn-primary btn-sm ms-3">
+                    + Προσθήκη Επαγγελματία
+                </a>
+            </div>
+
+            {{-- Search bar --}}
+            <form method="GET" action="{{ route('professionals.index') }}" class="mt-3">
+                <div class="input-group">
+                    <input type="text"
+                           name="search"
+                           class="form-control"
+                           placeholder="Αναζήτηση (όνομα, τηλέφωνο, email, εταιρεία)..."
+                           value="{{ $search ?? '' }}">
+
+                    <button class="btn btn-outline-primary">
+                        Αναζήτηση
+                    </button>
+
+                    @if(isset($search) && $search !== '')
+                        <a href="{{ route('professionals.index') }}" class="btn btn-outline-secondary">
+                            Καθαρισμός
+                        </a>
+                    @endif
+                </div>
+            </form>
+
         </div>
 
         <div class="card-body p-0">
@@ -59,7 +85,7 @@
                     @empty
                         <tr>
                             <td colspan="8" class="text-center text-muted py-4">
-                                Δεν υπάρχουν επαγγελματίες ακόμα.
+                                Δεν υπάρχουν επαγγελματίες για εμφάνιση.
                             </td>
                         </tr>
                     @endforelse

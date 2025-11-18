@@ -4,11 +4,37 @@
 
 @section('content')
     <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <span>Λίστα Πελατών</span>
-            <a href="{{ route('customers.create') }}" class="btn btn-primary btn-sm">
-                + Προσθήκη Πελάτη
-            </a>
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+
+                <span>Λίστα Πελατών</span>
+
+                <a href="{{ route('customers.create') }}" class="btn btn-primary btn-sm ms-3">
+                    + Προσθήκη Πελάτη
+                </a>
+            </div>
+
+            {{-- Search bar --}}
+            <form method="GET" action="{{ route('customers.index') }}" class="mt-3">
+                <div class="input-group">
+                    <input type="text"
+                           name="search"
+                           class="form-control"
+                           placeholder="Αναζήτηση (όνομα, τηλέφωνο, email, εταιρεία)..."
+                           value="{{ $search ?? '' }}">
+
+                    <button class="btn btn-outline-primary">
+                        Αναζήτηση
+                    </button>
+
+                    @if(isset($search) && $search !== '')
+                        <a href="{{ route('customers.index') }}" class="btn btn-outline-secondary">
+                            Καθαρισμός
+                        </a>
+                    @endif
+                </div>
+            </form>
+
         </div>
 
         <div class="card-body p-0">
@@ -24,21 +50,33 @@
                         <th>Ενέργειες</th>
                     </tr>
                     </thead>
+
                     <tbody>
                     @forelse($customers as $customer)
                         <tr>
                             <td>{{ $customer->id }}</td>
-                            <td>{{ $customer->last_name }} {{ $customer->first_name }}</td>
-                            <td>{{ $customer->phone }}</td>
-                            <td>{{ $customer->email ?? '-' }}</td>
-                            <td>{{ $customer->company->name ?? '-' }}</td>
+
                             <td>
-                                 <a href="{{ route('customers.show', $customer) }}" class="btn btn-sm btn-info">
+                                <a href="{{ route('customers.show', $customer) }}">
+                                    {{ $customer->last_name }} {{ $customer->first_name }}
+                                </a>
+                            </td>
+
+                            <td>{{ $customer->phone }}</td>
+
+                            <td>{{ $customer->email ?? '-' }}</td>
+
+                            <td>{{ $customer->company->name ?? '-' }}</td>
+
+                            <td>
+                                <a href="{{ route('customers.show', $customer) }}" class="btn btn-sm btn-info">
                                     Προβολή
                                 </a>
+
                                 <a href="{{ route('customers.edit', $customer) }}" class="btn btn-sm btn-secondary">
                                     Επεξεργασία
                                 </a>
+
                                 <form action="{{ route('customers.destroy', $customer) }}" method="POST"
                                       class="d-inline"
                                       onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτόν τον πελάτη;');">
@@ -53,11 +91,12 @@
                     @empty
                         <tr>
                             <td colspan="6" class="text-center text-muted py-4">
-                                Δεν υπάρχουν πελάτες ακόμα.
+                                Δεν υπάρχουν πελάτες για εμφάνιση.
                             </td>
                         </tr>
                     @endforelse
                     </tbody>
+
                 </table>
             </div>
         </div>

@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
+ 
 use App\Models\Appointment;
 use App\Models\Company;
 use App\Models\Customer;
@@ -12,14 +12,107 @@ use Illuminate\Support\Facades\Auth;
 
 class AppointmentController extends Controller
 {
-    public function index()
-    {
-        $appointments = Appointment::with(['customer', 'professional', 'company', 'payment'])
-            ->orderBy('start_time', 'desc')
-            ->get();
+    
+public function index(Request $request)
+{
+    // Λίστες για dropdowns
+    $customers     = Customer::orderBy('last_name')->get();
+    $professionals = Professional::orderBy('last_name')->get();
+    $companies     = Company::orderBy('name')->get();
 
-        return view('appointments.index', compact('appointments'));
+    // Παίρνουμε τις τιμές των φίλτρων
+    $from            = $request->input('from');
+    $to              = $request->input('to');
+    $customerId      = $request->input('customer_id');
+    $professionalId  = $request->input('professional_id');
+    $companyId       = $request->input('company_id');
+    $status          = $request->input('status');          // all / ...
+    $paymentStatus   = $request->input('payment_status');  // all / unpaid / partial / full
+    $paymentMethod   = $request->input('payment_method');  // all / cash / card
+
+    // Βασικό query
+    $query = Appointment::with(['customer', 'professional', 'company', 'payment'])
+        ->orderBy('start_time', 'desc');
+
+    // Φίλτρα που μπορούν να μπουν στο query
+    if ($from) {
+        $query->whereDate('start_time', '>=', $from);
     }
+
+    if ($to) {
+        $query->whereDate('start_time', '<=', $to);
+    }
+
+    if ($customerId) {
+        $query->where('customer_id', $customerId);
+    }
+
+    if ($professionalId) {
+        $query->where('professional_id', $professionalId);
+    }
+
+    if ($companyId) {
+        $query->where('company_id', $companyId);
+    }
+
+    if ($status && $status !== 'all') {
+        $query->where('status', $status);
+    }
+
+    // Παίρνουμε τα αποτελέσματα
+    $appointments = $query->get();
+
+    // Φίλτρα που έχουν να κάνουν με payments, τα κρατάμε σε collection
+    if ($paymentStatus && $paymentStatus !== 'all') {
+        $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
+            $total = $a->total_price ?? 0;
+            $paid  = $a->payment->amount ?? 0;
+
+            if ($paymentStatus === 'unpaid') {
+                return $paid <= 0;
+            }
+
+            if ($paymentStatus === 'partial') {
+                return $paid > 0 && $paid < $total;
+            }
+
+            if ($paymentStatus === 'full') {
+                return $total > 0 && $paid >= $total;
+            }
+
+            return true;
+        });
+    }
+
+    if ($paymentMethod && $paymentMethod !== 'all') {
+        $appointments = $appointments->filter(function ($a) use ($paymentMethod) {
+            if (!$a->payment) {
+                return false;
+            }
+            return $a->payment->method === $paymentMethod;
+        });
+    }
+
+    // Φίλτρα για το view
+    $filters = [
+        'from'            => $from,
+        'to'              => $to,
+        'customer_id'     => $customerId,
+        'professional_id' => $professionalId,
+        'company_id'      => $companyId,
+        'status'          => $status ?? 'all',
+        'payment_status'  => $paymentStatus ?? 'all',
+        'payment_method'  => $paymentMethod ?? 'all',
+    ];
+
+    return view('appointments.index', compact(
+        'appointments',
+        'filters',
+        'customers',
+        'professionals',
+        'companies'
+    ));
+}
 
     public function create()
     {
