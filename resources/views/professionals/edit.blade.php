@@ -1,0 +1,102 @@
+@extends('layouts.app')
+
+@section('title', 'Επεξεργασία Επαγγελματία')
+
+@section('content')
+    <div class="card">
+        <div class="card-header">
+            Επεξεργασία Επαγγελματία
+        </div>
+        <div class="card-body">
+            <form action="{{ route('professionals.update', $professional) }}" method="POST">
+                @csrf
+                @method('PUT')
+
+                <div class="mb-3">
+                    <label class="form-label">Όνομα</label>
+                    <input
+                        type="text"
+                        name="first_name"
+                        class="form-control"
+                        value="{{ old('first_name', $professional->first_name) }}"
+                        required
+                    >
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Επίθετο</label>
+                    <input
+                        type="text"
+                        name="last_name"
+                        class="form-control"
+                        value="{{ old('last_name', $professional->last_name) }}"
+                        required
+                    >
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Τηλέφωνο</label>
+                    <input
+                        type="text"
+                        name="phone"
+                        class="form-control"
+                        value="{{ old('phone', $professional->phone) }}"
+                        required
+                    >
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Email (προαιρετικό)</label>
+                    <input
+                        type="email"
+                        name="email"
+                        class="form-control"
+                        value="{{ old('email', $professional->email) }}"
+                    >
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Εταιρεία</label>
+                    <select name="company_id" class="form-select" required>
+                        <option value="">-- Επιλέξτε εταιρεία --</option>
+                        @foreach($companies as $company)
+                            <option
+                                value="{{ $company->id }}"
+                                @selected(old('company_id', $professional->company_id) == $company->id)
+                            >
+                                {{ $company->name }} ({{ $company->city }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Χρέωση Υπηρεσίας (€)</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="service_fee"
+                        class="form-control"
+                        value="{{ old('service_fee', $professional->service_fee) }}"
+                        required
+                    >
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Ποσοστό που παίρνει ο επαγγελματίας (%)</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="percentage_cut"
+                        class="form-control"
+                        value="{{ old('percentage_cut', $professional->percentage_cut) }}"
+                        required
+                    >
+                </div>
+
+                <button class="btn btn-primary">Αποθήκευση Αλλαγών</button>
+                <a href="{{ route('professionals.index') }}" class="btn btn-secondary">Ακύρωση</a>
+            </form>
+        </div>
+    </div>
+@endsection
