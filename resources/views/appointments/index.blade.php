@@ -98,10 +98,28 @@
 
                         {{-- Ενέργειες --}}
                         <td>
-                            <a href="{{ route('appointments.payment.edit', $appointment) }}" class="btn btn-sm btn-outline-primary">
+                            <a href="{{ route('appointments.edit', $appointment) }}"
+                            class="btn btn-sm btn-secondary mb-1">
+                                Επεξεργασία
+                            </a>
+
+                            <a href="{{ route('appointments.payment.edit', $appointment) }}"
+                            class="btn btn-sm btn-outline-primary mb-1">
                                 Επεξεργασία Πληρωμής
                             </a>
+
+                            <form action="{{ route('appointments.destroy', $appointment) }}"
+                                method="POST"
+                                class="d-inline"
+                                onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτό το ραντεβού;');">
+                                @csrf
+                                @method('DELETE')
+                                <button class="btn btn-sm btn-danger">
+                                    Διαγραφή
+                                </button>
+                            </form>
                         </td>
+
                     </tr>
                 @empty
                         <tr>

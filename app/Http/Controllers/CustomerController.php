@@ -70,19 +70,52 @@ class CustomerController extends Controller
             ->with('success', 'Ο πελάτης ενημερώθηκε επιτυχώς.');
     }
 
+    
     public function show(Customer $customer)
     {
         $customer->load([
             'company',
             'appointments.professional',
             'appointments.company',
-            'appointments.payment', // σημαντικό
+            'appointments.payment',
         ]);
 
-        $appointmentsCount = $customer->appointments->count();
+        $appointments      = $customer->appointments;
+        $appointmentsCount = $appointments->count();
 
-        return view('customers.show', compact('customer', 'appointmentsCount'));
+        $totalAmount = $appointments->sum(function ($a) {
+            return $a->total_price ?? 0;
+        });
+
+        $paidTotal = $appointments->sum(function ($a) {
+            return $a->payment->amount ?? 0;
+        });
+
+        $outstandingTotal = max($totalAmount - $paidTotal, 0);
+
+        $cashTotal = $appointments->sum(function ($a) {
+            return ($a->payment && $a->payment->method === 'cash')
+                ? $a->payment->amount
+                : 0;
+        });
+
+        $cardTotal = $appointments->sum(function ($a) {
+            return ($a->payment && $a->payment->method === 'card')
+                ? $a->payment->amount
+                : 0;
+        });
+
+        return view('customers.show', compact(
+            'customer',
+            'appointmentsCount',
+            'totalAmount',
+            'paidTotal',
+            'outstandingTotal',
+            'cashTotal',
+            'cardTotal'
+        ));
     }
+
 
 
 

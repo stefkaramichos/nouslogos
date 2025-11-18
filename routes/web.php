@@ -18,3 +18,6 @@ Route::get('appointments/{appointment}/payment', [PaymentController::class, 'edi
 
 Route::post('appointments/{appointment}/payment', [PaymentController::class, 'update'])
     ->name('appointments.payment.update');
+
+    Route::get('/professionals/{professional}', [ProfessionalController::class, 'show'])
+    ->name('professionals.show');

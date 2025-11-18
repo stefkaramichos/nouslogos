@@ -30,7 +30,12 @@
                     @forelse($professionals as $professional)
                         <tr>
                             <td>{{ $professional->id }}</td>
-                            <td>{{ $professional->last_name }} {{ $professional->first_name }}</td>
+                            <td>
+                                <a href="{{ route('professionals.show', $professional) }}">
+                                    {{ $professional->last_name }} {{ $professional->first_name }}
+                                </a>
+                            </td>
+
                             <td>{{ $professional->phone }}</td>
                             <td>{{ $professional->email ?? '-' }}</td>
                             <td>{{ $professional->company->name ?? '-' }}</td>
