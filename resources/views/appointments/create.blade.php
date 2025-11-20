@@ -60,7 +60,7 @@
                 </div> --}}
 
                 <div class="mb-3">
-                    <label class="form-label">Κατάσταση</label>
+                    <label class="form-label">Υπηρεσία</label>
                     <select name="status" class="form-select">
                         <option value="logotherapia" >Λογοθεραπεία</option>
                         <option value="psixotherapia" >Ψυχοθεραπεία</option>
@@ -78,9 +78,7 @@
                         name="total_price"
                         class="form-control"
                     >
-                    <small class="text-muted">
-                        Αν το αφήσετε κενό, θα χρησιμοποιηθεί η χρέωση του επαγγελματία.
-                    </small>
+                    
                 </div>
 
                 <div class="mb-3">
@@ -107,7 +105,7 @@
                         value="1"
                         @checked(old('mark_as_paid'))>
                     <label class="form-check-label" for="mark_as_paid">
-                        Ο πελάτης πλήρωσε (ολικά ή μερικώς) για αυτό το ραντεβού
+                        Ο πελάτης πλήρωσε (ολικά) για αυτό το ραντεβού
                     </label>
                 </div>
 

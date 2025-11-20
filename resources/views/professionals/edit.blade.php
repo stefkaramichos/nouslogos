@@ -70,7 +70,7 @@
                     </select>
                 </div>
 
-                <div class="mb-3">
+                {{-- <div class="mb-3">
                     <label class="form-label">Χρέωση Υπηρεσίας (€)</label>
                     <input
                         type="number"
@@ -80,10 +80,10 @@
                         value="{{ old('service_fee', $professional->service_fee) }}"
                         required
                     >
-                </div>
+                </div> --}}
 
                 <div class="mb-3">
-                    <label class="form-label">Ποσοστό που παίρνει ο επαγγελματίας (%)</label>
+                    <label class="form-label">Ποσό που παίρνει ο επαγγελματίας</label>
                     <input
                         type="number"
                         step="0.01"

@@ -106,9 +106,6 @@
                         class="form-control"
                         value="{{ old('total_price', $appointment->total_price) }}"
                     >
-                    <small class="text-muted">
-                        Αν το αφήσετε κενό, θα χρησιμοποιηθεί η χρέωση του επαγγελματία.
-                    </small>
                 </div>
 
                 <div class="mb-3">

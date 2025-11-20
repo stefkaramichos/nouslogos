@@ -44,7 +44,7 @@ class ProfessionalController extends Controller
                 'phone'          => 'required|string|max:30',
                 'email'          => 'nullable|email|max:150',
                 'company_id'     => 'required|exists:companies,id',
-                'service_fee'    => 'required|numeric|min:0',
+                'service_fee'    => 'numeric|min:0',
                 // ΤΩΡΑ: percentage_cut = ποσό επαγγελματία σε €
                 'percentage_cut' => 'required|numeric|min:0',
             ],
@@ -53,11 +53,10 @@ class ProfessionalController extends Controller
                 'last_name.required'      => 'Το επίθετο είναι υποχρεωτικό.',
                 'phone.required'          => 'Το τηλέφωνο είναι υποχρεωτικό.',
                 'company_id.required'     => 'Η εταιρεία είναι υποχρεωτική.',
-                'service_fee.required'    => 'Η χρέωση υπηρεσίας είναι υποχρεωτική.',
                 'percentage_cut.required' => 'Το ποσό που λαμβάνει ο επαγγελματίας είναι υποχρεωτικό.',
             ]
         );
-
+ 
         Professional::create($data);
 
         return redirect()
@@ -80,7 +79,7 @@ class ProfessionalController extends Controller
                 'phone'          => 'required|string|max:30',
                 'email'          => 'nullable|email|max:150',
                 'company_id'     => 'required|exists:companies,id',
-                'service_fee'    => 'required|numeric|min:0',
+                'service_fee'    => 'numeric|min:0',
                 // ΤΩΡΑ: ποσό, όχι ποσοστό
                 'percentage_cut' => 'required|numeric|min:0',
             ],
@@ -89,7 +88,6 @@ class ProfessionalController extends Controller
                 'last_name.required'      => 'Το επίθετο είναι υποχρεωτικό.',
                 'phone.required'          => 'Το τηλέφωνο είναι υποχρεωτικό.',
                 'company_id.required'     => 'Η εταιρεία είναι υποχρεωτική.',
-                'service_fee.required'    => 'Η χρέωση υπηρεσίας είναι υποχρεωτική.',
                 'percentage_cut.required' => 'Το ποσό που λαμβάνει ο επαγγελματίας είναι υποχρεωτικό.',
             ]
         );

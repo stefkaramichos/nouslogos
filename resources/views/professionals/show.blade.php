@@ -242,7 +242,7 @@
                                 </a>
 
                                 <a href="{{ route('appointments.payment.edit', $appointment) }}" class="btn btn-sm btn-outline-primary">
-                                    Πληρωμή
+                                    Επεξεργασία Πληρωμή
                                 </a>
 
                                 <form action="{{ route('appointments.destroy', $appointment) }}"
