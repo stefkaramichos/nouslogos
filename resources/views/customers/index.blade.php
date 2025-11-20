@@ -69,24 +69,34 @@
                             <td>{{ $customer->company->name ?? '-' }}</td>
 
                             <td>
-                                <a href="{{ route('customers.show', $customer) }}" class="btn btn-sm btn-info">
-                                    Προβολή
+                                <!-- View -->
+                                <a href="{{ route('customers.show', $customer) }}"
+                                class="btn btn-sm btn-info"
+                                title="Προβολή πελάτη">
+                                    <i class="bi bi-eye"></i>
                                 </a>
 
-                                <a href="{{ route('customers.edit', $customer) }}" class="btn btn-sm btn-secondary">
-                                    Επεξεργασία
+                                <!-- Edit -->
+                                <a href="{{ route('customers.edit', $customer) }}"
+                                class="btn btn-sm btn-secondary"
+                                title="Επεξεργασία πελάτη">
+                                    <i class="bi bi-pencil-square"></i>
                                 </a>
 
-                                <form action="{{ route('customers.destroy', $customer) }}" method="POST"
-                                      class="d-inline"
-                                      onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτόν τον πελάτη;');">
+                                <!-- Delete -->
+                                <form action="{{ route('customers.destroy', $customer) }}"
+                                    method="POST"
+                                    class="d-inline"
+                                    onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτόν τον πελάτη;');">
                                     @csrf
                                     @method('DELETE')
-                                    <button class="btn btn-sm btn-danger">
-                                        Διαγραφή
+                                    <button class="btn btn-sm btn-danger"
+                                            title="Διαγραφή πελάτη">
+                                        <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
                             </td>
+
                         </tr>
                     @empty
                         <tr>

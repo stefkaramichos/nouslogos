@@ -68,19 +68,27 @@
                             <td>{{ number_format($professional->service_fee, 2, ',', '.') }}</td>
                             <td>{{ number_format($professional->percentage_cut, 2, ',', '.') }}</td>
                             <td>
-                                <a href="{{ route('professionals.edit', $professional) }}" class="btn btn-sm btn-secondary">
-                                    Επεξεργασία
+                                <!-- Edit -->
+                                <a href="{{ route('professionals.edit', $professional) }}"
+                                class="btn btn-sm btn-secondary"
+                                title="Επεξεργασία επαγγελματία">
+                                    <i class="bi bi-pencil-square"></i>
                                 </a>
-                                <form action="{{ route('professionals.destroy', $professional) }}" method="POST"
-                                      class="d-inline"
-                                      onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτόν τον επαγγελματία;');">
+
+                                <!-- Delete -->
+                                <form action="{{ route('professionals.destroy', $professional) }}"
+                                    method="POST"
+                                    class="d-inline"
+                                    onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτόν τον επαγγελματία;');">
                                     @csrf
                                     @method('DELETE')
-                                    <button class="btn btn-sm btn-danger">
-                                        Διαγραφή
+                                    <button class="btn btn-sm btn-danger"
+                                            title="Διαγραφή επαγγελματία">
+                                        <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
                             </td>
+
                         </tr>
                     @empty
                         <tr>

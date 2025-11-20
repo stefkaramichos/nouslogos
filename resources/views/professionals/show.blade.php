@@ -236,17 +236,22 @@
                                 </span>
                             </td>
 
-                            <td>
+                           <td>
+                                <!-- Edit -->
                                 <a href="{{ route('appointments.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
-                                class="btn btn-sm btn-secondary">
-                                    Επεξεργασία
+                                class="btn btn-sm btn-secondary"
+                                title="Επεξεργασία ραντεβού">
+                                    <i class="bi bi-pencil-square"></i>
                                 </a>
 
+                                <!-- Edit Payment -->
                                 <a href="{{ route('appointments.payment.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
-                                class="btn btn-sm btn-outline-primary">
-                                    Επεξεργασία Πληρωμή
+                                class="btn btn-sm btn-outline-primary"
+                                title="Επεξεργασία πληρωμής">
+                                    <i class="bi bi-credit-card"></i>
                                 </a>
 
+                                <!-- Delete -->
                                 <form action="{{ route('appointments.destroy', $appointment) }}"
                                     class="d-inline"
                                     method="POST"
@@ -254,9 +259,13 @@
                                     @csrf
                                     @method('DELETE')
                                     <input type="hidden" name="redirect_to" value="{{ request()->fullUrl() }}">
-                                    <button class="btn btn-sm btn-danger">Διαγραφή</button>
+                                    <button class="btn btn-sm btn-danger"
+                                            title="Διαγραφή ραντεβού">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
                                 </form>
                             </td>
+
 
                         </tr>
 

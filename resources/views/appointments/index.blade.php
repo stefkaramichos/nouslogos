@@ -215,27 +215,35 @@
 
                             {{-- Ενέργειες --}}
                             <td>
+                                <!-- Edit -->
                                 <a href="{{ route('appointments.edit', $appointment) }}"
-                                   class="btn btn-sm btn-secondary mb-1">
-                                    Επεξεργασία
+                                class="btn btn-sm btn-secondary mb-1"
+                                title="Επεξεργασία ραντεβού">
+                                    <i class="bi bi-pencil-square"></i>
                                 </a>
 
+                                <!-- Edit Payment -->
                                 <a href="{{ route('appointments.payment.edit', $appointment) }}"
-                                   class="btn btn-sm btn-outline-primary mb-1">
-                                    Επεξεργασία Πληρωμής
+                                class="btn btn-sm btn-outline-primary mb-1"
+                                title="Επεξεργασία πληρωμής">
+                                    <i class="bi bi-credit-card"></i>
                                 </a>
 
+                                <!-- Delete -->
                                 <form action="{{ route('appointments.destroy', $appointment) }}"
-                                      method="POST"
-                                      class="d-inline"
-                                      onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτό το ραντεβού;');">
+                                    method="POST"
+                                    class="d-inline"
+                                    onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτό το ραντεβού;');">
                                     @csrf
                                     @method('DELETE')
-                                    <button class="btn btn-sm btn-danger">
-                                        Διαγραφή
+                                    <button class="btn btn-sm btn-danger"
+                                            title="Διαγραφή ραντεβού">
+                                        <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
                             </td>
+
+
                         </tr>
                     @empty
                         <tr>

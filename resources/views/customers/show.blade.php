@@ -225,14 +225,16 @@
                             <td>
                                 {{-- Επεξεργασία Ραντεβού --}}
                                 <a href="{{ route('appointments.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
-                                class="btn btn-sm btn-secondary mb-1">
-                                    Επεξεργασία
+                                class="btn btn-sm btn-secondary mb-1"
+                                title="Επεξεργασία ραντεβού">
+                                    <i class="bi bi-pencil-square"></i>
                                 </a>
 
                                 {{-- Επεξεργασία Πληρωμής --}}
                                 <a href="{{ route('appointments.payment.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
-                                class="btn btn-sm btn-outline-primary mb-1">
-                                    Πληρωμή
+                                class="btn btn-sm btn-outline-primary mb-1"
+                                title="Επεξεργασία πληρωμής">
+                                    <i class="bi bi-credit-card"></i>
                                 </a>
 
                                 {{-- Διαγραφή Ραντεβού --}}
@@ -243,11 +245,13 @@
                                     @csrf
                                     @method('DELETE')
                                     <input type="hidden" name="redirect_to" value="{{ request()->fullUrl() }}">
-                                    <button class="btn btn-sm btn-danger">
-                                        Διαγραφή
+                                    <button class="btn btn-sm btn-danger"
+                                            title="Διαγραφή ραντεβού">
+                                        <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
                             </td>
+
 
                         </tr>
                     @empty
