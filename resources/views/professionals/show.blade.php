@@ -44,7 +44,7 @@
             </p>
 
             <p>
-                <strong>Συνολικό ποσό ραντεβών:</strong><br>
+                <strong>Συνολικό ποσό ραντεβού:</strong><br>
                 <span class="badge bg-info fs-6">
                     {{ number_format($totalAmount, 2, ',', '.') }} €
                 </span>
@@ -237,23 +237,27 @@
                             </td>
 
                             <td>
-                                <a href="{{ route('appointments.edit', $appointment) }}" class="btn btn-sm btn-secondary">
+                                <a href="{{ route('appointments.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
+                                class="btn btn-sm btn-secondary">
                                     Επεξεργασία
                                 </a>
 
-                                <a href="{{ route('appointments.payment.edit', $appointment) }}" class="btn btn-sm btn-outline-primary">
+                                <a href="{{ route('appointments.payment.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
+                                class="btn btn-sm btn-outline-primary">
                                     Επεξεργασία Πληρωμή
                                 </a>
 
                                 <form action="{{ route('appointments.destroy', $appointment) }}"
-                                      class="d-inline"
-                                      method="POST"
-                                      onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε;');">
+                                    class="d-inline"
+                                    method="POST"
+                                    onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε;');">
                                     @csrf
                                     @method('DELETE')
+                                    <input type="hidden" name="redirect_to" value="{{ request()->fullUrl() }}">
                                     <button class="btn btn-sm btn-danger">Διαγραφή</button>
                                 </form>
                             </td>
+
                         </tr>
 
                     @empty

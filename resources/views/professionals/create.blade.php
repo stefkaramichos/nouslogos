@@ -42,15 +42,15 @@
                         @endforeach
                     </select>
                 </div>
-
+{{-- 
                 <div class="mb-3">
                     <label class="form-label">Χρέωση Υπηρεσίας (€)</label>
                     <input type="number" step="0.01" name="service_fee" class="form-control"
                            value="{{ old('service_fee') }}" required>
-                </div>
+                </div> --}}
 
                 <div class="mb-3">
-                    <label class="form-label">Ποσοστό που παίρνει ο επαγγελματίας (%)</label>
+                    <label class="form-label">Ποσό που παίρνει ο επαγγελματίας</label>
                     <input type="number" step="0.01" name="percentage_cut" class="form-control"
                            value="{{ old('percentage_cut') }}" required>
                 </div>

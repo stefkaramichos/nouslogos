@@ -266,20 +266,33 @@ class AppointmentController extends Controller
 
         $appointment->update($data);
 
+        $redirectTo = $request->input('redirect_to');
+
+        if ($redirectTo) {
+            return redirect($redirectTo)
+                ->with('success', 'Το ραντεβού ενημερώθηκε επιτυχώς.');
+        }
+
         return redirect()
             ->route('appointments.index')
             ->with('success', 'Το ραντεβού ενημερώθηκε επιτυχώς.');
     }
 
-    public function destroy(Appointment $appointment)
+    public function destroy(Request $request, Appointment $appointment)
     {
-        // Σβήνουμε πρώτα τυχόν πληρωμές (αν δεν έχεις ON DELETE CASCADE)
         $appointment->payments()->delete();
-
         $appointment->delete();
+
+        $redirectTo = $request->input('redirect_to');
+
+        if ($redirectTo) {
+            return redirect($redirectTo)
+                ->with('success', 'Το ραντεβού διαγράφηκε επιτυχώς.');
+        }
 
         return redirect()
             ->route('appointments.index')
             ->with('success', 'Το ραντεβού διαγράφηκε επιτυχώς.');
     }
+
 }

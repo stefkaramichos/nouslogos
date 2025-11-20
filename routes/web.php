@@ -39,4 +39,9 @@ Route::middleware('auth')->group(function () {
 
     Route::post('appointments/{appointment}/payment', [PaymentController::class, 'update'])
         ->name('appointments.payment.update');
+
+    Route::post('/customers/{customer}/pay-all', [CustomerController::class, 'payAll'])
+    ->name('customers.payAll');
+
 });
+

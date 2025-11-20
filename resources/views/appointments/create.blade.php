@@ -97,7 +97,7 @@
                     <textarea name="notes" class="form-control" rows="3">{{ old('notes') }}</textarea>
                 </div>
 
-                <div class="mb-3 form-check">
+                {{-- <div class="mb-3 form-check">
                     <input type="checkbox"
                         class="form-check-input"
                         id="mark_as_paid"
@@ -121,7 +121,7 @@
                         name="payment_amount"
                         class="form-control"
                         value="{{ old('payment_amount') }}">
-                </div>
+                </div> --}}
 
                 <button class="btn btn-primary">Αποθήκευση</button>
                 <a href="{{ route('appointments.index') }}" class="btn btn-secondary">Ακύρωση</a>

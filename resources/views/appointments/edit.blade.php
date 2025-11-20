@@ -16,6 +16,8 @@
                 @csrf
                 @method('PUT')
 
+                <input type="hidden" name="redirect_to" value="{{ request('redirect') }}">
+
                 {{-- Πελάτης --}}
                 <div class="mb-3">
                     <label class="form-label">Πελάτης</label>

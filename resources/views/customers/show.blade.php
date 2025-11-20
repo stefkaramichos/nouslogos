@@ -49,6 +49,23 @@
                 </div>
             </div>
         </div>
+        {{-- <form method="POST" action="{{ route('customers.payAll', $customer) }}"
+            onsubmit="return confirm('Να πληρωθούν όλα τα φιλτραρισμένα ραντεβού;');">
+
+            @csrf
+
+             Στέλνουμε τα ίδια φίλτρα 
+            <input type="hidden" name="from" value="{{ $filters['from'] ?? '' }}">
+            <input type="hidden" name="to" value="{{ $filters['to'] ?? '' }}">
+            <input type="hidden" name="status" value="{{ $filters['status'] ?? 'all' }}">
+            <input type="hidden" name="payment_status" value="{{ $filters['payment_status'] ?? 'all' }}">
+            <input type="hidden" name="payment_method" value="{{ $filters['payment_method'] ?? 'all' }}">
+
+            <button class="btn btn-success mt-3">
+                💶 Πληρωμή Όλων (Φιλτραρισμένων)
+            </button>
+        </form> --}}
+
     </div>
 
     {{-- Ραντεβού Πελάτη --}}
@@ -88,7 +105,7 @@
                     </div>
 
                     <div class="col-md-3">
-                        <label class="form-label">Υπηρεσία Πληρωμής</label>
+                        <label class="form-label">Κατάσταση Πληρωμής</label>
                         @php $ps = $filters['payment_status'] ?? 'all'; @endphp
                         <select name="payment_status" class="form-select">
                             <option value="all" @selected($ps === 'all')>Όλα</option>
@@ -206,27 +223,32 @@
 
                             {{-- Ενέργειες --}}
                             <td>
-                                <a href="{{ route('appointments.edit', $appointment) }}"
-                                   class="btn btn-sm btn-secondary mb-1">
+                                {{-- Επεξεργασία Ραντεβού --}}
+                                <a href="{{ route('appointments.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
+                                class="btn btn-sm btn-secondary mb-1">
                                     Επεξεργασία
                                 </a>
 
-                                <a href="{{ route('appointments.payment.edit', $appointment) }}"
-                                   class="btn btn-sm btn-outline-primary mb-1">
+                                {{-- Επεξεργασία Πληρωμής --}}
+                                <a href="{{ route('appointments.payment.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
+                                class="btn btn-sm btn-outline-primary mb-1">
                                     Πληρωμή
                                 </a>
 
+                                {{-- Διαγραφή Ραντεβού --}}
                                 <form action="{{ route('appointments.destroy', $appointment) }}"
-                                      method="POST"
-                                      class="d-inline"
-                                      onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτό το ραντεβού;');">
+                                    method="POST"
+                                    class="d-inline"
+                                    onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτό το ραντεβού;');">
                                     @csrf
                                     @method('DELETE')
+                                    <input type="hidden" name="redirect_to" value="{{ request()->fullUrl() }}">
                                     <button class="btn btn-sm btn-danger">
                                         Διαγραφή
                                     </button>
                                 </form>
                             </td>
+
                         </tr>
                     @empty
                         <tr>

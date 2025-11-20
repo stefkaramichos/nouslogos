@@ -72,8 +72,15 @@ class PaymentController extends Controller
             ]
         );
 
+         $redirectTo = $request->input('redirect_to');
+
+        if ($redirectTo) {
+            return redirect($redirectTo)
+                ->with('success', 'Η πληρωμή ενημερώθηκε επιτυχώς.');
+        }
+
         return redirect()
             ->route('appointments.index')
-            ->with('success', 'Η πληρωμή αποθηκεύτηκε επιτυχώς.');
+            ->with('success', 'Η πληρωμή ενημερώθηκε επιτυχώς.');
     }
 }

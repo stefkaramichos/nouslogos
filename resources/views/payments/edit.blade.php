@@ -37,6 +37,8 @@
             <form action="{{ route('appointments.payment.update', $appointment) }}" method="POST">
                 @csrf
 
+                <input type="hidden" name="redirect_to" value="{{ request('redirect') }}">
+
                 <div class="mb-3">
                     <label class="form-label">Ποσό Πληρωμής (€)</label>
                     <input
