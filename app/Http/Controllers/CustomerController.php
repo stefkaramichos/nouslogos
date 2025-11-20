@@ -85,7 +85,7 @@ class CustomerController extends Controller
     }
 
     
-    public function show(Customer $customer)
+   public function show(Request $request, Customer $customer)
     {
         $customer->load([
             'company',
@@ -94,7 +94,69 @@ class CustomerController extends Controller
             'appointments.payment',
         ]);
 
-        $appointments      = $customer->appointments;
+        // Παίρνουμε τα φίλτρα από το request
+        $from          = $request->input('from');             // date
+        $to            = $request->input('to');               // date
+        $status        = $request->input('status');           // all / scheduled / completed / cancelled / no_show
+        $paymentStatus = $request->input('payment_status');   // all / unpaid / partial / full
+        $paymentMethod = $request->input('payment_method');   // all / cash / card
+
+        // Βασικό σύνολο ραντεβών πελάτη (πριν τα φίλτρα)
+        $appointments = $customer->appointments
+            ->sortByDesc('start_time')
+            ->values(); // to reset keys
+
+        // Εφαρμογή φίλτρων σε collection
+
+        if ($from) {
+            $appointments = $appointments->filter(function ($a) use ($from) {
+                return $a->start_time && $a->start_time->toDateString() >= $from;
+            });
+        }
+
+        if ($to) {
+            $appointments = $appointments->filter(function ($a) use ($to) {
+                return $a->start_time && $a->start_time->toDateString() <= $to;
+            });
+        }
+
+        if ($status && $status !== 'all') {
+            $appointments = $appointments->filter(function ($a) use ($status) {
+                return $a->status === $status;
+            });
+        }
+
+        if ($paymentStatus && $paymentStatus !== 'all') {
+            $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
+                $total = $a->total_price ?? 0;
+                $paid  = $a->payment->amount ?? 0;
+
+                if ($paymentStatus === 'unpaid') {
+                    return $paid <= 0;
+                }
+
+                if ($paymentStatus === 'partial') {
+                    return $paid > 0 && $paid < $total;
+                }
+
+                if ($paymentStatus === 'full') {
+                    return $total > 0 && $paid >= $total;
+                }
+
+                return true;
+            });
+        }
+
+        if ($paymentMethod && $paymentMethod !== 'all') {
+            $appointments = $appointments->filter(function ($a) use ($paymentMethod) {
+                if (!$a->payment) {
+                    return false;
+                }
+                return $a->payment->method === $paymentMethod;
+            });
+        }
+
+        // Τώρα τα ραντεβού είναι φιλτραρισμένα
         $appointmentsCount = $appointments->count();
 
         $totalAmount = $appointments->sum(function ($a) {
@@ -119,14 +181,25 @@ class CustomerController extends Controller
                 : 0;
         });
 
+        // Για να κρατάμε τις τιμές στα inputs
+        $filters = [
+            'from'           => $from,
+            'to'             => $to,
+            'status'         => $status ?? 'all',
+            'payment_status' => $paymentStatus ?? 'all',
+            'payment_method' => $paymentMethod ?? 'all',
+        ];
+
         return view('customers.show', compact(
             'customer',
+            'appointments',
             'appointmentsCount',
             'totalAmount',
             'paidTotal',
             'outstandingTotal',
             'cashTotal',
-            'cardTotal'
+            'cardTotal',
+            'filters'
         ));
     }
 

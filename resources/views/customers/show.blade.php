@@ -19,7 +19,7 @@
                     <p><strong>Τηλέφωνο:</strong> {{ $customer->phone }}</p>
                     <p><strong>Email:</strong> {{ $customer->email ?? '-' }}</p>
                     <p><strong>Εταιρεία:</strong> {{ $customer->company->name ?? '-' }}</p>
-                    <p><strong>Σύνολο Ραντεβού:</strong> {{ $appointmentsCount }}</p>
+                    <p><strong>Σύνολο Ραντεβού (με βάση τα φίλτρα):</strong> {{ $appointmentsCount }}</p>
                 </div>
                 <div class="col-md-6">
                     <p>
@@ -56,7 +56,71 @@
         <div class="card-header">
             Ραντεβού Πελάτη
         </div>
-        <div class="card-body p-0">
+
+        <div class="card-body">
+
+            {{-- Φίλτρα --}}
+            <form method="GET" action="{{ route('customers.show', $customer) }}" class="mb-3">
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <label class="form-label">Από Ημερομηνία</label>
+                        <input type="date" name="from" class="form-control"
+                               value="{{ $filters['from'] ?? '' }}">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Έως Ημερομηνία</label>
+                        <input type="date" name="to" class="form-control"
+                               value="{{ $filters['to'] ?? '' }}">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Υπηρεσία Ραντεβού</label>
+                        @php $st = $filters['status'] ?? 'all'; @endphp
+                        <select name="status" class="form-select">
+                            <option value="all" @selected($st === 'all')>Όλα</option>
+                            <option value="logotherapia" @selected($st === 'logotherapia')>Λογοθεραπεία</option>
+                            <option value="psixotherapia" @selected($st === 'psixotherapia')>Ψυχοθεραπεία</option>
+                            <option value="ergotherapia" @selected($st === 'ergotherapia')>Εργοθεραπεία</option>
+                            <option value="omadiki" @selected($st === 'omadiki')>Ομαδική</option>
+                            <option value="eidikos" @selected($st === 'eidikos')>Ειδικός παιδαγωγός</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Υπηρεσία Πληρωμής</label>
+                        @php $ps = $filters['payment_status'] ?? 'all'; @endphp
+                        <select name="payment_status" class="form-select">
+                            <option value="all" @selected($ps === 'all')>Όλα</option>
+                            <option value="unpaid" @selected($ps === 'unpaid')>Απλήρωτα</option>
+                            <option value="partial" @selected($ps === 'partial')>Μερικώς πληρωμένα</option>
+                            <option value="full" @selected($ps === 'full')>Πλήρως πληρωμένα</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row g-2 mt-2">
+                    <div class="col-md-3">
+                        <label class="form-label">Τρόπος Πληρωμής</label>
+                        @php $pm = $filters['payment_method'] ?? 'all'; @endphp
+                        <select name="payment_method" class="form-select">
+                            <option value="all" @selected($pm === 'all')>Όλοι</option>
+                            <option value="cash" @selected($pm === 'cash')>Μετρητά</option>
+                            <option value="card" @selected($pm === 'card')>Κάρτα</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-9 d-flex align-items-end justify-content-end">
+                        <button class="btn btn-outline-primary me-2">
+                            Εφαρμογή Φίλτρων
+                        </button>
+                        <a href="{{ route('customers.show', $customer) }}" class="btn btn-outline-secondary">
+                            Καθαρισμός
+                        </a>
+                    </div>
+                </div>
+            </form>
+
             <div class="table-responsive">
                 <table class="table table-striped mb-0 align-middle">
                     <thead>
@@ -65,14 +129,14 @@
                         <th>Ημ/νία & Ώρα</th>
                         <th>Επαγγελματίας</th>
                         <th>Εταιρεία</th>
-                        <th>Κατάσταση</th>
+                        <th>Υπηρεσία </th>
                         <th>Σύνολο (€)</th>
                         <th>Πληρωμή</th>
                         <th>Ενέργειες</th>
                     </tr>
                     </thead>
                     <tbody>
-                    @forelse($customer->appointments as $appointment)
+                    @forelse($appointments as $appointment)
                         @php
                             $payment = $appointment->payment;
                             $total   = $appointment->total_price ?? 0;
@@ -81,6 +145,7 @@
                         <tr>
                             <td>{{ $appointment->id }}</td>
                             <td>{{ $appointment->start_time?->format('d/m/Y H:i') }}</td>
+
                             <td>
                                 @if($appointment->professional)
                                     {{ $appointment->professional->last_name }} {{ $appointment->professional->first_name }}
@@ -88,7 +153,9 @@
                                     <span class="text-muted">-</span>
                                 @endif
                             </td>
+
                             <td>{{ $appointment->company->name ?? '-' }}</td>
+
                             <td>
                                 <span class="badge
                                     @if($appointment->status === 'completed') bg-success
@@ -99,6 +166,7 @@
                                     {{ $appointment->status }}
                                 </span>
                             </td>
+
                             <td>{{ number_format($total, 2, ',', '.') }}</td>
 
                             {{-- Πληρωμή --}}
@@ -138,19 +206,16 @@
 
                             {{-- Ενέργειες --}}
                             <td>
-                                {{-- Επεξεργασία Ραντεβού --}}
                                 <a href="{{ route('appointments.edit', $appointment) }}"
                                    class="btn btn-sm btn-secondary mb-1">
                                     Επεξεργασία
                                 </a>
 
-                                {{-- Επεξεργασία Πληρωμής --}}
                                 <a href="{{ route('appointments.payment.edit', $appointment) }}"
                                    class="btn btn-sm btn-outline-primary mb-1">
                                     Πληρωμή
                                 </a>
 
-                                {{-- Διαγραφή Ραντεβού --}}
                                 <form action="{{ route('appointments.destroy', $appointment) }}"
                                       method="POST"
                                       class="d-inline"
@@ -173,6 +238,7 @@
                     </tbody>
                 </table>
             </div>
+
         </div>
     </div>
 @endsection
