@@ -49,23 +49,24 @@
 
                 <div class="mb-3">
                     <label class="form-label">Ημερομηνία & Ώρα Έναρξης</label>
-                    <input type="datetime-local" name="start_time" class="form-control"
+                    <input id="start_time" type="text" name="start_time" class="form-control"
                            value="{{ old('start_time') }}" required>
                 </div>
 
-                <div class="mb-3">
+                {{-- <div class="mb-3">
                     <label class="form-label">Ημερομηνία & Ώρα Λήξης (προαιρετικό)</label>
                     <input type="datetime-local" name="end_time" class="form-control"
                            value="{{ old('end_time') }}">
-                </div>
+                </div> --}}
 
                 <div class="mb-3">
                     <label class="form-label">Κατάσταση</label>
                     <select name="status" class="form-select">
-                        <option value="scheduled" @selected(old('status') == 'scheduled')>Προγραμματισμένο</option>
-                        <option value="completed" @selected(old('status') == 'completed')>Ολοκληρωμένο</option>
-                        <option value="cancelled" @selected(old('status') == 'cancelled')>Ακυρωμένο</option>
-                        <option value="no_show" @selected(old('status') == 'no_show')>Δεν προσήλθε</option>
+                        <option value="logotherapia" >Λογοθεραπεία</option>
+                        <option value="psixotherapia" >Ψυχοθεραπεία</option>
+                        <option value="ergotherapia" >Εργοθεραπεία</option>
+                        <option value="omadiki" >Ομαδική</option>
+                        <option value="eidikos" >Ειδικός παιδαγωγός</option>
                     </select>
                 </div>
 
@@ -119,3 +120,14 @@
         </div>
     </div>
 @endsection
+
+
+@push('scripts')
+<script>
+    flatpickr("#start_time", {
+        enableTime: true,
+        dateFormat: "Y-m-d H:i",
+        minuteIncrement: 15
+    });
+</script>
+@endpush

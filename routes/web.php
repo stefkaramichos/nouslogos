@@ -5,19 +5,38 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\ProfessionalController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\AuthController;
 
-Route::get('/', function () {
-    return redirect()->route('appointments.index');
+// 🔹 Login routes (χωρίς auth)
+Route::get('/login', [AuthController::class, 'showLoginForm'])
+    ->name('login')
+    ->middleware('guest');
+
+Route::post('/login', [AuthController::class, 'login'])
+    ->name('login.post')
+    ->middleware('guest');
+
+Route::post('/logout', [AuthController::class, 'logout'])
+    ->name('logout')
+    ->middleware('auth');
+
+// 🔹 Όλες οι υπόλοιπες σελίδες ΜΟΝΟ για logged-in users
+Route::middleware('auth')->group(function () {
+
+    // Αρχική -> ραντεβού
+    Route::get('/', function () {
+        return redirect()->route('appointments.index');
+    })->name('dashboard');
+
+    // Πελάτες / Επαγγελματίες / Ραντεβού
+    Route::resource('customers', CustomerController::class);
+    Route::resource('professionals', ProfessionalController::class);
+    Route::resource('appointments', AppointmentController::class);
+
+    // Πληρωμές ραντεβού
+    Route::get('appointments/{appointment}/payment', [PaymentController::class, 'edit'])
+        ->name('appointments.payment.edit');
+
+    Route::post('appointments/{appointment}/payment', [PaymentController::class, 'update'])
+        ->name('appointments.payment.update');
 });
-
-Route::resource('customers', CustomerController::class);
-Route::resource('professionals', ProfessionalController::class);
-Route::resource('appointments', AppointmentController::class);
-Route::get('appointments/{appointment}/payment', [PaymentController::class, 'edit'])
-    ->name('appointments.payment.edit');
-
-Route::post('appointments/{appointment}/payment', [PaymentController::class, 'update'])
-    ->name('appointments.payment.update');
-
-    Route::get('/professionals/{professional}', [ProfessionalController::class, 'show'])
-    ->name('professionals.show');

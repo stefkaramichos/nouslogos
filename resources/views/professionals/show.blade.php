@@ -160,6 +160,7 @@
                         <th>Εταιρεία</th>
                         <th>Σύνολο (€)</th>
                         <th>Πληρωμή Πελάτη</th>
+                        <th>Σημειώσεις</th>
                         <th>Ποσό Επαγγελματία (€)</th>
                         <th>Ενέργειες</th>
                     </tr>
@@ -189,7 +190,7 @@
                             </td>
 
                             <td>{{ $appointment->company->name ?? '-' }}</td>
-
+                            
                             <td>{{ number_format($total, 2, ',', '.') }}</td>
 
                             <td>
@@ -224,6 +225,9 @@
                                         </small>
                                     </span>
                                 @endif
+                            </td>
+                            <td>
+                                {{ $appointment->notes ? Str::limit($appointment->notes, 50) : '-' }}
                             </td>
 
                             <td>

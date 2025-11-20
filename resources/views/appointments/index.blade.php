@@ -72,14 +72,15 @@
         </div>
 
         <div class="col-md-3">
-            <label class="form-label">Κατάσταση Ραντεβού</label>
+            <label class="form-label">Υπηρεσία Ραντεβού</label>
             @php $st = $filters['status'] ?? 'all'; @endphp
             <select name="status" class="form-select">
                 <option value="all" @selected($st === 'all')>Όλα</option>
-                <option value="scheduled" @selected($st === 'scheduled')>Προγραμματισμένο</option>
-                <option value="completed" @selected($st === 'completed')>Ολοκληρωμένο</option>
-                <option value="cancelled" @selected($st === 'cancelled')>Ακυρωμένο</option>
-                <option value="no_show" @selected($st === 'no_show')>Δεν προσήλθε</option>
+                 <option value="logotherapia" @selected($st === 'logotherapia')>Λογοθεραπεία</option>
+                        <option value="psixotherapia" @selected($st === 'psixotherapia')>Ψυχοθεραπεία</option>
+                        <option value="ergotherapia" @selected($st === 'ergotherapia')>Εργοθεραπεία</option>
+                        <option value="omadiki" @selected($st === 'omadiki')>Ομαδική</option>
+                        <option value="eidikos" @selected($st === 'eidikos')>Ειδικός παιδαγωγός</option>
             </select>
         </div>
 
@@ -128,8 +129,9 @@
                         <th>Πελάτης</th>
                         <th>Επαγγελματίας</th>
                         <th>Εταιρεία</th>
-                        <th>Κατάσταση</th>
+                        <th>Υπηρεσία</th>
                         <th>Σύνολο (€)</th>
+                        <th>Σημειώσεις</th>
                         <th>Πληρωμή</th>
                         <th>Ενέργειες</th>
                     </tr>
@@ -182,6 +184,9 @@
 
                             {{-- Σύνολο --}}
                             <td>{{ number_format($total, 2, ',', '.') }}</td>
+                            <td>
+                                {{ $appointment->notes ? Str::limit($appointment->notes, 50) : '-' }}
+                            </td>
 
                             {{-- Πληρωμή --}}
                             <td>
