@@ -16,6 +16,7 @@ class Payment extends Model
         'is_full',
         'paid_at',
         'method',
+        'tax',
         'notes',
     ];
 

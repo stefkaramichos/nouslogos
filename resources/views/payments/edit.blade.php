@@ -70,7 +70,7 @@
 
                 <div class="mb-3">
                     <label class="form-label">Μέθοδος Πληρωμής</label>
-                    <select name="method" class="form-select">
+                    <select name="method" class="form-select" id="payment_method">
                         <option value="">-- Επιλέξτε --</option>
                         <option value="cash" @selected(old('method', $payment->method ?? '') === 'cash')>
                             Μετρητά
@@ -80,15 +80,72 @@
                         </option>
                     </select>
                 </div>
-{{-- 
+
+                {{-- TAX --}}
+                <div class="mb-3" id="tax-wrapper">
+                    <label class="form-label">ΦΠΑ / Απόδειξη</label>
+                    @php
+                        $currentTax = old('tax', $payment->tax ?? 'N');
+                    @endphp
+                    <select name="tax" class="form-select" id="tax_select">
+                        <option value="">-- Επιλέξτε --</option>
+                        <option value="Y" @selected($currentTax === 'Y')>Ναι</option>
+                        <option value="N" @selected($currentTax === 'N')>Όχι</option>
+                    </select>
+                    <small class="text-muted" id="tax_help">
+                        Αν επιλέξετε Κάρτα, ο ΦΠΑ θα είναι πάντα "Ναι".
+                    </small>
+                </div>
+
+                {{-- Αν θες σημειώσεις, ξεκλείδωσέ το --}}
+                {{-- 
                 <div class="mb-3">
                     <label class="form-label">Σημειώσεις</label>
                     <textarea name="notes" class="form-control" rows="3">{{ old('notes', $payment->notes ?? '') }}</textarea>
-                </div> --}}
+                </div>
+                --}}
 
                 <button class="btn btn-primary">Αποθήκευση</button>
                 <a href="{{ route('appointments.index') }}" class="btn btn-secondary">Ακύρωση</a>
             </form>
         </div>
     </div>
+
+    {{-- Μικρό script για να κρύβει/δείχνει το tax ανάλογα με τη μέθοδο --}}
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const methodSelect = document.getElementById('payment_method');
+                const taxWrapper   = document.getElementById('tax-wrapper');
+                const taxSelect    = document.getElementById('tax_select');
+                const taxHelp      = document.getElementById('tax_help');
+
+                function updateTaxUI() {
+                    const method = methodSelect.value;
+
+                    if (method === 'card') {
+                        // Κρύβουμε το πεδίο, θέτουμε tax = Y
+                        taxWrapper.classList.add('d-none');
+                        if (taxSelect) {
+                            taxSelect.value = 'Y';
+                        }
+                        taxHelp.textContent = 'Πληρωμή με κάρτα: ο ΦΠΑ ορίζεται αυτόματα σε "Ναι".';
+                    } else if (method === 'cash') {
+                        // Δείχνουμε το πεδίο και αφήνουμε τον χρήστη να επιλέξει
+                        taxWrapper.classList.remove('d-none');
+                        taxHelp.textContent = 'Επιλέξτε αν θα κοπεί απόδειξη (ΦΠΑ) για πληρωμή με μετρητά.';
+                    } else {
+                        // Καμία μέθοδος επιλεγμένη
+                        taxWrapper.classList.remove('d-none');
+                        taxHelp.textContent = 'Επιλέξτε μέθοδο πληρωμής και στη συνέχεια ΦΠΑ.';
+                    }
+                }
+
+                if (methodSelect) {
+                    methodSelect.addEventListener('change', updateTaxUI);
+                    updateTaxUI();
+                }
+            });
+        </script>
+    @endpush
 @endsection

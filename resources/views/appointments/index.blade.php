@@ -131,8 +131,8 @@
                         <th>Εταιρεία</th>
                         <th>Υπηρεσία</th>
                         <th>Σύνολο (€)</th>
-                        <th>Σημειώσεις</th>
                         <th>Πληρωμή</th>
+                        <th>Σημειώσεις</th>
                         <th>Ενέργειες</th>
                     </tr>
                     </thead>
@@ -184,33 +184,41 @@
 
                             {{-- Σύνολο --}}
                             <td>{{ number_format($total, 2, ',', '.') }}</td>
-                            <td>
-                                {{ $appointment->notes ? Str::limit($appointment->notes, 50) : '-' }}
-                            </td>
+                           
 
                             {{-- Πληρωμή --}}
                             <td>
                                 @if(!$payment || $paid <= 0)
                                     <span class="badge bg-danger">Απλήρωτο</span>
-                                @elseif($paid < $total)
-                                    <span class="badge bg-warning text-dark">
-                                        Μερική πληρωμή {{ number_format($paid, 2, ',', '.') }} €
-                                        @if($payment->method === 'cash')
-                                            (Μετρητά)
-                                        @elseif($payment->method === 'card')
-                                            (Κάρτα)
-                                        @endif
-                                    </span>
                                 @else
-                                    <span class="badge bg-success">
-                                        Πλήρως πληρωμένο {{ number_format($paid, 2, ',', '.') }} €
-                                        @if($payment->method === 'cash')
-                                            (Μετρητά)
-                                        @elseif($payment->method === 'card')
-                                            (Κάρτα)
-                                        @endif
-                                    </span>
+                                    @php
+                                        $methodLabel = $payment->method === 'cash'
+                                            ? 'Μετρητά'
+                                            : ($payment->method === 'card' ? 'Κάρτα' : 'Άγνωστο');
+
+                                        $taxLabel = $payment->tax === 'Y'
+                                            ? 'Με απόδειξη'
+                                            : 'Χωρίς απόδειξη';
+                                    @endphp
+
+                                    @if($paid < $total)
+                                        <span class="badge bg-warning text-dark d-block mb-1">
+                                            Μερική πληρωμή {{ number_format($paid, 2, ',', '.') }} €
+                                        </span>
+                                    @else
+                                        <span class="badge bg-success d-block mb-1">
+                                            Πλήρως πληρωμένο {{ number_format($paid, 2, ',', '.') }} €
+                                        </span>
+                                    @endif
+
+                                    <small class="d-block text-muted">
+                                        {{ $methodLabel }} &middot; {{ $taxLabel }}
+                                    </small>
                                 @endif
+                            </td>
+
+                             <td>
+                                {{ $appointment->notes ? Str::limit($appointment->notes, 50) : '-' }}
                             </td>
 
                             {{-- Ενέργειες --}}

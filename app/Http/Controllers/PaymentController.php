@@ -23,14 +23,16 @@ class PaymentController extends Controller
     {
         $data = $request->validate(
             [
-                'amount'   => 'nullable|numeric|min:0',
-                'is_full'  => 'nullable|boolean',
-                'method'   => 'nullable|in:cash,card',
-                'notes'    => 'nullable|string',
+                'amount'  => 'nullable|numeric|min:0',
+                'is_full' => 'nullable|boolean',
+                'method'  => 'nullable|in:cash,card',
+                'tax'     => 'nullable|in:Y,N',
+                'notes'   => 'nullable|string',
             ],
             [
                 'amount.numeric' => 'Το ποσό πρέπει να είναι αριθμός.',
                 'method.in'      => 'Η μέθοδος πληρωμής πρέπει να είναι Μετρητά ή Κάρτα.',
+                'tax.in'         => 'Η τιμή ΦΠΑ πρέπει να είναι Ν ή Y.',
             ]
         );
 
@@ -38,26 +40,46 @@ class PaymentController extends Controller
 
         $amount = $data['amount'] ?? 0;
         $isFull = $request->boolean('is_full');
+        $method = $data['method'] ?? null;
 
         // Αν χρήστης τσεκάρει "πλήρης εξόφληση" και δεν βάλει ποσό → βάλε total
         if ($isFull && $amount <= 0 && $total > 0) {
             $amount = $total;
         }
 
-        // Αν ποσό 0 και δεν είναι full → σβήνουμε πληρωμή (προαιρετικό)
+        // Αν ποσό 0 → σβήνουμε πληρωμή
         if ($amount <= 0) {
-            // αν υπάρχει πληρωμή, μπορείς είτε να τη σβήσεις είτε να την αφήσεις
-            // εδώ επιλέγω delete:
             Payment::where('appointment_id', $appointment->id)->delete();
 
+            $redirectTo = $request->input('redirect_to');
+            if ($redirectTo) {
+                return redirect($redirectTo)
+                    ->with('success', 'Η πληρωμή διαγράφηκε.');
+            }
+
             return redirect()
-                ->back()
+                ->route('appointments.index')
                 ->with('success', 'Η πληρωμή διαγράφηκε.');
         }
 
-        // Αν ποσό >= total → θεώρησέ το full
+        // Αν ποσό >= total → full
         if ($total > 0 && $amount >= $total) {
             $isFull = true;
+        }
+
+        // TAX LOGIC
+        $tax = null;
+
+        if ($method === 'card') {
+            // Κάρτα ⇒ πάντα ΦΠΑ = Y
+            $tax = 'Y';
+        } elseif ($method === 'cash') {
+            // Μετρητά ⇒ επιλέγει ο χρήστης, default N
+            $taxInput = $request->input('tax');
+            $tax = ($taxInput === 'Y') ? 'Y' : 'N';
+        } else {
+            // Αν δεν έχει οριστεί μέθοδος, μπορούμε να αφήσουμε null ή N.
+            $tax = $data['tax'] ?? 'N';
         }
 
         Payment::updateOrCreate(
@@ -67,12 +89,13 @@ class PaymentController extends Controller
                 'amount'      => $amount,
                 'is_full'     => $isFull,
                 'paid_at'     => now(),
-                'method'      => $data['method'] ?? null,
+                'method'      => $method,
+                'tax'         => $tax,
                 'notes'       => $data['notes'] ?? null,
             ]
         );
 
-         $redirectTo = $request->input('redirect_to');
+        $redirectTo = $request->input('redirect_to');
 
         if ($redirectTo) {
             return redirect($redirectTo)
