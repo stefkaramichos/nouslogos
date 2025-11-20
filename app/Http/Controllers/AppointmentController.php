@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
- 
+
 use App\Models\Appointment;
 use App\Models\Company;
 use App\Models\Customer;
@@ -12,107 +12,106 @@ use Illuminate\Support\Facades\Auth;
 
 class AppointmentController extends Controller
 {
-    
-public function index(Request $request)
-{
-    // Λίστες για dropdowns
-    $customers     = Customer::orderBy('last_name')->get();
-    $professionals = Professional::orderBy('last_name')->get();
-    $companies     = Company::orderBy('name')->get();
+    public function index(Request $request)
+    {
+        // Λίστες για dropdowns
+        $customers     = Customer::orderBy('last_name')->get();
+        $professionals = Professional::orderBy('last_name')->get();
+        $companies     = Company::orderBy('name')->get();
 
-    // Παίρνουμε τις τιμές των φίλτρων
-    $from            = $request->input('from');
-    $to              = $request->input('to');
-    $customerId      = $request->input('customer_id');
-    $professionalId  = $request->input('professional_id');
-    $companyId       = $request->input('company_id');
-    $status          = $request->input('status');          // all / ...
-    $paymentStatus   = $request->input('payment_status');  // all / unpaid / partial / full
-    $paymentMethod   = $request->input('payment_method');  // all / cash / card
+        // Παίρνουμε τις τιμές των φίλτρων
+        $from            = $request->input('from');
+        $to              = $request->input('to');
+        $customerId      = $request->input('customer_id');
+        $professionalId  = $request->input('professional_id');
+        $companyId       = $request->input('company_id');
+        $status          = $request->input('status');          // all / ...
+        $paymentStatus   = $request->input('payment_status');  // all / unpaid / partial / full
+        $paymentMethod   = $request->input('payment_method');  // all / cash / card
 
-    // Βασικό query
-    $query = Appointment::with(['customer', 'professional', 'company', 'payment'])
-        ->orderBy('start_time', 'desc');
+        // Βασικό query
+        $query = Appointment::with(['customer', 'professional', 'company', 'payment'])
+            ->orderBy('start_time', 'desc');
 
-    // Φίλτρα που μπορούν να μπουν στο query
-    if ($from) {
-        $query->whereDate('start_time', '>=', $from);
+        // Φίλτρα που μπορούν να μπουν στο query
+        if ($from) {
+            $query->whereDate('start_time', '>=', $from);
+        }
+
+        if ($to) {
+            $query->whereDate('start_time', '<=', $to);
+        }
+
+        if ($customerId) {
+            $query->where('customer_id', $customerId);
+        }
+
+        if ($professionalId) {
+            $query->where('professional_id', $professionalId);
+        }
+
+        if ($companyId) {
+            $query->where('company_id', $companyId);
+        }
+
+        if ($status && $status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        // Παίρνουμε τα αποτελέσματα
+        $appointments = $query->get();
+
+        // Φίλτρα που έχουν να κάνουν με payments, τα κρατάμε σε collection
+        if ($paymentStatus && $paymentStatus !== 'all') {
+            $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
+                $total = $a->total_price ?? 0;
+                $paid  = $a->payment->amount ?? 0;
+
+                if ($paymentStatus === 'unpaid') {
+                    return $paid <= 0;
+                }
+
+                if ($paymentStatus === 'partial') {
+                    return $paid > 0 && $paid < $total;
+                }
+
+                if ($paymentStatus === 'full') {
+                    return $total > 0 && $paid >= $total;
+                }
+
+                return true;
+            });
+        }
+
+        if ($paymentMethod && $paymentMethod !== 'all') {
+            $appointments = $appointments->filter(function ($a) use ($paymentMethod) {
+                if (!$a->payment) {
+                    return false;
+                }
+                return $a->payment->method === $paymentMethod;
+            });
+        }
+
+        // Φίλτρα για το view
+        $filters = [
+            'from'            => $from,
+            'to'              => $to,
+            'customer_id'     => $customerId,
+            'professional_id' => $professionalId,
+            'company_id'      => $companyId,
+            'status'          => $status ?? 'all',
+            'payment_status'  => $paymentStatus ?? 'all',
+            'payment_method'  => $paymentMethod ?? 'all',
+        ];
+
+        return view('appointments.index', compact(
+            'appointments',
+            'filters',
+            'customers',
+            'professionals',
+            'companies'
+        ));
     }
-
-    if ($to) {
-        $query->whereDate('start_time', '<=', $to);
-    }
-
-    if ($customerId) {
-        $query->where('customer_id', $customerId);
-    }
-
-    if ($professionalId) {
-        $query->where('professional_id', $professionalId);
-    }
-
-    if ($companyId) {
-        $query->where('company_id', $companyId);
-    }
-
-    if ($status && $status !== 'all') {
-        $query->where('status', $status);
-    }
-
-    // Παίρνουμε τα αποτελέσματα
-    $appointments = $query->get();
-
-    // Φίλτρα που έχουν να κάνουν με payments, τα κρατάμε σε collection
-    if ($paymentStatus && $paymentStatus !== 'all') {
-        $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
-            $total = $a->total_price ?? 0;
-            $paid  = $a->payment->amount ?? 0;
-
-            if ($paymentStatus === 'unpaid') {
-                return $paid <= 0;
-            }
-
-            if ($paymentStatus === 'partial') {
-                return $paid > 0 && $paid < $total;
-            }
-
-            if ($paymentStatus === 'full') {
-                return $total > 0 && $paid >= $total;
-            }
-
-            return true;
-        });
-    }
-
-    if ($paymentMethod && $paymentMethod !== 'all') {
-        $appointments = $appointments->filter(function ($a) use ($paymentMethod) {
-            if (!$a->payment) {
-                return false;
-            }
-            return $a->payment->method === $paymentMethod;
-        });
-    }
-
-    // Φίλτρα για το view
-    $filters = [
-        'from'            => $from,
-        'to'              => $to,
-        'customer_id'     => $customerId,
-        'professional_id' => $professionalId,
-        'company_id'      => $companyId,
-        'status'          => $status ?? 'all',
-        'payment_status'  => $paymentStatus ?? 'all',
-        'payment_method'  => $paymentMethod ?? 'all',
-    ];
-
-    return view('appointments.index', compact(
-        'appointments',
-        'filters',
-        'customers',
-        'professionals',
-        'companies'
-    ));
-}
 
     public function create()
     {
@@ -127,16 +126,18 @@ public function index(Request $request)
     {
         $data = $request->validate(
             [
-                'customer_id'     => 'required|exists:customers,id',
-                'professional_id' => 'required|exists:professionals,id',
-                'company_id'      => 'required|exists:companies,id',
-                'start_time'      => 'required|date',
-                'end_time'        => 'nullable|date|after_or_equal:start_time',
-                'status'          => 'nullable|string',
-                'total_price'     => 'nullable|numeric|min:0',
-                'notes'           => 'nullable|string',
-                'mark_as_paid'    => 'nullable|boolean',
-                'payment_amount'  => 'nullable|numeric|min:0',
+                'customer_id'           => 'required|exists:customers,id',
+                'professional_id'       => 'required|exists:professionals,id',
+                'company_id'            => 'required|exists:companies,id',
+                'start_time'            => 'required|date',
+                'end_time'              => 'nullable|date|after_or_equal:start_time',
+                'status'                => 'nullable|string',
+                'total_price'           => 'nullable|numeric|min:0',
+                'notes'                 => 'nullable|string',
+                'mark_as_paid'          => 'nullable|boolean',
+                'payment_amount'        => 'nullable|numeric|min:0',
+                // ΝΕΟ πεδίο: ειδικό ποσό επαγγελματία για αυτό το ραντεβού (override)
+                'professional_amount'   => 'nullable|numeric|min:0',
             ],
             [
                 'customer_id.required'     => 'Ο πελάτης είναι υποχρεωτικός.',
@@ -151,8 +152,23 @@ public function index(Request $request)
         // Αν δεν δώσεις total_price, παίρνουμε τη χρέωση του επαγγελματία
         $total = $data['total_price'] ?? $professional->service_fee;
 
-        $professionalAmount = $total * ($professional->percentage_cut / 100);
-        $companyAmount      = $total - $professionalAmount;
+        // Βάση: ποσό ανά ραντεβού από το profile του επαγγελματία
+        $baseProfessionalAmount = $professional->percentage_cut; // ΠΟΣΟ, όχι ποσοστό %
+
+        // Default ποσό επαγγελματία = αυτό
+        $professionalAmount = $baseProfessionalAmount;
+
+        // Αν συμπλήρωσες ειδικό ποσό στο ραντεβού, κάνουμε override
+        if (array_key_exists('professional_amount', $data) && $data['professional_amount'] !== null) {
+            $professionalAmount = $data['professional_amount'];
+        }
+
+        // Δεν αφήνουμε ποτέ ο επαγγελματίας να πάρει παραπάνω από total
+        if ($professionalAmount > $total) {
+            $professionalAmount = $total;
+        }
+
+        $companyAmount = $total - $professionalAmount;
 
         $data['total_price']         = $total;
         $data['professional_amount'] = $professionalAmount;
@@ -205,14 +221,16 @@ public function index(Request $request)
     {
         $data = $request->validate(
             [
-                'customer_id'     => 'required|exists:customers,id',
-                'professional_id' => 'required|exists:professionals,id',
-                'company_id'      => 'required|exists:companies,id',
-                'start_time'      => 'required|date',
-                'end_time'        => 'nullable|date|after_or_equal:start_time',
-                'status'          => 'nullable|string',
-                'total_price'     => 'nullable|numeric|min:0',
-                'notes'           => 'nullable|string',
+                'customer_id'           => 'required|exists:customers,id',
+                'professional_id'       => 'required|exists:professionals,id',
+                'company_id'            => 'required|exists:companies,id',
+                'start_time'            => 'required|date',
+                'end_time'              => 'nullable|date|after_or_equal:start_time',
+                'status'                => 'nullable|string',
+                'total_price'           => 'nullable|numeric|min:0',
+                'notes'                 => 'nullable|string',
+                // το ίδιο override πεδίο και εδώ
+                'professional_amount'   => 'nullable|numeric|min:0',
             ],
             [
                 'customer_id.required'     => 'Ο πελάτης είναι υποχρεωτικός.',
@@ -227,8 +245,20 @@ public function index(Request $request)
 
         $total = $data['total_price'] ?? $professional->service_fee;
 
-        $professionalAmount = $total * ($professional->percentage_cut / 100);
-        $companyAmount      = $total - $professionalAmount;
+        // Βάση = ποσό ανά ραντεβού από τον επαγγελματία
+        $baseProfessionalAmount = $professional->percentage_cut;
+
+        $professionalAmount = $baseProfessionalAmount;
+
+        if (array_key_exists('professional_amount', $data) && $data['professional_amount'] !== null) {
+            $professionalAmount = $data['professional_amount'];
+        }
+
+        if ($professionalAmount > $total) {
+            $professionalAmount = $total;
+        }
+
+        $companyAmount = $total - $professionalAmount;
 
         $data['total_price']         = $total;
         $data['professional_amount'] = $professionalAmount;

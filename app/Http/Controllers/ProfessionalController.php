@@ -39,13 +39,14 @@ class ProfessionalController extends Controller
     {
         $data = $request->validate(
             [
-                'first_name'      => 'required|string|max:100',
-                'last_name'       => 'required|string|max:100',
-                'phone'           => 'required|string|max:30',
-                'email'           => 'nullable|email|max:150',
-                'company_id'      => 'required|exists:companies,id',
-                'service_fee'     => 'required|numeric|min:0',
-                'percentage_cut'  => 'required|numeric|min:0|max:100',
+                'first_name'     => 'required|string|max:100',
+                'last_name'      => 'required|string|max:100',
+                'phone'          => 'required|string|max:30',
+                'email'          => 'nullable|email|max:150',
+                'company_id'     => 'required|exists:companies,id',
+                'service_fee'    => 'required|numeric|min:0',
+                // ΤΩΡΑ: percentage_cut = ποσό επαγγελματία σε €
+                'percentage_cut' => 'required|numeric|min:0',
             ],
             [
                 'first_name.required'     => 'Το μικρό όνομα είναι υποχρεωτικό.',
@@ -53,7 +54,7 @@ class ProfessionalController extends Controller
                 'phone.required'          => 'Το τηλέφωνο είναι υποχρεωτικό.',
                 'company_id.required'     => 'Η εταιρεία είναι υποχρεωτική.',
                 'service_fee.required'    => 'Η χρέωση υπηρεσίας είναι υποχρεωτική.',
-                'percentage_cut.required' => 'Το ποσοστό είναι υποχρεωτικό.',
+                'percentage_cut.required' => 'Το ποσό που λαμβάνει ο επαγγελματίας είναι υποχρεωτικό.',
             ]
         );
 
@@ -72,15 +73,26 @@ class ProfessionalController extends Controller
 
     public function update(Request $request, Professional $professional)
     {
-        $data = $request->validate([
-            'first_name'      => 'required|string|max:100',
-            'last_name'       => 'required|string|max:100',
-            'phone'           => 'required|string|max:30',
-            'email'           => 'nullable|email|max:150',
-            'company_id'      => 'required|exists:companies,id',
-            'service_fee'     => 'required|numeric|min:0',
-            'percentage_cut'  => 'required|numeric|min:0|max:100',
-        ]);
+        $data = $request->validate(
+            [
+                'first_name'     => 'required|string|max:100',
+                'last_name'      => 'required|string|max:100',
+                'phone'          => 'required|string|max:30',
+                'email'          => 'nullable|email|max:150',
+                'company_id'     => 'required|exists:companies,id',
+                'service_fee'    => 'required|numeric|min:0',
+                // ΤΩΡΑ: ποσό, όχι ποσοστό
+                'percentage_cut' => 'required|numeric|min:0',
+            ],
+            [
+                'first_name.required'     => 'Το μικρό όνομα είναι υποχρεωτικό.',
+                'last_name.required'      => 'Το επίθετο είναι υποχρεωτικό.',
+                'phone.required'          => 'Το τηλέφωνο είναι υποχρεωτικό.',
+                'company_id.required'     => 'Η εταιρεία είναι υποχρεωτική.',
+                'service_fee.required'    => 'Η χρέωση υπηρεσίας είναι υποχρεωτική.',
+                'percentage_cut.required' => 'Το ποσό που λαμβάνει ο επαγγελματίας είναι υποχρεωτικό.',
+            ]
+        );
 
         $professional->update($data);
 
@@ -97,7 +109,7 @@ class ProfessionalController extends Controller
             ->route('professionals.index')
             ->with('success', 'Ο επαγγελματίας διαγράφηκε επιτυχώς.');
     }
-    
+
     public function show(Request $request, Professional $professional)
     {
         // Παίρνουμε τα φίλτρα από το request
@@ -113,7 +125,7 @@ class ProfessionalController extends Controller
             ->orderBy('start_time', 'desc')
             ->get();
 
-        // Εφαρμογή φίλτρων σε collection (αρκετό για κλασικό ιατρείο / γραφείο)
+        // Εφαρμογή φίλτρων σε collection
         if ($from) {
             $appointments = $appointments->filter(function ($a) use ($from) {
                 return $a->start_time && $a->start_time->toDateString() >= $from;
@@ -132,7 +144,7 @@ class ProfessionalController extends Controller
                 if (!$a->customer) {
                     return false;
                 }
-                $full = mb_strtolower($a->customer->first_name.' '.$a->customer->last_name);
+                $full    = mb_strtolower($a->customer->first_name.' '.$a->customer->last_name);
                 $fullRev = mb_strtolower($a->customer->last_name.' '.$a->customer->first_name);
                 return str_contains($full, $name) || str_contains($fullRev, $name);
             });
@@ -168,33 +180,47 @@ class ProfessionalController extends Controller
             });
         }
 
-        // Τώρα τα appointments είναι ήδη φιλτραρισμένα
+        // Μετά τα φίλτρα
         $appointmentsCount = $appointments->count();
 
-        // Συνολικά ποσά
+        // Συνολικό ποσό ραντεβών (τζίρος)
         $totalAmount = $appointments->sum(fn($a) => $a->total_price ?? 0);
 
-        $professionalTotalCut = $appointments->sum(fn($a) => $a->professional_amount ?? 0);
+        // ΠΟΣΟ ΠΟΥ ΔΙΚΑΙΟΥΤΑΙ Ο ΕΠΑΓΓΕΛΜΑΤΙΑΣ
+        // Αν το ραντεβού έχει professional_amount → το χρησιμοποιούμε (override)
+        // Αλλιώς → χρησιμοποιούμε το default ποσό ανά ραντεβού από το προφίλ του επαγγελματία
+        $professionalTotalCut = $appointments->sum(function ($a) use ($professional) {
+            if (!is_null($a->professional_amount)) {
+                return $a->professional_amount;
+            }
 
-        // Πόσα έχουν πληρωθεί από πελάτες
+            // fallback στο default ποσό ανά ραντεβού
+            return $professional->percentage_cut;
+        });
+
+        // Πόσα έχουν πληρωθεί από πελάτες (σύνολο εισπράξεων)
         $paidTotal = $appointments->sum(fn($a) => $a->payment->amount ?? 0);
 
-        // Πόσα ραντεβού παραμένουν απλήρωτα (ως ποσό)
+        // Ποσό τζίρου που παραμένει απλήρωτο από πελάτες
         $outstandingTotal = max($totalAmount - $paidTotal, 0);
 
-        // Πόσα έχει πληρωθεί ο επαγγελματίας (απλή υπόθεση: όταν το ραντεβού είναι πλήρως πληρωμένο)
+        // Πόσα (εκτιμώμενα) έχει ήδη λάβει ο επαγγελματίας
         $professionalPaid = $appointments->sum(function ($a) {
             if (!$a->payment) {
                 return 0;
             }
             $total = $a->total_price ?? 0;
             $paid  = $a->payment->amount ?? 0;
+
+            // Αν το ραντεβού είναι πλήρως πληρωμένο, θεωρούμε ότι ο επαγγελματίας
+            // δικαιούται ό,τι γράφει το professional_amount (ή 0)
             return ($total > 0 && $paid >= $total) ? ($a->professional_amount ?? 0) : 0;
         });
 
+        // Πόσα απομένουν να του δοθούν
         $professionalOutstanding = max($professionalTotalCut - $professionalPaid, 0);
 
-        // για να κρατάμε τις τιμές στα inputs
+
         $filters = [
             'from'           => $from,
             'to'             => $to,
@@ -216,5 +242,4 @@ class ProfessionalController extends Controller
             'filters'
         ));
     }
-
 }

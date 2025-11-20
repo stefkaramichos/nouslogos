@@ -24,9 +24,9 @@
                 {{ number_format($professional->service_fee, 2, ',', '.') }} €
             </p>
 
-            <p><strong>Ποσοστό Επαγγελματία:</strong>
-                {{ number_format($professional->percentage_cut, 2, ',', '.') }}%
-            </p>
+            <p><strong>Ποσό που λαμβάνει ο επαγγελματίας ανά ραντεβού:</strong>
+    {{ number_format($professional->percentage_cut, 2, ',', '.') }} €
+</p>
 
         </div>
     </div>

@@ -84,6 +84,17 @@
                 </div>
 
                 <div class="mb-3">
+                    <label class="form-label">Ποσό Επαγγελματία (€)</label>
+                    <input type="number" step="0.01" name="professional_amount"
+                        class="form-control"
+                        value="{{ old('professional_amount', $appointment->professional_amount ?? null) }}">
+                    <small class="text-muted">
+                        Αν μείνει κενό, θα χρησιμοποιηθεί το ποσό από το προφίλ του επαγγελματία.
+                    </small>
+                </div>
+
+
+                <div class="mb-3">
                     <label class="form-label">Σημειώσεις</label>
                     <textarea name="notes" class="form-control" rows="3">{{ old('notes') }}</textarea>
                 </div>

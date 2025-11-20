@@ -47,8 +47,8 @@
                         <th>Τηλέφωνο</th>
                         <th>Email</th>
                         <th>Εταιρεία</th>
-                        <th>Χρέωση Υπηρεσίας (€)</th>
-                        <th>% Ποσοστό</th>
+                        <th>Χρέωση (€)</th>
+                        <th>Ποσό Επαγγελματία</th>
                         <th>Ενέργειες</th>
                     </tr>
                     </thead>
@@ -66,7 +66,7 @@
                             <td>{{ $professional->email ?? '-' }}</td>
                             <td>{{ $professional->company->name ?? '-' }}</td>
                             <td>{{ number_format($professional->service_fee, 2, ',', '.') }}</td>
-                            <td>{{ number_format($professional->percentage_cut, 2, ',', '.') }}%</td>
+                            <td>{{ number_format($professional->percentage_cut, 2, ',', '.') }}</td>
                             <td>
                                 <a href="{{ route('professionals.edit', $professional) }}" class="btn btn-sm btn-secondary">
                                     Επεξεργασία
