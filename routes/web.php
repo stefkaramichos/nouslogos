@@ -43,5 +43,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/customers/{customer}/pay-all', [CustomerController::class, 'payAll'])
     ->name('customers.payAll');
 
+    Route::get('/api/customers/last-appointment', [AppointmentController::class, 'getLastForCustomer'])
+    ->name('customers.lastAppointment');
+
 });
 

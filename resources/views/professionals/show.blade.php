@@ -13,8 +13,8 @@
         <div class="card-header">
             Στοιχεία Επαγγελματία
         </div>
-        <div class="card-body">
-
+        <div class="card-body row">
+          <div class="col-md-6">
             <p><strong>Ονοματεπώνυμο:</strong> {{ $professional->last_name }} {{ $professional->first_name }}</p>
             <p><strong>Τηλέφωνο:</strong> {{ $professional->phone }}</p>
             <p><strong>Email:</strong> {{ $professional->email ?? '-' }}</p>
@@ -25,20 +25,11 @@
             </p>
 
             <p><strong>Ποσό που λαμβάνει ο επαγγελματίας ανά ραντεβού:</strong>
-    {{ number_format($professional->percentage_cut, 2, ',', '.') }} €
-</p>
-
-        </div>
-    </div>
-
-    {{-- Οικονομικά στοιχεία --}}
-    <div class="card mb-4">
-        <div class="card-header">
-            Οικονομική Εικόνα Επαγγελματία (με βάση τα φίλτρα)
-        </div>
-
-        <div class="card-body">
-            <p>
+                {{ number_format($professional->percentage_cut, 2, ',', '.') }} €
+            </p>
+          </div>
+          <div class="col-md-6">
+             <p>
                 <strong>Σύνολο Ραντεβού:</strong>
                 <span class="badge bg-primary fs-6">{{ $appointmentsCount }}</span>
             </p>
@@ -56,38 +47,13 @@
                     {{ number_format($professionalTotalCut, 2, ',', '.') }} €
                 </span>
             </p>
+          </div>
+            
 
-            {{-- <p>
-                <strong>Πόσα έχουν πληρωθεί από πελάτες:</strong><br>
-                <span class="badge bg-primary fs-6">
-                    {{ number_format($paidTotal, 2, ',', '.') }} €
-                </span>
-            </p>
-
-            <p>
-                <strong>Απλήρωτο ποσό ραντεβών (συνολικά):</strong><br>
-                <span class="badge {{ $outstandingTotal > 0 ? 'bg-danger' : 'bg-secondary' }} fs-6">
-                    {{ number_format($outstandingTotal, 2, ',', '.') }} €
-                </span>
-            </p>
-
-            <hr>
-
-            <p>
-                <strong>Πόσα (εκτιμώμενα) έχει λάβει ο επαγγελματίας:</strong><br>
-                <span class="badge bg-success fs-6">
-                    {{ number_format($professionalPaid, 2, ',', '.') }} €
-                </span>
-            </p>
-
-            <p>
-                <strong>Υπόλοιπο που (εκτιμώμενα) οφείλεται στον επαγγελματία:</strong><br>
-                <span class="badge {{ $professionalOutstanding > 0 ? 'bg-danger' : 'bg-secondary' }} fs-6">
-                    {{ number_format($professionalOutstanding, 2, ',', '.') }} €
-                </span>
-            </p> --}}
         </div>
     </div>
+
+   
 
 
     {{-- Αναλυτικός πίνακας ραντεβών --}}

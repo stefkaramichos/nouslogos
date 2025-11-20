@@ -53,14 +53,20 @@
 
     {{-- Ραντεβού Πελάτη --}}
     <div class="card">
-        <div class="card-header">
-            Ραντεβού Πελάτη
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Ραντεβού Πελάτη</span>
+
+            {{-- ΝΕΟ κουμπί: Προσθήκη ραντεβού για αυτόν τον πελάτη --}}
+            <a href="{{ route('appointments.create', ['customer_id' => $customer->id]) }}"
+               class="btn btn-primary btn-sm">
+                + Προσθήκη ραντεβού
+            </a>
         </div>
 
         <div class="card-body">
 
             {{-- Φίλτρα --}}
-            <form method="GET" action="{{ route('customers.show', $customer) }}" class="mb-3">
+            <form method="GET" action="{{ route('customers.show', $customer) }} " class="mb-3">
                 <div class="row g-2">
                     <div class="col-md-3">
                         <label class="form-label">Από Ημερομηνία</label>
@@ -73,19 +79,6 @@
                         <input type="date" name="to" class="form-control"
                                value="{{ $filters['to'] ?? '' }}">
                     </div>
-{{-- 
-                    <div class="col-md-3">
-                        <label class="form-label">Υπηρεσία Ραντεβού</label>
-                        @php $st = $filters['status'] ?? 'all'; @endphp
-                        <select name="status" class="form-select">
-                            <option value="all" @selected($st === 'all')>Όλα</option>
-                            <option value="logotherapia" @selected($st === 'logotherapia')>Λογοθεραπεία</option>
-                            <option value="psixotherapia" @selected($st === 'psixotherapia')>Ψυχοθεραπεία</option>
-                            <option value="ergotherapia" @selected($st === 'ergotherapia')>Εργοθεραπεία</option>
-                            <option value="omadiki" @selected($st === 'omadiki')>Ομαδική</option>
-                            <option value="eidikos" @selected($st === 'eidikos')>Ειδικός παιδαγωγός</option>
-                        </select>
-                    </div> --}}
 
                     <div class="col-md-3">
                         <label class="form-label">Κατάσταση Πληρωμής</label>
@@ -97,7 +90,8 @@
                             <option value="full" @selected($ps === 'full')>Πλήρως πληρωμένα</option>
                         </select>
                     </div>
-                     <div class="col-md-3 d-flex align-items-end justify-content-end">
+
+                    <div class="col-md-3 d-flex align-items-end justify-content-end">
                         <button class="btn btn-outline-primary me-2">
                             Εφαρμογή Φίλτρων
                         </button>
@@ -105,20 +99,6 @@
                             Καθαρισμός
                         </a>
                     </div>
-                </div>
-
-                <div class="row g-2 mt-2">
-                    {{-- <div class="col-md-3">
-                        <label class="form-label">Τρόπος Πληρωμής</label>
-                        @php $pm = $filters['payment_method'] ?? 'all'; @endphp
-                        <select name="payment_method" class="form-select">
-                            <option value="all" @selected($pm === 'all')>Όλοι</option>
-                            <option value="cash" @selected($pm === 'cash')>Μετρητά</option>
-                            <option value="card" @selected($pm === 'card')>Κάρτα</option>
-                        </select>
-                    </div> --}}
-
-                   
                 </div>
             </form>
 
@@ -189,7 +169,6 @@
                             <td>
                                 @if(!$payment || $paid <= 0)
                                     <span class="badge bg-danger">Απλήρωτο</span>
-
                                 @else
                                     @php
                                         $methodLabel = $payment->method === 'cash'
@@ -315,8 +294,6 @@
                     if (bulkTax) {
                         bulkTax.value = 'Y';
                     }
-                } else if (method === 'cash') {
-                    bulkTaxWrapper.classList.remove('d-none');
                 } else {
                     bulkTaxWrapper.classList.remove('d-none');
                 }
@@ -343,7 +320,6 @@
                 return false;
             }
 
-            // καθαρίζουμε παλιά hidden inputs
             container.innerHTML = '';
 
             checkboxes.forEach(cb => {
@@ -354,7 +330,7 @@
                 container.appendChild(hidden);
             });
 
-            return true; // προχωράει το submit
+            return true;
         }
     </script>
 @endsection

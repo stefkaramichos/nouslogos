@@ -113,6 +113,34 @@ class AppointmentController extends Controller
         ));
     }
 
+    public function getLastForCustomer(Request $request)
+    {
+        $customerId = $request->query('customer_id');
+
+        if (!$customerId) {
+            return response()->json(['found' => false]);
+        }
+
+        $appointment = Appointment::where('customer_id', $customerId)
+            ->with(['professional', 'company'])
+            ->orderByDesc('start_time')
+            ->first();
+
+        if (!$appointment) {
+            return response()->json(['found' => false]);
+        }
+
+        return response()->json([
+            'found'               => true,
+            'professional_id'     => $appointment->professional_id,
+            'company_id'          => $appointment->company_id,
+            'status'              => $appointment->status,
+            'total_price'         => $appointment->total_price,
+            'professional_amount' => $appointment->professional_amount,
+            'notes'               => $appointment->notes,
+        ]);
+    }
+
     public function create()
     {
         $customers     = Customer::orderBy('last_name')->get();
