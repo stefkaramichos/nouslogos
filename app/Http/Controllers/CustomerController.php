@@ -206,82 +206,60 @@ class CustomerController extends Controller
 
 
     public function payAll(Request $request, Customer $customer)
-    {
-        // Φιλτράρισμα όπως γίνεται στο show()
-        $customer->load([
-            'appointments.payment',
-            'appointments.company',
-            'appointments.professional'
-        ]);
+{
+    // IDs των επιλεγμένων ραντεβών
+    $appointmentIds = $request->input('appointments', []);
 
-        $appointments = $customer->appointments;
-
-        // Φίλτρα
-        if ($request->from) {
-            $appointments = $appointments->filter(fn($a) =>
-                $a->start_time && $a->start_time->toDateString() >= $request->from
-            );
-        }
-
-        if ($request->to) {
-            $appointments = $appointments->filter(fn($a) =>
-                $a->start_time && $a->start_time->toDateString() <= $request->to
-            );
-        }
-
-        if ($request->status && $request->status !== 'all') {
-            $appointments = $appointments->filter(fn($a) =>
-                $a->status === $request->status
-            );
-        }
-
-        if ($request->payment_status && $request->payment_status !== 'all') {
-            $appointments = $appointments->filter(function ($a) use ($request) {
-                $total = $a->total_price ?? 0;
-                $paid  = $a->payment->amount ?? 0;
-
-                if ($request->payment_status === 'unpaid') return $paid <= 0;
-                if ($request->payment_status === 'partial') return $paid > 0 && $paid < $total;
-                if ($request->payment_status === 'full') return $paid >= $total;
-
-                return true;
-            });
-        }
-
-        // Πληρωμή όλων
-        foreach ($appointments as $appointment) {
-
-            $total = $appointment->total_price ?? 0;
-
-            if ($total <= 0) {
-                continue;
-            }
-
-            if (!$appointment->payment) {
-                // create payment
-                Payment::create([
-                    'appointment_id' => $appointment->id,
-                    'customer_id'    => $customer->id,
-                    'amount'         => $total,
-                    'method'         => 'cash',
-                    'is_full'        => true,
-                    'paid_at'        => now(),
-                    'notes'          => 'Μαζική πληρωμή πελάτη.',
-                ]);
-            } else {
-                // update existing payment
-                $appointment->payment->update([
-                    'amount'  => $total,
-                    'is_full' => true,
-                    'method'  => 'cash',
-                    'paid_at' => now(),
-                    'notes'   => 'Μαζική πληρωμή πελάτη (ανανεώθηκε).',
-                ]);
-            }
-        }
-
-        return back()->with('success', 'Όλα τα ραντεβού της περιόδου πληρώθηκαν επιτυχώς.');
+    if (empty($appointmentIds)) {
+        return back()->with('error', 'Δεν επιλέχθηκαν ραντεβού για πληρωμή.');
     }
+
+    // Κοινός τρόπος πληρωμής για όλα
+    $method = $request->input('method');
+
+    if (!in_array($method, ['cash', 'card'], true)) {
+        return back()->with('error', 'Πρέπει να επιλέξετε τρόπο πληρωμής (μετρητά ή κάρτα).');
+    }
+
+    // TAX – κοινό για όλα
+    if ($method === 'card') {
+        // Κάρτα ⇒ πάντα με απόδειξη
+        $tax = 'Y';
+    } else {
+        // Μετρητά ⇒ επιλογή χρήστη
+        $tax = $request->input('tax') === 'Y' ? 'Y' : 'N';
+    }
+
+    // Φορτώνουμε ραντεβού του συγκεκριμένου πελάτη για ασφάλεια
+    $customer->load(['appointments.payment']);
+
+    foreach ($customer->appointments as $appointment) {
+        if (!in_array($appointment->id, $appointmentIds)) {
+            continue;
+        }
+
+        $total = $appointment->total_price ?? 0;
+        if ($total <= 0) {
+            continue;
+        }
+
+        Payment::updateOrCreate(
+            ['appointment_id' => $appointment->id],
+            [
+                'customer_id' => $customer->id,
+                'amount'      => $total,
+                'is_full'     => true,
+                'paid_at'     => now(),
+                'method'      => $method,
+                'tax'         => $tax,
+                'notes'       => 'Μαζική πληρωμή επιλεγμένων ραντεβού.',
+            ]
+        );
+    }
+
+    return back()->with('success', 'Οι πληρωμές για τα επιλεγμένα ραντεβού ενημερώθηκαν επιτυχώς.');
+}
+
 
 
 

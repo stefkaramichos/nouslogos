@@ -117,7 +117,7 @@
                                placeholder="Όνομα ή επώνυμο..."
                                value="{{ $filters['customer'] ?? '' }}">
                     </div>
-                    <div class="col-md-3">
+                    {{-- <div class="col-md-3">
                         <label class="form-label">Κατάσταση Πληρωμής</label>
                         <select name="payment_status" class="form-select">
                             @php $st = $filters['payment_status'] ?? 'all'; @endphp
@@ -126,20 +126,8 @@
                             <option value="partial" @selected($st === 'partial')>Μερικώς πληρωμένα</option>
                             <option value="full" @selected($st === 'full')>Πλήρως πληρωμένα</option>
                         </select>
-                    </div>
-                </div>
-
-                <div class="row g-2 mt-2">
-                    <div class="col-md-3">
-                        <label class="form-label">Τρόπος Πληρωμής</label>
-                        <select name="payment_method" class="form-select">
-                            @php $pm = $filters['payment_method'] ?? 'all'; @endphp
-                            <option value="all" @selected($pm === 'all')>Όλοι</option>
-                            <option value="cash" @selected($pm === 'cash')>Μετρητά</option>
-                            <option value="card" @selected($pm === 'card')>Κάρτα</option>
-                        </select>
-                    </div>
-                    <div class="col-md-9 d-flex align-items-end justify-content-end">
+                    </div> --}}
+                     <div class="col-md-3 d-flex align-items-end justify-content-end">
                         <button class="btn btn-outline-primary me-2">
                             Εφαρμογή Φίλτρων
                         </button>
@@ -147,6 +135,19 @@
                             Καθαρισμός
                         </a>
                     </div>
+                </div>
+
+                <div class="row g-2 mt-2">
+                    {{-- <div class="col-md-3">
+                        <label class="form-label">Τρόπος Πληρωμής</label>
+                        <select name="payment_method" class="form-select">
+                            @php $pm = $filters['payment_method'] ?? 'all'; @endphp
+                            <option value="all" @selected($pm === 'all')>Όλοι</option>
+                            <option value="cash" @selected($pm === 'cash')>Μετρητά</option>
+                            <option value="card" @selected($pm === 'card')>Κάρτα</option>
+                        </select>
+                    </div> --}}
+                   
                 </div>
             </form>
 

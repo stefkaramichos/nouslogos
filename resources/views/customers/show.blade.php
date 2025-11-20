@@ -49,23 +49,6 @@
                 </div>
             </div>
         </div>
-        {{-- <form method="POST" action="{{ route('customers.payAll', $customer) }}"
-            onsubmit="return confirm('Να πληρωθούν όλα τα φιλτραρισμένα ραντεβού;');">
-
-            @csrf
-
-             Στέλνουμε τα ίδια φίλτρα 
-            <input type="hidden" name="from" value="{{ $filters['from'] ?? '' }}">
-            <input type="hidden" name="to" value="{{ $filters['to'] ?? '' }}">
-            <input type="hidden" name="status" value="{{ $filters['status'] ?? 'all' }}">
-            <input type="hidden" name="payment_status" value="{{ $filters['payment_status'] ?? 'all' }}">
-            <input type="hidden" name="payment_method" value="{{ $filters['payment_method'] ?? 'all' }}">
-
-            <button class="btn btn-success mt-3">
-                💶 Πληρωμή Όλων (Φιλτραρισμένων)
-            </button>
-        </form> --}}
-
     </div>
 
     {{-- Ραντεβού Πελάτη --}}
@@ -90,7 +73,7 @@
                         <input type="date" name="to" class="form-control"
                                value="{{ $filters['to'] ?? '' }}">
                     </div>
-
+{{-- 
                     <div class="col-md-3">
                         <label class="form-label">Υπηρεσία Ραντεβού</label>
                         @php $st = $filters['status'] ?? 'all'; @endphp
@@ -102,7 +85,7 @@
                             <option value="omadiki" @selected($st === 'omadiki')>Ομαδική</option>
                             <option value="eidikos" @selected($st === 'eidikos')>Ειδικός παιδαγωγός</option>
                         </select>
-                    </div>
+                    </div> --}}
 
                     <div class="col-md-3">
                         <label class="form-label">Κατάσταση Πληρωμής</label>
@@ -114,20 +97,7 @@
                             <option value="full" @selected($ps === 'full')>Πλήρως πληρωμένα</option>
                         </select>
                     </div>
-                </div>
-
-                <div class="row g-2 mt-2">
-                    <div class="col-md-3">
-                        <label class="form-label">Τρόπος Πληρωμής</label>
-                        @php $pm = $filters['payment_method'] ?? 'all'; @endphp
-                        <select name="payment_method" class="form-select">
-                            <option value="all" @selected($pm === 'all')>Όλοι</option>
-                            <option value="cash" @selected($pm === 'cash')>Μετρητά</option>
-                            <option value="card" @selected($pm === 'card')>Κάρτα</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-9 d-flex align-items-end justify-content-end">
+                     <div class="col-md-3 d-flex align-items-end justify-content-end">
                         <button class="btn btn-outline-primary me-2">
                             Εφαρμογή Φίλτρων
                         </button>
@@ -136,17 +106,35 @@
                         </a>
                     </div>
                 </div>
+
+                <div class="row g-2 mt-2">
+                    {{-- <div class="col-md-3">
+                        <label class="form-label">Τρόπος Πληρωμής</label>
+                        @php $pm = $filters['payment_method'] ?? 'all'; @endphp
+                        <select name="payment_method" class="form-select">
+                            <option value="all" @selected($pm === 'all')>Όλοι</option>
+                            <option value="cash" @selected($pm === 'cash')>Μετρητά</option>
+                            <option value="card" @selected($pm === 'card')>Κάρτα</option>
+                        </select>
+                    </div> --}}
+
+                   
+                </div>
             </form>
 
-            <div class="table-responsive">
+            {{-- Πίνακας ραντεβών --}}
+            <div class="table-responsive mb-3">
                 <table class="table table-striped mb-0 align-middle">
                     <thead>
                     <tr>
+                        <th class="text-center">
+                            <input type="checkbox" id="select_all">
+                        </th>
                         <th>#</th>
                         <th>Ημ/νία & Ώρα</th>
                         <th>Επαγγελματίας</th>
                         <th>Εταιρεία</th>
-                        <th>Υπηρεσία </th>
+                        <th>Υπηρεσία</th>
                         <th>Σύνολο (€)</th>
                         <th>Πληρωμή</th>
                         <th>Ενέργειες</th>
@@ -160,6 +148,17 @@
                             $paid    = $payment->amount ?? 0;
                         @endphp
                         <tr>
+                            {{-- Επιλογή για μαζική πληρωμή --}}
+                            <td class="text-center">
+                                @if($total > 0)
+                                    <input type="checkbox"
+                                           class="appointment-checkbox"
+                                           value="{{ $appointment->id }}">
+                                @else
+                                    <small class="text-muted">-</small>
+                                @endif
+                            </td>
+
                             <td>{{ $appointment->id }}</td>
                             <td>{{ $appointment->start_time?->format('d/m/Y H:i') }}</td>
 
@@ -186,7 +185,7 @@
 
                             <td>{{ number_format($total, 2, ',', '.') }}</td>
 
-                           {{-- Πληρωμή --}}
+                            {{-- Πληρωμή --}}
                             <td>
                                 @if(!$payment || $paid <= 0)
                                     <span class="badge bg-danger">Απλήρωτο</span>
@@ -218,28 +217,27 @@
                                 @endif
                             </td>
 
-
                             {{-- Ενέργειες --}}
                             <td>
                                 {{-- Επεξεργασία Ραντεβού --}}
                                 <a href="{{ route('appointments.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
-                                class="btn btn-sm btn-secondary mb-1"
-                                title="Επεξεργασία ραντεβού">
+                                   class="btn btn-sm btn-secondary mb-1"
+                                   title="Επεξεργασία ραντεβού">
                                     <i class="bi bi-pencil-square"></i>
                                 </a>
 
                                 {{-- Επεξεργασία Πληρωμής --}}
                                 <a href="{{ route('appointments.payment.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
-                                class="btn btn-sm btn-outline-primary mb-1"
-                                title="Επεξεργασία πληρωμής">
+                                   class="btn btn-sm btn-outline-primary mb-1"
+                                   title="Επεξεργασία πληρωμής">
                                     <i class="bi bi-credit-card"></i>
                                 </a>
 
                                 {{-- Διαγραφή Ραντεβού --}}
                                 <form action="{{ route('appointments.destroy', $appointment) }}"
-                                    method="POST"
-                                    class="d-inline"
-                                    onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτό το ραντεβού;');">
+                                      method="POST"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτό το ραντεβού;');">
                                     @csrf
                                     @method('DELETE')
                                     <input type="hidden" name="redirect_to" value="{{ request()->fullUrl() }}">
@@ -249,12 +247,10 @@
                                     </button>
                                 </form>
                             </td>
-
-
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-muted py-4">
+                            <td colspan="9" class="text-center text-muted py-4">
                                 Δεν υπάρχουν ραντεβού για αυτόν τον πελάτη.
                             </td>
                         </tr>
@@ -263,6 +259,102 @@
                 </table>
             </div>
 
+            {{-- Φόρμα για μαζική πληρωμή επιλεγμένων ραντεβών --}}
+            <form id="payAllForm"
+                  method="POST"
+                  action="{{ route('customers.payAll', $customer) }}"
+                  onsubmit="return preparePayAllForm();">
+                @csrf
+
+                {{-- εδώ θα μπουν δυναμικά τα hidden appointments[] --}}
+                <div id="appointmentsHiddenContainer"></div>
+
+                <div class="row g-2 mt-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label">Τρόπος πληρωμής (για όλα τα επιλεγμένα)</label>
+                        <select name="method" id="bulk_method" class="form-select" required>
+                            <option value="">-- Επιλέξτε --</option>
+                            <option value="cash">Μετρητά</option>
+                            <option value="card">Κάρτα</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3" id="bulk_tax_wrapper">
+                        <label class="form-label">ΦΠΑ (για όλα τα επιλεγμένα)</label>
+                        <select name="tax" id="bulk_tax" class="form-select">
+                            <option value="Y">Με απόδειξη</option>
+                            <option value="N" selected>Χωρίς απόδειξη</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6 text-end">
+                        <button type="submit" class="btn btn-success">
+                            💶 Πληρωμή επιλεγμένων ραντεβού (πλήρης εξόφληση)
+                        </button>
+                    </div>
+                </div>
+            </form>
+
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const bulkMethod      = document.getElementById('bulk_method');
+            const bulkTaxWrapper  = document.getElementById('bulk_tax_wrapper');
+            const bulkTax         = document.getElementById('bulk_tax');
+            const selectAll       = document.getElementById('select_all');
+            const checkboxes      = document.querySelectorAll('.appointment-checkbox');
+
+            function updateTaxVisibility() {
+                const method = bulkMethod.value;
+
+                if (method === 'card') {
+                    // Κάρτα => πάντα με απόδειξη
+                    bulkTaxWrapper.classList.add('d-none');
+                    if (bulkTax) {
+                        bulkTax.value = 'Y';
+                    }
+                } else if (method === 'cash') {
+                    bulkTaxWrapper.classList.remove('d-none');
+                } else {
+                    bulkTaxWrapper.classList.remove('d-none');
+                }
+            }
+
+            if (bulkMethod) {
+                bulkMethod.addEventListener('change', updateTaxVisibility);
+                updateTaxVisibility();
+            }
+
+            if (selectAll) {
+                selectAll.addEventListener('change', function () {
+                    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+                });
+            }
+        });
+
+        function preparePayAllForm() {
+            const container = document.getElementById('appointmentsHiddenContainer');
+            const checkboxes = document.querySelectorAll('.appointment-checkbox:checked');
+
+            if (!checkboxes.length) {
+                alert('Παρακαλώ επιλέξτε τουλάχιστον ένα ραντεβού.');
+                return false;
+            }
+
+            // καθαρίζουμε παλιά hidden inputs
+            container.innerHTML = '';
+
+            checkboxes.forEach(cb => {
+                const hidden = document.createElement('input');
+                hidden.type  = 'hidden';
+                hidden.name  = 'appointments[]';
+                hidden.value = cb.value;
+                container.appendChild(hidden);
+            });
+
+            return true; // προχωράει το submit
+        }
+    </script>
 @endsection
