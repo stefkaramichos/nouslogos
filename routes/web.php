@@ -6,6 +6,7 @@ use App\Http\Controllers\ProfessionalController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\SettlementController;
 
 // 🔹 Login routes (χωρίς auth)
 Route::get('/login', [AuthController::class, 'showLoginForm'])
@@ -50,7 +51,8 @@ Route::middleware('auth')->group(function () {
     ->name('customers.lastAppointment');
 
  
-
+    Route::get('/settlements', [SettlementController::class, 'index'])
+            ->name('settlements.index');
 
 });
 

@@ -35,3 +35,8 @@ main {
 label {
     font-weight: 600;
 }
+
+  table.table tbody tr:hover {
+        background-color: #21527e  !important; /* ανοιχτό μπλε */
+        cursor: pointer;
+    }
