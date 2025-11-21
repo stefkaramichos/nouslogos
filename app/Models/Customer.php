@@ -15,6 +15,8 @@ class Customer extends Model
         'phone',
         'email',
         'company_id',
+        'tax_office', 
+        'vat_number', 
     ];
 
     public function company()

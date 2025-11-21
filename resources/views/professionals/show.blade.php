@@ -149,8 +149,10 @@
 
                             <td>
                                 @if($appointment->customer)
-                                    {{ $appointment->customer->last_name }}
-                                    {{ $appointment->customer->first_name }}
+                                    <a href="{{ route('customers.show', $appointment->customer) }}">
+                                        {{ $appointment->customer->last_name }}
+                                        {{ $appointment->customer->first_name }}
+                                    </a>
                                 @else
                                     <span class="text-muted">-</span>
                                 @endif

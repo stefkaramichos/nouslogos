@@ -46,6 +46,8 @@
                         <th>Ονοματεπώνυμο</th>
                         <th>Τηλέφωνο</th>
                         <th>Email</th>
+                        <th>ΑΦΜ</th>
+                        <th>ΔΟΥ</th>
                         <th>Εταιρεία</th>
                         <th>Ενέργειες</th>
                     </tr>
@@ -66,28 +68,32 @@
 
                             <td>{{ $customer->email ?? '-' }}</td>
 
+                            <td>{{ $customer->vat_number ?? '-' }}</td>
+
+                            <td>{{ $customer->tax_office ?? '-' }}</td>
+
                             <td>{{ $customer->company->name ?? '-' }}</td>
 
                             <td>
-                                <!-- View -->
+                                {{-- View --}}
                                 <a href="{{ route('customers.show', $customer) }}"
-                                class="btn btn-sm btn-info"
-                                title="Προβολή πελάτη">
+                                   class="btn btn-sm btn-info"
+                                   title="Προβολή πελάτη">
                                     <i class="bi bi-eye"></i>
                                 </a>
 
-                                <!-- Edit -->
+                                {{-- Edit --}}
                                 <a href="{{ route('customers.edit', $customer) }}"
-                                class="btn btn-sm btn-secondary"
-                                title="Επεξεργασία πελάτη">
+                                   class="btn btn-sm btn-secondary"
+                                   title="Επεξεργασία πελάτη">
                                     <i class="bi bi-pencil-square"></i>
                                 </a>
 
-                                <!-- Delete -->
+                                {{-- Delete --}}
                                 <form action="{{ route('customers.destroy', $customer) }}"
-                                    method="POST"
-                                    class="d-inline"
-                                    onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτόν τον πελάτη;');">
+                                      method="POST"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτόν τον πελάτη;');">
                                     @csrf
                                     @method('DELETE')
                                     <button class="btn btn-sm btn-danger"
@@ -100,7 +106,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-4">
+                            <td colspan="8" class="text-center text-muted py-4">
                                 Δεν υπάρχουν πελάτες για εμφάνιση.
                             </td>
                         </tr>

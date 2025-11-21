@@ -44,8 +44,12 @@ class CustomerController extends Controller
                 'first_name' => 'required|string|max:100',
                 'last_name'  => 'required|string|max:100',
                 'phone'      => 'required|string|max:30',
-                'email'      => 'nullable|email|max:150',
+                'email'      => 'required|email|max:150',
                 'company_id' => 'required|exists:companies,id',
+
+                // ΝΕΑ ΠΕΔΙΑ
+                'tax_office' => 'required|string|max:100', // ΔΟΥ
+                'vat_number' => 'required|string|max:20',  // ΑΦΜ
             ],
             [
                 'first_name.required' => 'Το μικρό όνομα είναι υποχρεωτικό.',
@@ -61,6 +65,7 @@ class CustomerController extends Controller
             ->route('customers.index')
             ->with('success', 'Ο πελάτης δημιουργήθηκε επιτυχώς.');
     }
+
 
     public function edit(Customer $customer)
     {

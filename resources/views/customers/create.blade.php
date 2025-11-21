@@ -13,22 +13,40 @@
 
                 <div class="mb-3">
                     <label class="form-label">Όνομα</label>
-                    <input type="text" name="first_name" class="form-control" value="{{ old('first_name') }}" required>
+                    <input type="text" name="first_name" class="form-control"
+                           value="{{ old('first_name') }}" required>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label">Επίθετο</label>
-                    <input type="text" name="last_name" class="form-control" value="{{ old('last_name') }}" required>
+                    <input type="text" name="last_name" class="form-control"
+                           value="{{ old('last_name') }}" required>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label">Τηλέφωνο</label>
-                    <input type="text" name="phone" class="form-control" value="{{ old('phone') }}" required>
+                    <input type="text" name="phone" class="form-control"
+                           value="{{ old('phone') }}" required>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label">Email (προαιρετικό)</label>
-                    <input type="email" name="email" class="form-control" value="{{ old('email') }}">
+                    <input type="email" name="email" class="form-control"
+                           value="{{ old('email') }}">
+                </div>
+
+                {{-- ΔΟΥ --}}
+                <div class="mb-3">
+                    <label class="form-label">ΔΟΥ</label>
+                    <input type="text" name="tax_office" class="form-control"
+                           value="{{ old('tax_office') }}">
+                </div>
+
+                {{-- ΑΦΜ --}}
+                <div class="mb-3">
+                    <label class="form-label">ΑΦΜ</label>
+                    <input type="text" name="vat_number" class="form-control"
+                           value="{{ old('vat_number') }}">
                 </div>
 
                 <div class="mb-3">
