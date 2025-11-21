@@ -46,17 +46,17 @@ class ProfessionalController extends Controller
                 'company_id'     => 'required|exists:companies,id',
                 'service_fee'    => 'numeric|min:0',
                 // ΤΩΡΑ: percentage_cut = ποσό επαγγελματία σε €
-                'percentage_cut' => 'required|numeric|min:0',
+                'percentage_cut' => 'numeric|min:0',
             ],
             [
                 'first_name.required'     => 'Το μικρό όνομα είναι υποχρεωτικό.',
                 'last_name.required'      => 'Το επίθετο είναι υποχρεωτικό.',
                 'phone.required'          => 'Το τηλέφωνο είναι υποχρεωτικό.',
                 'company_id.required'     => 'Η εταιρεία είναι υποχρεωτική.',
-                'percentage_cut.required' => 'Το ποσό που λαμβάνει ο επαγγελματίας είναι υποχρεωτικό.',
+                //'percentage_cut.required' => 'Το ποσό που λαμβάνει ο επαγγελματίας είναι υποχρεωτικό.',
             ]
         );
- 
+
         Professional::create($data);
 
         return redirect()
@@ -70,6 +70,20 @@ class ProfessionalController extends Controller
         return view('professionals.edit', compact('professional', 'companies'));
     }
 
+    public function getCompany(Request $request)
+    {
+        $professional = \App\Models\Professional::find($request->professional_id);
+
+        if (!$professional) {
+            return response()->json(['found' => false]);
+        }
+
+        return response()->json([
+            'found' => true,
+            'company_id' => $professional->company_id,
+        ]);
+    }
+
     public function update(Request $request, Professional $professional)
     {
         $data = $request->validate(
@@ -81,14 +95,14 @@ class ProfessionalController extends Controller
                 'company_id'     => 'required|exists:companies,id',
                 'service_fee'    => 'numeric|min:0',
                 // ΤΩΡΑ: ποσό, όχι ποσοστό
-                'percentage_cut' => 'required|numeric|min:0',
+                //'percentage_cut' => 'required|numeric|min:0',
             ],
             [
                 'first_name.required'     => 'Το μικρό όνομα είναι υποχρεωτικό.',
                 'last_name.required'      => 'Το επίθετο είναι υποχρεωτικό.',
                 'phone.required'          => 'Το τηλέφωνο είναι υποχρεωτικό.',
                 'company_id.required'     => 'Η εταιρεία είναι υποχρεωτική.',
-                'percentage_cut.required' => 'Το ποσό που λαμβάνει ο επαγγελματίας είναι υποχρεωτικό.',
+                //'percentage_cut.required' => 'Το ποσό που λαμβάνει ο επαγγελματίας είναι υποχρεωτικό.',
             ]
         );
 

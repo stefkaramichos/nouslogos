@@ -82,7 +82,7 @@
                     >
                 </div> --}}
 
-                <div class="mb-3">
+                {{-- <div class="mb-3">
                     <label class="form-label">Ποσό που παίρνει ο επαγγελματίας</label>
                     <input
                         type="number"
@@ -92,7 +92,7 @@
                         value="{{ old('percentage_cut', $professional->percentage_cut) }}"
                         required
                     >
-                </div>
+                </div> --}}
 
                 <button class="btn btn-primary">Αποθήκευση Αλλαγών</button>
                 <a href="{{ route('professionals.index') }}" class="btn btn-secondary">Ακύρωση</a>

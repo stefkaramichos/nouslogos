@@ -20,13 +20,13 @@
             <p><strong>Email:</strong> {{ $professional->email ?? '-' }}</p>
             <p><strong>Εταιρεία:</strong> {{ $professional->company->name ?? '-' }}</p>
 
-            <p><strong>Χρέωση Υπηρεσίας:</strong>
+            {{-- <p><strong>Χρέωση Υπηρεσίας:</strong>
                 {{ number_format($professional->service_fee, 2, ',', '.') }} €
             </p>
 
             <p><strong>Ποσό που λαμβάνει ο επαγγελματίας ανά ραντεβού:</strong>
                 {{ number_format($professional->percentage_cut, 2, ',', '.') }} €
-            </p>
+            </p> --}}
           </div>
           <div class="col-md-6">
              <p>

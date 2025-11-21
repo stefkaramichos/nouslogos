@@ -96,7 +96,7 @@
                         value="{{ old('professional_amount') }}"
                     >
                     <small class="text-muted">
-                        Αν μείνει κενό, θα χρησιμοποιηθεί το ποσό από το προφίλ του επαγγελματία (ή ο αυτόματος υπολογισμός).
+                        {{-- Αν μείνει κενό, θα χρησιμοποιηθεί το ποσό από το προφίλ του επαγγελματία (ή ο αυτόματος υπολογισμός). --}}
                     </small>
                 </div>
 
@@ -135,6 +135,29 @@
 
         const lastAppointmentUrl = "{{ route('customers.lastAppointment') }}";
 
+        const professionalCompanyUrl = "{{ route('professionals.getCompany') }}";
+
+        if (professionalSelect) {
+            professionalSelect.addEventListener('change', function () {
+                const profId = this.value;
+
+                if (!profId) {
+                    companySelect.value = "";
+                    return;
+                }
+
+                fetch(professionalCompanyUrl + "?professional_id=" + profId)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.found) {
+                            companySelect.value = data.company_id;
+                        }
+                    })
+                    .catch(err => console.error("Σφάλμα στο fetch εταιρείας επαγγελματία:", err));
+            });
+        }
+
+
         if (customerSelect) {
             customerSelect.addEventListener('change', function () {
                 const customerId = this.value;
@@ -157,9 +180,12 @@
                             professionalSelect.value = data.professional_id;
                         }
 
-                        // Εταιρεία
-                        if (data.company_id && companySelect) {
-                            companySelect.value = data.company_id;
+                        if (data.professional_id && professionalSelect) {
+                            professionalSelect.value = data.professional_id;
+
+                            // μόλις βάλουμε επαγγελματία, 
+                            // αφήνουμε το event change να φέρει την εταιρεία του
+                            professionalSelect.dispatchEvent(new Event('change'));
                         }
 
                         // Υπηρεσία (status)
@@ -203,6 +229,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (customerSelect && customerSelect.value) {
         customerSelect.dispatchEvent(new Event('change'));
     }
+    
 
 });
 </script>

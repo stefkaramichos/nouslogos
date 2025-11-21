@@ -32,3 +32,6 @@ main {
     overflow-y: auto;
     position: relative;
 } 
+label {
+    font-weight: 600;
+}

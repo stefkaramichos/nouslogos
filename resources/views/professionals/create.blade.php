@@ -27,8 +27,8 @@
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">Email (προαιρετικό)</label>
-                    <input type="email" name="email" class="form-control" value="{{ old('email') }}">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-control" value="{{ old('email') }}" required>
                 </div>
 
                 <div class="mb-3">
@@ -49,11 +49,11 @@
                            value="{{ old('service_fee') }}" required>
                 </div> --}}
 
-                <div class="mb-3">
+                {{-- <div class="mb-3">
                     <label class="form-label">Ποσό που παίρνει ο επαγγελματίας</label>
                     <input type="number" step="0.01" name="percentage_cut" class="form-control"
-                           value="{{ old('percentage_cut') }}" required>
-                </div>
+                           value="{{ old('percentage_cut') }}" >
+                </div> --}}
 
                 <button class="btn btn-primary">Αποθήκευση</button>
                 <a href="{{ route('professionals.index') }}" class="btn btn-secondary">Ακύρωση</a>

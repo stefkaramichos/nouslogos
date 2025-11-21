@@ -28,6 +28,9 @@ Route::middleware('auth')->group(function () {
         return redirect()->route('appointments.index');
     })->name('dashboard');
 
+    Route::get('/professionals/company', [\App\Http\Controllers\ProfessionalController::class, 'getCompany'])
+    ->name('professionals.getCompany');
+
     // Πελάτες / Επαγγελματίες / Ραντεβού
     Route::resource('customers', CustomerController::class);
     Route::resource('professionals', ProfessionalController::class);
@@ -45,6 +48,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/api/customers/last-appointment', [AppointmentController::class, 'getLastForCustomer'])
     ->name('customers.lastAppointment');
+
+ 
+
 
 });
 
