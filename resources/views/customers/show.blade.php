@@ -57,10 +57,11 @@
             <span>Ραντεβού Πελάτη</span>
 
             {{-- ΝΕΟ κουμπί: Προσθήκη ραντεβού για αυτόν τον πελάτη --}}
-            <a href="{{ route('appointments.create', ['customer_id' => $customer->id]) }}"
-               class="btn btn-primary btn-sm">
-                + Προσθήκη ραντεβού
+            <a href="{{ route('appointments.create', ['customer_id' => $customer->id, 'redirect' => request()->fullUrl()]) }}"
+            class="btn btn-primary mb-3">
+                + Προσθήκη Ραντεβού
             </a>
+
         </div>
 
         <div class="card-body">

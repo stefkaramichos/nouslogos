@@ -222,9 +222,14 @@ class AppointmentController extends Controller
             }
         }
 
-        return redirect()
-            ->route('appointments.index')
-            ->with('success', 'Το ραντεβού δημιουργήθηκε επιτυχώς.');
+          // ---- Χειρισμός redirect ----
+        if ($request->filled('redirect_to')) {
+            return redirect($request->input('redirect_to'))
+                ->with('success', 'Το ραντεβού δημιουργήθηκε επιτυχώς!');
+        }
+
+        return redirect()->route('appointments.index')
+            ->with('success', 'Το ραντεβού δημιουργήθηκε επιτυχώς!');
     }
 
     public function show(Appointment $appointment)

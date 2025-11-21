@@ -57,7 +57,7 @@
                     <input id="start_time" type="text" name="start_time" class="form-control"
                            value="{{ old('start_time') }}" required>
                 </div>
-
+                <input type="hidden" name="redirect_to" value="{{ request('redirect') }}">
                 {{-- ΥΠΗΡΕΣΙΑ (status) --}}
                 <div class="mb-3">
                     <label class="form-label">Υπηρεσία</label>
