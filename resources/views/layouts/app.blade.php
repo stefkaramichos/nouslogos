@@ -41,15 +41,15 @@
 
                 <ul class="nav flex-column px-2">
                     <li class="nav-item mb-1">
-                        <a class="nav-link @if(request()->routeIs('appointments.*')) active @endif"
-                           href="{{ route('appointments.index') }}">
-                            📅 Ραντεβού
+                        <a class="nav-link @if(request()->routeIs('customers.*')) active @endif"
+                            href="{{ route('customers.index') }}">
+                            👤 Πελάτες
                         </a>
                     </li>
                     <li class="nav-item mb-1">
-                        <a class="nav-link @if(request()->routeIs('customers.*')) active @endif"
-                           href="{{ route('customers.index') }}">
-                            👤 Πελάτες
+                        <a class="nav-link @if(request()->routeIs('appointments.*')) active @endif"
+                           href="{{ route('appointments.index') }}">
+                            📅 Ραντεβού
                         </a>
                     </li>
                     <li class="nav-item mb-1">
@@ -58,7 +58,23 @@
                             💼 Επαγγελματίες
                         </a>
                     </li>
+                    <li class="nav-item mb-1">
+                        @if(Auth::check() && Auth::user()->role === 'owner')
+                            <a class="nav-link @if(request()->routeIs('settlements.*')) active @endif"
+                            href="{{ route('settlements.index') }}">
+                                📑 Εκκαθάριση
+                            </a>
+                        @endif
+                    </li>
                 </ul>
+            </div>
+            <div class="nav-item mt-3 logout-button">
+                <form action="{{ route('logout') }}" method="POST" class="d-flex align-items-center">
+                    @csrf
+                    <button class="btn w-100 d-flex align-items-center justify-content-center">
+                        <i class="bi bi-box-arrow-right me-2"></i> Αποσύνδεση
+                    </button>
+                </form>
             </div>
         </nav>
 

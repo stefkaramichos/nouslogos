@@ -36,7 +36,17 @@ label {
     font-weight: 600;
 }
 
-  table.table tbody tr:hover {
-        background-color: #21527e  !important; /* ανοιχτό μπλε */
-        cursor: pointer;
-    }
+.nav-link:hover {
+    background-color: #0d6efd !important; /* σκούρο πράσινο */
+    color: #ffffff !important; /* λευκό κείμενο */
+}
+
+.nav-link.active {
+    background: #0d6efd;
+    color: #fff !important;
+}
+
+.logout-button{
+    position: absolute;
+    bottom: 20px;
+}

@@ -3,13 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Models\Payment;
+use Illuminate\Support\Facades\Auth; 
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
 class SettlementController extends Controller
 {
+
+    
     public function index(Request $request)
     {
+
+        $user = Auth::user();
+
+        // Αν δεν είναι συνδεδεμένος ή δεν είναι owner → 403
+        if (!$user || $user->role !== 'owner') {
+            abort(403, 'Δεν έχετε πρόσβαση σε αυτή τη σελίδα.');
+        }
+
         // mapping professionals -> συνεταίροι
         $partnerProfessionals = [
             'partner1' => 1,   // Γιάννης

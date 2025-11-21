@@ -26,7 +26,7 @@ Route::middleware('auth')->group(function () {
 
     // Αρχική -> ραντεβού
     Route::get('/', function () {
-        return redirect()->route('appointments.index');
+        return redirect()->route('customers.index');
     })->name('dashboard');
 
     Route::get('/professionals/company', [\App\Http\Controllers\ProfessionalController::class, 'getCompany'])

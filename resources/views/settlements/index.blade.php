@@ -43,8 +43,8 @@
                     <div class="border rounded p-3 h-100">
                         <h6 class="text-muted mb-1">Ποσό επιχείρησης στην Τράπεζα</h6>
                         <strong>{{ number_format($companyBankTotal, 2, ',', '.') }} €</strong><br>
-                        <small class="text-muted">
-                            Μετρητά προς κατάθεση: {{ number_format($cashToBank, 2, ',', '.') }} €<br>
+                        <small class="text-muted ">
+                            Μετρητά προς κατάθεση: <span class="badge bg-success fs-6 ">{{ number_format($cashToBank, 2, ',', '.') }} € </span><br>
                             Πληρωμές με κάρτα (ήδη στην τράπεζα): {{ number_format($cardTotal, 2, ',', '.') }} €<br>
                             {{-- Καθαρό από κάρτα για επιχείρηση: {{ number_format($bankFromCard, 2, ',', '.') }} € --}}
                         </small>
@@ -64,9 +64,9 @@
                 <div class="col-md-3">
                     <div class="border rounded p-3 h-100">
                         <h6 class="text-muted mb-1">Ποσά επαγγελματία (προσωπικά)</h6>
-                        <small class="text-muted d-block">Συνεταίρος 1 (prof #1):</small>
+                        <small class="text-muted d-block">Γιάννης #1:</small>
                         <strong>{{ number_format($partner1Personal, 2, ',', '.') }} €</strong><br>
-                        <small class="text-muted d-block mt-2">Συνεταίρος 2 (prof #2):</small>
+                        <small class="text-muted d-block mt-2">Ελένη #2:</small>
                         <strong>{{ number_format($partner2Personal, 2, ',', '.') }} €</strong>
                     </div>
                 </div>
@@ -78,7 +78,7 @@
             <div class="row g-3 mb-4">
                 <div class="col-md-6">
                     <div class="border rounded p-3 h-100">
-                        <h5>Συνεταίρος 1 (prof #1)</h5>
+                        <h5>Γιάννης #1</h5>
                         <p class="mb-1">
                             <strong>Προσωπικά ραντεβού:</strong>
                             {{ number_format($partner1Personal, 2, ',', '.') }} €
@@ -98,7 +98,7 @@
 
                 <div class="col-md-6">
                     <div class="border rounded p-3 h-100">
-                        <h5>Συνεταίρος 2 (prof #2)</h5>
+                        <h5>Ελένη #2</h5>
                         <p class="mb-1">
                             <strong>Προσωπικά ραντεβού:</strong>
                             {{ number_format($partner2Personal, 2, ',', '.') }} €
