@@ -13,17 +13,17 @@
                 @csrf
 
                 {{-- ΠΕΛΑΤΗΣ --}}
-                <div class="mb-3">
-                    <label class="form-label">Πελάτης</label>
-                    <select name="customer_id" class="form-select" required>
-                        <option value="">-- Επιλέξτε πελάτη --</option>
-                        @foreach($customers as $customer)
-                            <option value="{{ $customer->id }}" @selected(old('customer_id') == $customer->id)>
-                                {{ $customer->last_name }} {{ $customer->first_name }} ({{ $customer->phone }})
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
+<div class="mb-3">
+    <label class="form-label">Πελάτης</label>
+    <select name="customer_id" id="customer_select" class="form-select select2" required>
+        <option value="">-- Επιλέξτε πελάτη --</option>
+        @foreach($customers as $customer)
+            <option value="{{ $customer->id }}" @selected(old('customer_id') == $customer->id)>
+                {{ $customer->last_name }} {{ $customer->first_name }} ({{ $customer->phone }})
+            </option>
+        @endforeach
+    </select>
+</div>
 
                 {{-- ΗΜΕΡΟΜΗΝΙΑ & ΩΡΑ --}}
                 <div class="mb-3">
@@ -47,3 +47,18 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    $(function () {
+        $('#customer_select').select2({
+            width: '100%',
+            placeholder: '-- Επιλέξτε πελάτη --',
+            allowClear: true
+        });
+    });
+</script>
+@endpush

@@ -14,7 +14,7 @@
                 {{-- ΠΕΛΑΤΗΣ --}}
                <div class="mb-3">
                     <label class="form-label">Πελάτης</label>
-                    <select name="customer_id" id="customer_select" class="form-select" required>
+                    <select name="customer_id" id="customer_select" class="form-select select2" required>
                         <option value="">-- Επιλέξτε πελάτη --</option>
                         @foreach($customers as $customer)
                             <option value="{{ $customer->id }}"
@@ -28,7 +28,7 @@
                 {{-- ΕΠΑΓΓΕΛΜΑΤΙΑΣ --}}
                 <div class="mb-3">
                     <label class="form-label">Επαγγελματίας</label>
-                    <select name="professional_id" id="professional_select" class="form-select" required>
+                    <select name="professional_id" id="professional_select" class="form-select select2" required>
                         <option value="">-- Επιλέξτε επαγγελματία --</option>
                         @foreach($professionals as $professional)
                             <option value="{{ $professional->id }}" @selected(old('professional_id') == $professional->id)>
@@ -114,9 +114,12 @@
 @endsection
 
 
-
 @push('scripts')
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 <script>
+$(function () {
     // flatpickr για ημερομηνία/ώρα
     flatpickr("#start_time", {
         enableTime: true,
@@ -124,113 +127,87 @@
         minuteIncrement: 15
     });
 
-    document.addEventListener('DOMContentLoaded', function () {
-        const customerSelect          = document.getElementById('customer_select');
-        const professionalSelect      = document.getElementById('professional_select');
-        const companySelect           = document.getElementById('company_select');
-        const statusSelect            = document.getElementById('status_select');
-        const totalPriceInput         = document.getElementById('total_price_input');
-        const professionalAmountInput = document.getElementById('professional_amount_input');
-        const notesTextarea           = document.getElementById('notes_textarea');
-
-        const lastAppointmentUrl = "{{ route('customers.lastAppointment') }}";
-
-        const professionalCompanyUrl = "{{ route('professionals.getCompany') }}";
-
-        if (professionalSelect) {
-            professionalSelect.addEventListener('change', function () {
-                const profId = this.value;
-
-                if (!profId) {
-                    companySelect.value = "";
-                    return;
-                }
-
-                fetch(professionalCompanyUrl + "?professional_id=" + profId)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.found) {
-                            companySelect.value = data.company_id;
-                        }
-                    })
-                    .catch(err => console.error("Σφάλμα στο fetch εταιρείας επαγγελματία:", err));
-            });
-        }
-
-
-        if (customerSelect) {
-            customerSelect.addEventListener('change', function () {
-                const customerId = this.value;
-
-                if (!customerId) {
-                    // Αν καθαρίσει ο πελάτης, δεν κάνουμε τίποτα (ή καθαρίζουμε πεδία αν θες)
-                    return;
-                }
-
-                fetch(lastAppointmentUrl + '?customer_id=' + encodeURIComponent(customerId))
-                    .then(response => response.json())
-                    .then(data => {
-                        if (!data.found) {
-                            // Δεν υπάρχει προηγούμενο ραντεβού → δεν πειράζουμε τίποτα
-                            return;
-                        }
-
-                        // Επαγγελματίας
-                        if (data.professional_id && professionalSelect) {
-                            professionalSelect.value = data.professional_id;
-                        }
-
-                        if (data.professional_id && professionalSelect) {
-                            professionalSelect.value = data.professional_id;
-
-                            // μόλις βάλουμε επαγγελματία, 
-                            // αφήνουμε το event change να φέρει την εταιρεία του
-                            professionalSelect.dispatchEvent(new Event('change'));
-                        }
-
-                        // Υπηρεσία (status)
-                        if (data.status && statusSelect) {
-                            statusSelect.value = data.status;
-                        }
-
-                        // Χρέωση ραντεβού
-                        if (typeof data.total_price !== 'undefined' && totalPriceInput) {
-                            totalPriceInput.value = data.total_price;
-                        }
-
-                        // Ποσό επαγγελματία
-                        if (typeof data.professional_amount !== 'undefined' && professionalAmountInput) {
-                            professionalAmountInput.value = data.professional_amount;
-                        }
-
-                        // Σημειώσεις (αν θες να τις φέρνεις)
-                        if (data.notes && notesTextarea && !notesTextarea.value) {
-                            notesTextarea.value = data.notes;
-                        }
-                    })
-                    .catch(err => {
-                        console.error('Σφάλμα στο fetch τελευταίου ραντεβού:', err);
-                    });
-            });
-        }
+    // Select2 init
+    $('#customer_select, #professional_select, #company_select, #status_select').select2({
+        width: '100%',
+        placeholder: '-- Επιλέξτε --',
+        allowClear: true
     });
-</script>
-@endpush
 
+    const lastAppointmentUrl      = "{{ route('customers.lastAppointment') }}";
+    const professionalCompanyUrl  = "{{ route('professionals.getCompany') }}";
 
-@push('scripts')
-<script>
-document.addEventListener("DOMContentLoaded", function () {
+    // === ΕΠΑΓΓΕΛΜΑΤΙΑΣ change -> φέρε εταιρεία ===
+    $('#professional_select').on('change', function () {
+        const profId = $(this).val();
 
-    const customerSelect = document.getElementById('customer_select');
+        if (!profId) {
+            $('#company_select').val(null).trigger('change');
+            return;
+        }
 
-    // Αν ήρθες από το κουμπί "Προσθήκη Ραντεβού" στη σελίδα του πελάτη
-    // και υπάρχει customer_id στο URL, κάνε αυτόματα load τα στοιχεία
-    if (customerSelect && customerSelect.value) {
-        customerSelect.dispatchEvent(new Event('change'));
+        $.getJSON(professionalCompanyUrl, { professional_id: profId })
+            .done(function (data) {
+                if (data.found) {
+                    $('#company_select').val(data.company_id).trigger('change');
+                }
+            })
+            .fail(function (err) {
+                console.error("Σφάλμα στο fetch εταιρείας επαγγελματία:", err);
+            });
+    });
+
+    // === ΠΕΛΑΤΗΣ change -> φέρε στοιχεία τελευταίου ραντεβού ===
+    $('#customer_select').on('change', function () {
+        const customerId = $(this).val();
+
+        if (!customerId) {
+            return;
+        }
+
+        $.getJSON(lastAppointmentUrl, { customer_id: customerId })
+            .done(function (data) {
+                if (!data.found) {
+                    return;
+                }
+
+                // Επαγγελματίας (και αυτόματα εταιρεία μέσω change)
+                if (data.professional_id) {
+                    $('#professional_select')
+                        .val(data.professional_id)
+                        .trigger('change'); // θα πυροδοτήσει και το event του επαγγελματία
+                }
+
+                // Υπηρεσία (status)
+                if (data.status) {
+                    $('#status_select').val(data.status).trigger('change');
+                }
+
+                // Χρέωση ραντεβού
+                if (typeof data.total_price !== 'undefined') {
+                    $('#total_price_input').val(data.total_price);
+                }
+
+                // Ποσό επαγγελματία
+                if (typeof data.professional_amount !== 'undefined') {
+                    $('#professional_amount_input').val(data.professional_amount);
+                }
+
+                // Σημειώσεις (μόνο αν είναι άδειο το πεδίο)
+                if (data.notes && !$('#notes_textarea').val()) {
+                    $('#notes_textarea').val(data.notes);
+                }
+            })
+            .fail(function (err) {
+                console.error('Σφάλμα στο fetch τελευταίου ραντεβού:', err);
+            });
+    });
+
+    // Αν ήρθες με ήδη επιλεγμένο πελάτη (customer_id στο URL κλπ),
+    // κάνε αυτόματα load τα στοιχεία
+    if ($('#customer_select').val()) {
+        $('#customer_select').trigger('change');
     }
-    
-
 });
 </script>
 @endpush

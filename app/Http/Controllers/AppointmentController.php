@@ -144,7 +144,9 @@ class AppointmentController extends Controller
     public function create()
     {
         $customers     = Customer::orderBy('last_name')->get();
-        $professionals = Professional::orderBy('last_name')->get();
+        $professionals = Professional::whereIn('role', ['owner', 'therapist'])
+            ->orderBy('last_name')
+            ->get();
         $companies     = Company::all();
 
         return view('appointments.create', compact('customers', 'professionals', 'companies'));
