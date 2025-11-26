@@ -56,14 +56,14 @@
                     <div class="border rounded p-3 h-100">
                         <h6 class="text-muted mb-1">Μετρητά χωρίς απόδειξη (σύνολο)</h6>
                         <strong>{{ number_format($cashNoTax, 2, ',', '.') }} €</strong><br>
-                        <small class="text-muted">
+                        {{-- <small class="text-muted">
                             Κοινό "μαύρο" ταμείο: {{ number_format($sharedPool, 2, ',', '.') }} € (προς μοίρασμα)
-                        </small>
+                        </small> --}}
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="border rounded p-3 h-100">
-                        <h6 class="text-muted mb-1">Ποσά επαγγελματία (προσωπικά)</h6>
+                        <h6 class="text-muted mb-1">Προσωπικά ραντεβού</h6>
                         <small class="text-muted d-block">Γιάννης #1:</small>
                         <strong>{{ number_format($partner1Personal, 2, ',', '.') }} €</strong><br>
                         <small class="text-muted d-block mt-2">Ελένη #2:</small>
