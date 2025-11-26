@@ -22,6 +22,7 @@ class ProfessionalController extends Controller
                         $q->where('name', 'like', "%$search%");
                     });
             })
+            ->whereIn('role', ['therapist', 'owner'])
             ->orderBy('last_name')
             ->get();
 
@@ -45,17 +46,19 @@ class ProfessionalController extends Controller
                 'email'          => 'nullable|email|max:150',
                 'company_id'     => 'required|exists:companies,id',
                 'service_fee'    => 'numeric|min:0',
-                // ΤΩΡΑ: percentage_cut = ποσό επαγγελματία σε €
                 'percentage_cut' => 'numeric|min:0',
+
+                // password
+                'password'       => 'required|string|min:6|confirmed',
             ],
             [
-                'first_name.required'     => 'Το μικρό όνομα είναι υποχρεωτικό.',
-                'last_name.required'      => 'Το επίθετο είναι υποχρεωτικό.',
-                'phone.required'          => 'Το τηλέφωνο είναι υποχρεωτικό.',
-                'company_id.required'     => 'Η εταιρεία είναι υποχρεωτική.',
-                //'percentage_cut.required' => 'Το ποσό που λαμβάνει ο επαγγελματίας είναι υποχρεωτικό.',
+                'password.required' => 'Ο κωδικός είναι υποχρεωτικός.',
+                'password.confirmed' => 'Οι κωδικοί δεν ταιριάζουν.', 
             ]
         );
+
+        // Hash the password
+        $data['password'] = \Hash::make($request->password);
 
         Professional::create($data);
 
@@ -63,6 +66,7 @@ class ProfessionalController extends Controller
             ->route('professionals.index')
             ->with('success', 'Ο επαγγελματίας δημιουργήθηκε επιτυχώς.');
     }
+
 
     public function edit(Professional $professional)
     {

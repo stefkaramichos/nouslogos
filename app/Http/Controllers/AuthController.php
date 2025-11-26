@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use App\Models\Professional;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -27,11 +27,17 @@ class AuthController extends Controller
             ]
         );
 
-        // Βρίσκουμε τον χρήστη
-        $user = User::where('email', $credentials['email'])->first();
+        // Βρίσκουμε τον επαγγελματία
+        $professional = Professional::where('email', $credentials['email'])->first();
 
-        // Αν δεν υπάρχει ή δεν έχει σωστό ρόλο → μπλοκάρισμα
-        if (!$user || !in_array($user->role, ['owner', 'grammatia'])) {
+        if (!$professional) {
+            return back()
+                ->withErrors(['email' => 'Λάθος email ή κωδικός.'])
+                ->withInput();
+        }
+
+        // Έλεγχος ρόλου
+        if (!in_array($professional->role, ['owner', 'grammatia', 'therapist'])) {
             return back()
                 ->withErrors(['email' => 'Δεν έχετε δικαίωμα πρόσβασης στο σύστημα.'])
                 ->withInput();
@@ -39,10 +45,16 @@ class AuthController extends Controller
 
         // Προσπάθεια login
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
+
             $request->session()->regenerate();
 
-            // Πάμε στο dashboard ή όπου θέλεις
-            return redirect()->intended(route('appointments.index'));
+            // 👇 REDIRECT BASED ON ROLE
+            if ($professional->role === 'therapist') {
+                return redirect()->route('therapist_appointments.index');
+            }
+
+            // Για owner & γραμματεία
+            return redirect()->intended(route('customers.index'));
         }
 
         return back()

@@ -6,6 +6,9 @@ use App\Http\Controllers\ProfessionalController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AuthController;
+use Illuminate\Support\Facades\Hash;
+use App\Models\Professional;
+use App\Http\Controllers\TherapistAppointmentController;
 use App\Http\Controllers\SettlementController;
 
 // 🔹 Login routes (χωρίς auth)
@@ -56,3 +59,28 @@ Route::middleware('auth')->group(function () {
 
 });
 
+Route::get('/hash-password', [\App\Http\Controllers\HashController::class, 'hashPassword']);
+// routes/web.php
+
+
+
+
+    // Ραντεβού θεραπευτή (νέο table)
+    Route::get('/my-appointments', [TherapistAppointmentController::class, 'index'])
+        ->name('therapist_appointments.index');
+
+    Route::get('/my-appointments/create', [TherapistAppointmentController::class, 'create'])
+        ->name('therapist_appointments.create');
+
+    Route::post('/my-appointments', [TherapistAppointmentController::class, 'store'])
+        ->name('therapist_appointments.store');
+        
+    Route::get('/my-appointments/{therapistAppointment}/edit', [TherapistAppointmentController::class, 'edit'])
+        ->name('therapist_appointments.edit');
+
+    Route::put('/my-appointments/{therapistAppointment}', [TherapistAppointmentController::class, 'update'])
+        ->name('therapist_appointments.update');
+
+    Route::delete('/my-appointments/{therapistAppointment}', [TherapistAppointmentController::class, 'destroy'])
+        ->name('therapist_appointments.destroy');
+ 

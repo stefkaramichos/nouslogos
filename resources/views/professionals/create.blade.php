@@ -25,12 +25,7 @@
                     <label class="form-label">Τηλέφωνο</label>
                     <input type="text" name="phone" class="form-control" value="{{ old('phone') }}" required>
                 </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-control" value="{{ old('email') }}" required>
-                </div>
-
+                
                 <div class="mb-3">
                     <label class="form-label">Εταιρεία</label>
                     <select name="company_id" class="form-select" required>
@@ -42,6 +37,21 @@
                         @endforeach
                     </select>
                 </div>
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-control" value="{{ old('email') }}" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Κωδικός</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Επιβεβαίωση Κωδικού</label>
+                    <input type="password" name="password_confirmation" class="form-control" required>
+                </div>
+
 {{-- 
                 <div class="mb-3">
                     <label class="form-label">Χρέωση Υπηρεσίας (€)</label>

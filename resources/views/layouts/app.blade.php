@@ -40,6 +40,8 @@
                 </div>
 
                 <ul class="nav flex-column px-2">
+                    @php $user = Auth::user(); @endphp
+                    @if($user && $user->role !== 'therapist')
                     <li class="nav-item mb-1">
                         <a class="nav-link @if(request()->routeIs('customers.*')) active @endif"
                             href="{{ route('customers.index') }}">
@@ -47,15 +49,15 @@
                         </a>
                     </li>
                     <li class="nav-item mb-1">
-                        <a class="nav-link @if(request()->routeIs('appointments.*')) active @endif"
-                           href="{{ route('appointments.index') }}">
-                            📅 Ραντεβού
-                        </a>
-                    </li>
-                    <li class="nav-item mb-1">
                         <a class="nav-link @if(request()->routeIs('professionals.*')) active @endif"
                            href="{{ route('professionals.index') }}">
                             💼 Επαγγελματίες
+                        </a>
+                    </li>
+                    <li class="nav-item mb-1">
+                        <a class="nav-link @if(request()->routeIs('appointments.*')) active @endif"
+                           href="{{ route('appointments.index') }}">
+                            📅 Ραντεβού
                         </a>
                     </li>
                     <li class="nav-item mb-1">
@@ -66,9 +68,30 @@
                             </a>
                         @endif
                     </li>
+                    @endif
+
+                    @if($user && $user->role === 'therapist')
+                     <ul class="nav flex-column px-2">
+                        <li class="nav-item mb-1">
+                            <a class="nav-link @if(request()->routeIs('therapist_appointments.*')) active @endif"
+                            href="{{ route('therapist_appointments.index') }}">
+                                🗓 Τα ραντεβού μου
+                            </a>
+                        </li>
+                    </ul>
+                    @endif
+
                 </ul>
             </div>
             <div class="nav-item mt-3 logout-button">
+                  @if($user && $user->role === 'owner')
+                        <li class="nav-item mb-1">
+                            <a class="nav-link @if(request()->routeIs('therapist_appointments.*')) active @endif"
+                            href="{{ route('therapist_appointments.index') }}">
+                                🗓 Τα ραντεβού μου
+                            </a>
+                        </li>
+                    @endif
                 <form action="{{ route('logout') }}" method="POST" class="d-flex align-items-center">
                     @csrf
                     <button class="btn w-100 d-flex align-items-center justify-content-center">
