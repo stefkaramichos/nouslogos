@@ -70,13 +70,13 @@ class SettlementController extends Controller
         // (για να αφαιρεθούν από τα μετρητά προς κατάθεση)
         $partnerCardProfessional = 0;
 
-        // *** ΝΕΟ: ΠΟΣΑ 10€ από ΜΕΤΡΗΤΑ ΧΩΡΙΣ ΑΠΟΔΕΙΞΗ (Γιάννης/Ελένη) ***
-        // Θέλουμε κι αυτά να αφαιρεθούν από τα Μετρητά προς κατάθεση,
-        // ΟΧΙ από το κοινό μαύρο ταμείο.
+        // ΠΟΣΑ 10€ από ΜΕΤΡΗΤΑ ΧΩΡΙΣ ΑΠΟΔΕΙΞΗ (Γιάννης/Ελένη)
         $partnerCashNoTaxProfessional = 0;
 
         // για διαγράμματα ανά μέρα
-        $daily = []; // ['Y-m-d' => ['bank' => ..., 'partners' => ... ]]
+        // ΤΩΡΑ: μόνο προσωπικά έσοδα Γιάννη / Ελένης
+        // ['Y-m-d' => ['giannis' => ..., 'eleni' => ... ]]
+        $daily = [];
 
         foreach ($payments as $payment) {
             $appointment = $payment->appointment;
@@ -90,8 +90,8 @@ class SettlementController extends Controller
 
             if ($dateKey && !isset($daily[$dateKey])) {
                 $daily[$dateKey] = [
-                    'bank'     => 0,
-                    'partners' => 0,
+                    'giannis' => 0,
+                    'eleni'   => 0,
                 ];
             }
 
@@ -105,34 +105,37 @@ class SettlementController extends Controller
 
             $isPartnerProfessional = in_array($professionalId, $partnerProfessionals, true);
 
+            // ===== Προσωπικά έσοδα Γιάννη / Ελένης + ημερήσια ενημέρωση =====
+            if ($isPartnerProfessional) {
+                if ($professionalId === $partnerProfessionals['partner1']) {
+                    $partner1Personal += $professionalAmt;
+
+                    if ($dateKey) {
+                        $daily[$dateKey]['giannis'] += $professionalAmt;
+                    }
+
+                } elseif ($professionalId === $partnerProfessionals['partner2']) {
+                    $partner2Personal += $professionalAmt;
+
+                    if ($dateKey) {
+                        $daily[$dateKey]['eleni'] += $professionalAmt;
+                    }
+                }
+            }
+
             // ===== CASE 1: CASH χωρίς απόδειξη =====
             if ($method === 'cash' && $tax === 'N') {
                 $cashNoTax += $amount;
 
                 if ($isPartnerProfessional) {
-                    // Προσωπικό ποσό επαγγελματία
-                    if ($professionalId === $partnerProfessionals['partner1']) {
-                        $partner1Personal += $professionalAmt;
-                    } elseif ($professionalId === $partnerProfessionals['partner2']) {
-                        $partner2Personal += $professionalAmt;
-                    }
-
                     // Μαζεύουμε τα 10€ του επαγγελματία από ΜΑΥΡΑ
                     $partnerCashNoTaxProfessional += ($professionalAmt > 0 ? $professionalAmt : 0);
 
                     // ΟΛΟ το ποσό πάει στο κοινό μαύρο ταμείο
                     $sharedPool += $amount;
-
-                    if ($dateKey) {
-                        $daily[$dateKey]['partners'] += $amount;
-                    }
                 } else {
                     // Τρίτος επαγγελματίας: όλο στο κοινό μαύρο ταμείο
                     $sharedPool += $amount;
-
-                    if ($dateKey) {
-                        $daily[$dateKey]['partners'] += $amount;
-                    }
                 }
 
                 continue;
@@ -143,28 +146,13 @@ class SettlementController extends Controller
                 $cashWithTax += $amount;
 
                 if ($isPartnerProfessional) {
-                    // Προσωπικό ποσό επαγγελματία
-                    if ($professionalId === $partnerProfessionals['partner1']) {
-                        $partner1Personal += $professionalAmt;
-                    } elseif ($professionalId === $partnerProfessionals['partner2']) {
-                        $partner2Personal += $professionalAmt;
-                    }
-
                     // Υπόλοιπο πρέπει να μπει στην τράπεζα από μετρητά
                     $bankPortion = max($amount - $professionalAmt, 0);
                     $cashToBank += $bankPortion;
 
-                    if ($dateKey) {
-                        $daily[$dateKey]['bank']     += $bankPortion;
-                        $daily[$dateKey]['partners'] += $professionalAmt;
-                    }
                 } else {
                     // Τρίτος επαγγελματίας: όλο στην τράπεζα από μετρητά
                     $cashToBank += $amount;
-
-                    if ($dateKey) {
-                        $daily[$dateKey]['bank'] += $amount;
-                    }
                 }
 
                 continue;
@@ -176,12 +164,6 @@ class SettlementController extends Controller
                 $cardTotal += $amount;
 
                 if ($isPartnerProfessional) {
-                    if ($professionalId === $partnerProfessionals['partner1']) {
-                        $partner1Personal += $professionalAmt;
-                    } elseif ($professionalId === $partnerProfessionals['partner2']) {
-                        $partner2Personal += $professionalAmt;
-                    }
-
                     // 10άρια από κάρτα που αφορούν συνεταίρους
                     $partnerCardProfessional += ($professionalAmt > 0 ? $professionalAmt : 0);
 
@@ -189,17 +171,9 @@ class SettlementController extends Controller
                     $bankPortion = max($amount - $professionalAmt, 0);
                     $bankFromCard += $bankPortion;
 
-                    if ($dateKey) {
-                        $daily[$dateKey]['bank']     += $bankPortion;
-                        $daily[$dateKey]['partners'] += $professionalAmt;
-                    }
                 } else {
                     // Τρίτος επαγγελματίας: όλο της επιχείρησης
                     $bankFromCard += $amount;
-
-                    if ($dateKey) {
-                        $daily[$dateKey]['bank'] += $amount;
-                    }
                 }
 
                 continue;
@@ -207,10 +181,6 @@ class SettlementController extends Controller
 
             // ===== Παλιά/άγνωστα δεδομένα: όλα στην επιχείρηση (τράπεζα από μετρητά) =====
             $cashToBank += $amount;
-
-            if ($dateKey) {
-                $daily[$dateKey]['bank'] += $amount;
-            }
         }
 
         // Τελικός επιμερισμός sharedPool 50-50
@@ -221,8 +191,6 @@ class SettlementController extends Controller
         // Από τα "μετρητά προς κατάθεση" αφαιρούμε:
         //  - τα 10€ από ΚΑΡΤΑ (partnerCardProfessional)
         //  - τα 10€ από ΜΕΤΡΗΤΑ ΧΩΡΙΣ ΑΠΟΔΕΙΞΗ (partnerCashNoTaxProfessional)
-        // ώστε οι αμοιβές των συνεταίρων να βγαίνουν από τα δηλωμένα μετρητά,
-        // ΟΧΙ από το κοινό μαύρο ταμείο.
         $cashToBank = max(
             $cashToBank - $partnerCardProfessional - $partnerCashNoTaxProfessional,
             0
@@ -231,22 +199,27 @@ class SettlementController extends Controller
         // Ποσό επιχείρησης στην τράπεζα (σύνολο κινήσεων: κάρτα + μετρητά κατάθεση)
         $companyBankTotal = $cashToBank + $cardTotal;
 
-        // Δεδομένα για Chart.js (κατανομή)
+        // 🔹 Δεδομένα για Chart.js (κατανομή)
         $chartDistribution = [
-            'labels' => ['Επιχείρηση (τράπεζα)', 'Συνεταίρος 1', 'Συνεταίρος 2'],
+            'labels' => [
+                'Μετρητά προς κατάθεση',
+                'Γιάννης #1',
+                'Ελένη #2',
+            ],
             'data'   => [
-                round($companyBankTotal, 2),
+                round($cashToBank, 2),
                 round($partner1Total, 2),
                 round($partner2Total, 2),
             ],
         ];
 
-        // Δεδομένα ανά ημέρα
+        // 🔹 Δεδομένα για 2ο γράφημα: ΜΟΝΟ Γιάννης / Ελένη ανά μέρα
         ksort($daily);
+
         $dailyChart = [
-            'labels'   => array_keys($daily),
-            'bank'     => array_map(fn ($d) => round($d['bank'], 2), $daily),
-            'partners' => array_map(fn ($d) => round($d['partners'], 2), $daily),
+            'labels'  => array_keys($daily),
+            'giannis' => array_map(fn($d) => round($d['giannis'], 2), $daily),
+            'eleni'   => array_map(fn($d) => round($d['eleni'], 2), $daily),
         ];
 
         $filters = [
@@ -257,12 +230,12 @@ class SettlementController extends Controller
         return view('settlements.index', compact(
             'filters',
             'totalAmount',
-            'cashToBank',          // Μετρητά προς κατάθεση (ΜΕΤΑ την αφαίρεση των 10€ από κάρτες & μαύρα)
-            'cardTotal',           // Πληρωμές με κάρτα (ήδη στην τράπεζα, bruto)
+            'cashToBank',          // Μετρητά προς κατάθεση
+            'cardTotal',           // Πληρωμές με κάρτα (πληροφοριακά στα cards μόνο)
             'companyBankTotal',    // Σύνολο επιχείρησης στην τράπεζα (cashToBank + cardTotal)
             'cashNoTax',
             'cashWithTax',
-            'bankFromCard',        // πληροφοριακά: καθαρό επιχείρησης από κάρτες
+            'bankFromCard',
             'sharedPool',
             'partner1Personal',
             'partner2Personal',

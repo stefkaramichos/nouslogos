@@ -32,23 +32,25 @@
             </form>
 
             {{-- Συνοπτικά --}}
-            <div class="row g-3">
+            <div class="row g-3 mb-3">
                 <div class="col-md-3">
                     <div class="border rounded p-3 h-100">
                         <h6 class="text-muted mb-1">Συνολικό ποσό εισπράξεων</h6>
                         <strong>{{ number_format($totalAmount, 2, ',', '.') }} €</strong>
                     </div>
                 </div>
-               <div class="col-md-3">
+                <div class="col-md-3">
                     <div class="border rounded p-3 h-100">
                         <h6 class="text-muted mb-1">Ποσό επιχείρησης στην Τράπεζα</h6>
                         <strong>{{ number_format($companyBankTotal, 2, ',', '.') }} €</strong><br>
                         <small class="text-muted ">
-                            Μετρητά προς κατάθεση: <span class="badge bg-success fs-6 ">{{ number_format($cashToBank, 2, ',', '.') }} € </span><br>
-                            Πληρωμές με κάρτα (ήδη στην τράπεζα): {{ number_format($cardTotal, 2, ',', '.') }} €<br>
-                            {{-- Καθαρό από κάρτα για επιχείρηση: {{ number_format($bankFromCard, 2, ',', '.') }} € --}}
+                            Μετρητά προς κατάθεση:
+                            <span class="badge bg-success fs-6">
+                                {{ number_format($cashToBank, 2, ',', '.') }} €
+                            </span><br>
+                            Πληρωμές με κάρτα (ήδη στην τράπεζα):
+                            {{ number_format($cardTotal, 2, ',', '.') }} €
                         </small>
-
                     </div>
                 </div>
 
@@ -56,9 +58,6 @@
                     <div class="border rounded p-3 h-100">
                         <h6 class="text-muted mb-1">Μετρητά χωρίς απόδειξη (σύνολο)</h6>
                         <strong>{{ number_format($cashNoTax, 2, ',', '.') }} €</strong><br>
-                        {{-- <small class="text-muted">
-                            Κοινό "μαύρο" ταμείο: {{ number_format($sharedPool, 2, ',', '.') }} € (προς μοίρασμα)
-                        </small> --}}
                     </div>
                 </div>
                 <div class="col-md-3">
@@ -122,7 +121,7 @@
                 <div class="col-md-6">
                     <div class="card h-100">
                         <div class="card-header">
-                            Κατανομή Ποσών (Τράπεζα vs Συνεταίροι)
+                            Κατανομή Ποσών (Μετρητά & Συνεταίροι)
                         </div>
                         <div class="card-body">
                             <canvas id="distributionChart"></canvas>
@@ -133,7 +132,7 @@
                 <div class="col-md-6">
                     <div class="card h-100">
                         <div class="card-header">
-                            Ημερήσια Ροή (Τράπεζα & Συνεταίροι)
+                            Ημερήσια Προσωπικά Έσοδα (Γιάννης & Ελένη)
                         </div>
                         <div class="card-body">
                             <canvas id="dailyChart"></canvas>
@@ -142,7 +141,7 @@
                 </div>
             </div>
 
-            {{-- Αναλυτικός πίνακας πληρωμών (προαιρετικά, για έλεγχο) --}}
+            {{-- Αναλυτικός πίνακας πληρωμών --}}
             <div class="card">
                 <div class="card-header">
                     Αναλυτικές Πληρωμές Περιόδου
@@ -230,7 +229,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            // --- Pie/Bar Chart για κατανομή ---
+            // --- Bar Chart για κατανομή ---
             const distCtx = document.getElementById('distributionChart').getContext('2d');
 
             const distributionChart = new Chart(distCtx, {
@@ -239,7 +238,7 @@
                     labels: {!! json_encode($chartDistribution['labels']) !!},
                     datasets: [{
                         label: 'Ποσό (€)',
-                        data: {!! json_encode($chartDistribution['data']) !!},
+                        data: {!! json_encode($chartDistribution['data']) !!}
                     }]
                 },
                 options: {
@@ -250,7 +249,7 @@
                 }
             });
 
-            // --- Line Chart για ημερήσια ροή ---
+            // --- Line Chart για ημερήσια προσωπικά έσοδα Γιάννη & Ελένης ---
             const dailyCtx = document.getElementById('dailyChart').getContext('2d');
 
             const dailyChart = new Chart(dailyCtx, {
@@ -259,13 +258,13 @@
                     labels: {!! json_encode($dailyChart['labels']) !!},
                     datasets: [
                         {
-                            label: 'Τράπεζα',
-                            data: {!! json_encode($dailyChart['bank']) !!},
+                            label: 'Γιάννης – Προσωπικά έσοδα',
+                            data: {!! json_encode($dailyChart['giannis']) !!},
                             tension: 0.3
                         },
                         {
-                            label: 'Συνεταίροι (μετρητά/ποσά επαγγελματία)',
-                            data: {!! json_encode($dailyChart['partners']) !!},
+                            label: 'Ελένη – Προσωπικά έσοδα',
+                            data: {!! json_encode($dailyChart['eleni']) !!},
                             tension: 0.3
                         }
                     ]
