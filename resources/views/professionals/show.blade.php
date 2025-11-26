@@ -121,6 +121,7 @@
                 <table class="table table-striped mb-0 align-middle">
                     <thead>
                     <tr>
+                        <th>Θερ.</th> {{-- ΝΕΑ ΣΤΗΛΗ --}}
                         <th>#</th>
                         <th>Ημερομηνία & Ώρα</th>
                         <th>Πελάτης</th>
@@ -142,7 +143,28 @@
                             $total   = $appointment->total_price ?? 0;
                         @endphp
 
+                         @php
+                            $payment = $appointment->payment;
+                            $paid    = $payment->amount ?? 0;
+                            $total   = $appointment->total_price ?? 0;
+
+                            $therapistMatches = $therapistMatches ?? [];
+                            $matchKey = ($appointment->customer_id ?? 0)
+                                . '|' 
+                                . ($appointment->start_time ? $appointment->start_time->toDateString() : '');
+                        @endphp
+
                         <tr>
+                             {{-- Σημάδι therapist_appointments --}}
+                            <td class="text-center">
+                                @if(isset($therapistMatches[$matchKey]))
+                                    <span class="badge bg-info" title="Υπάρχει αντίστοιχο ραντεβού από τον θεραπευτή">
+                                        ✅
+                                    </span>
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
+                            </td>
                             <td>{{ $appointment->id }}</td>
 
                             <td>{{ $appointment->start_time?->format('d/m/Y H:i') }}</td>
@@ -264,8 +286,54 @@
                     </tbody>
 
                 </table>
+                {{-- Ραντεβού που υπάρχουν ΜΟΝΟ στον πίνακα therapist_appointments --}}
+                @if(!empty($therapistMissing) && count($therapistMissing) > 0)
+                    <hr>
+
+                    <h5 class="mt-3">
+                        Συνεδρίες που έχουν καταχωρηθεί ΜΟΝΟ στο προσωπικό ημερολόγιο θεραπευτή
+                    </h5>
+
+                    <div class="table-responsive mt-2">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                            <tr>
+                                <th>Ημερομηνία</th>
+                                <th>Πελάτης</th>
+                                <th>Σημειώσεις θεραπευτή</th>
+                                <th>Κατάσταση</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($therapistMissing as $ta)
+                                <tr class="text-muted" style="opacity: 0.6;">
+                                    <td>
+                                        {{ $ta->start_time ? $ta->start_time->format('d/m/Y') : '-' }}
+                                    </td>
+                                    <td>
+                                        @if($ta->customer)
+                                            {{ $ta->customer->last_name }} {{ $ta->customer->first_name }}
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        {{ $ta->notes ?: '-' }}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-warning text-dark" title="Δεν υπάρχει στο κεντρικό σύστημα ραντεβού">
+                                            ⚠ Δεν έχει καταχωρηθεί στο κύριο σύστημα
+                                        </span>
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
+              
             </div>
         </div>
     </div>
-
 @endsection

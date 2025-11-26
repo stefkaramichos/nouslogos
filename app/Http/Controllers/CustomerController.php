@@ -81,6 +81,8 @@ class CustomerController extends Controller
             'phone'      => 'required|string|max:30',
             'email'      => 'nullable|email|max:150',
             'company_id' => 'required|exists:companies,id',
+            'tax_office' => 'required|string|max:100',
+        'vat_number' => 'required|string|max:20',
         ]);
 
         $customer->update($data);

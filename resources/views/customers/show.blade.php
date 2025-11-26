@@ -19,8 +19,11 @@
                     <p><strong>Τηλέφωνο:</strong> {{ $customer->phone }}</p>
                     <p><strong>Email:</strong> {{ $customer->email ?? '-' }}</p>
                     <p><strong>Εταιρεία:</strong> {{ $customer->company->name ?? '-' }}</p>
+                    <p><strong>ΑΦΜ:</strong> {{ $customer->vat_number ?? '-' }}</p>
+                    <p><strong>ΔΟΥ:</strong> {{ $customer->tax_office ?? '-' }}</p>
                     <p><strong>Σύνολο Ραντεβού (με βάση τα φίλτρα):</strong> {{ $appointmentsCount }}</p>
                 </div>
+
                 <div class="col-md-6">
                     <p>
                         <strong>Συνολικό Ποσό Ραντεβού:</strong><br>
@@ -40,15 +43,17 @@
                             {{ number_format($outstandingTotal, 2, ',', '.') }} €
                         </span>
                     </p>
-                    <p class="mb-0">
-                        <small class="text-muted">
-                            Μετρητά: {{ number_format($cashTotal, 2, ',', '.') }} € &nbsp;|&nbsp;
-                            Κάρτα: {{ number_format($cardTotal, 2, ',', '.') }} €
-                        </small>
-                    </p>
                 </div>
             </div>
+
+            <!-- ⭐ Edit Button Bottom Right -->
+            <div class="d-flex justify-content-end mt-3">
+                <a href="{{ route('customers.edit', $customer) }}" title="Επεξεργασία πελάτη" class="btn btn-sm btn-secondary">
+                    <i class="bi bi-pencil-square"></i>
+                </a>
+            </div>
         </div>
+
     </div>
 
     {{-- Ραντεβού Πελάτη --}}

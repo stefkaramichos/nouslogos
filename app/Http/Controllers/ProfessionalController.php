@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Models\TherapistAppointment;
 use App\Models\Professional;
 use Illuminate\Http\Request;
 
@@ -127,135 +128,174 @@ class ProfessionalController extends Controller
     }
 
     public function show(Request $request, Professional $professional)
-    {
-        // Παίρνουμε τα φίλτρα από το request
-        $from           = $request->input('from');            // date
-        $to             = $request->input('to');              // date
-        $customerName   = $request->input('customer');        // text
-        $paymentStatus  = $request->input('payment_status');  // all / unpaid / partial / full
-        $paymentMethod  = $request->input('payment_method');  // all / cash / card
+{
+    // Παίρνουμε τα φίλτρα από το request
+    $from           = $request->input('from');            // date
+    $to             = $request->input('to');              // date
+    $customerName   = $request->input('customer');        // text
+    $paymentStatus  = $request->input('payment_status');  // all / unpaid / partial / full
+    $paymentMethod  = $request->input('payment_method');  // all / cash / card
 
-        // Φορτώνουμε όλα τα ραντεβού του επαγγελματία με σχέσεις
-        $appointments = $professional->appointments()
-            ->with(['customer', 'company', 'payment'])
-            ->orderBy('start_time', 'desc')
-            ->get();
+    // ----------------- MAIN APPOINTMENTS -----------------
+    $appointments = $professional->appointments()
+        ->with(['customer', 'company', 'payment'])
+        ->orderBy('start_time', 'desc')
+        ->get();
 
-        // Εφαρμογή φίλτρων σε collection
-        if ($from) {
-            $appointments = $appointments->filter(function ($a) use ($from) {
-                return $a->start_time && $a->start_time->toDateString() >= $from;
-            });
-        }
-
-        if ($to) {
-            $appointments = $appointments->filter(function ($a) use ($to) {
-                return $a->start_time && $a->start_time->toDateString() <= $to;
-            });
-        }
-
-        if ($customerName) {
-            $name = mb_strtolower($customerName);
-            $appointments = $appointments->filter(function ($a) use ($name) {
-                if (!$a->customer) {
-                    return false;
-                }
-                $full    = mb_strtolower($a->customer->first_name.' '.$a->customer->last_name);
-                $fullRev = mb_strtolower($a->customer->last_name.' '.$a->customer->first_name);
-                return str_contains($full, $name) || str_contains($fullRev, $name);
-            });
-        }
-
-        if ($paymentStatus && $paymentStatus !== 'all') {
-            $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
-                $total = $a->total_price ?? 0;
-                $paid  = $a->payment->amount ?? 0;
-
-                if ($paymentStatus === 'unpaid') {
-                    return $paid <= 0;
-                }
-
-                if ($paymentStatus === 'partial') {
-                    return $paid > 0 && $paid < $total;
-                }
-
-                if ($paymentStatus === 'full') {
-                    return $total > 0 && $paid >= $total;
-                }
-
-                return true;
-            });
-        }
-
-        if ($paymentMethod && $paymentMethod !== 'all') {
-            $appointments = $appointments->filter(function ($a) use ($paymentMethod) {
-                if (!$a->payment) {
-                    return false;
-                }
-                return $a->payment->method === $paymentMethod;
-            });
-        }
-
-        // Μετά τα φίλτρα
-        $appointmentsCount = $appointments->count();
-
-        // Συνολικό ποσό ραντεβών (τζίρος)
-        $totalAmount = $appointments->sum(fn($a) => $a->total_price ?? 0);
-
-        // ΠΟΣΟ ΠΟΥ ΔΙΚΑΙΟΥΤΑΙ Ο ΕΠΑΓΓΕΛΜΑΤΙΑΣ
-        // Αν το ραντεβού έχει professional_amount → το χρησιμοποιούμε (override)
-        // Αλλιώς → χρησιμοποιούμε το default ποσό ανά ραντεβού από το προφίλ του επαγγελματία
-        $professionalTotalCut = $appointments->sum(function ($a) use ($professional) {
-            if (!is_null($a->professional_amount)) {
-                return $a->professional_amount;
-            }
-
-            // fallback στο default ποσό ανά ραντεβού
-            return $professional->percentage_cut;
+    // Φίλτρα πάνω στην collection (appointments)
+    if ($from) {
+        $appointments = $appointments->filter(function ($a) use ($from) {
+            return $a->start_time && $a->start_time->toDateString() >= $from;
         });
+    }
 
-        // Πόσα έχουν πληρωθεί από πελάτες (σύνολο εισπράξεων)
-        $paidTotal = $appointments->sum(fn($a) => $a->payment->amount ?? 0);
+    if ($to) {
+        $appointments = $appointments->filter(function ($a) use ($to) {
+            return $a->start_time && $a->start_time->toDateString() <= $to;
+        });
+    }
 
-        // Ποσό τζίρου που παραμένει απλήρωτο από πελάτες
-        $outstandingTotal = max($totalAmount - $paidTotal, 0);
-
-        // Πόσα (εκτιμώμενα) έχει ήδη λάβει ο επαγγελματίας
-        $professionalPaid = $appointments->sum(function ($a) {
-            if (!$a->payment) {
-                return 0;
+    if ($customerName) {
+        $name = mb_strtolower($customerName);
+        $appointments = $appointments->filter(function ($a) use ($name) {
+            if (!$a->customer) {
+                return false;
             }
+            $full    = mb_strtolower($a->customer->first_name.' '.$a->customer->last_name);
+            $fullRev = mb_strtolower($a->customer->last_name.' '.$a->customer->first_name);
+            return str_contains($full, $name) || str_contains($fullRev, $name);
+        });
+    }
+
+    if ($paymentStatus && $paymentStatus !== 'all') {
+        $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
             $total = $a->total_price ?? 0;
             $paid  = $a->payment->amount ?? 0;
 
-            // Αν το ραντεβού είναι πλήρως πληρωμένο, θεωρούμε ότι ο επαγγελματίας
-            // δικαιούται ό,τι γράφει το professional_amount (ή 0)
-            return ($total > 0 && $paid >= $total) ? ($a->professional_amount ?? 0) : 0;
+            if ($paymentStatus === 'unpaid') {
+                return $paid <= 0;
+            }
+
+            if ($paymentStatus === 'partial') {
+                return $paid > 0 && $paid < $total;
+            }
+
+            if ($paymentStatus === 'full') {
+                return $total > 0 && $paid >= $total;
+            }
+
+            return true;
         });
-
-        // Πόσα απομένουν να του δοθούν
-        $professionalOutstanding = max($professionalTotalCut - $professionalPaid, 0);
-
-
-        $filters = [
-            'from'           => $from,
-            'to'             => $to,
-            'customer'       => $customerName,
-            'payment_status' => $paymentStatus ?? 'all',
-            'payment_method' => $paymentMethod ?? 'all',
-        ];
-
-        return view('professionals.show', compact(
-            'professional',
-            'appointments',
-            'appointmentsCount',
-            'totalAmount',
-            'professionalTotalCut',
-            'paidTotal',
-            'outstandingTotal',
-            'professionalPaid',
-            'professionalOutstanding',
-            'filters'
-        ));
     }
+
+    if ($paymentMethod && $paymentMethod !== 'all') {
+        $appointments = $appointments->filter(function ($a) use ($paymentMethod) {
+            if (!$a->payment) {
+                return false;
+            }
+            return $a->payment->method === $paymentMethod;
+        });
+    }
+
+    // Μετά τα φίλτρα
+    $appointmentsCount = $appointments->count();
+    $totalAmount = $appointments->sum(fn($a) => $a->total_price ?? 0);
+
+    $professionalTotalCut = $appointments->sum(function ($a) use ($professional) {
+        if (!is_null($a->professional_amount)) {
+            return $a->professional_amount;
+        }
+        return $professional->percentage_cut;
+    });
+
+    $paidTotal = $appointments->sum(fn($a) => $a->payment->amount ?? 0);
+    $outstandingTotal = max($totalAmount - $paidTotal, 0);
+
+    $professionalPaid = $appointments->sum(function ($a) {
+        if (!$a->payment) {
+            return 0;
+        }
+        $total = $a->total_price ?? 0;
+        $paid  = $a->payment->amount ?? 0;
+
+        return ($total > 0 && $paid >= $total)
+            ? ($a->professional_amount ?? 0)
+            : 0;
+    });
+
+    $professionalOutstanding = max($professionalTotalCut - $professionalPaid, 0);
+
+    // ----------------- THERAPIST APPOINTMENTS ΜΕ ΦΙΛΤΡΑ -----------------
+
+    $therapistQuery = TherapistAppointment::with('customer')
+        ->where('professional_id', $professional->id);
+
+    if ($from) {
+        $therapistQuery->whereDate('start_time', '>=', $from);
+    }
+
+    if ($to) {
+        $therapistQuery->whereDate('start_time', '<=', $to);
+    }
+
+    if ($customerName) {
+        $name = mb_strtolower($customerName);
+        $therapistQuery->whereHas('customer', function ($q) use ($name) {
+            $q->whereRaw("LOWER(CONCAT(first_name,' ',last_name)) like ?", ["%{$name}%"])
+              ->orWhereRaw("LOWER(CONCAT(last_name,' ',first_name)) like ?", ["%{$name}%"]);
+        });
+    }
+
+    $therapistAppointments = $therapistQuery->get();
+
+    // Map για main appointments (customer + date) για εύκολο matching
+    $mainKeys = [];
+    foreach ($appointments as $a) {
+        if ($a->customer_id && $a->start_time) {
+            $key = $a->customer_id.'|'.$a->start_time->toDateString();
+            $mainKeys[$key] = true;
+        }
+    }
+
+    $therapistMatches = [];
+    $therapistMissing = [];
+
+    foreach ($therapistAppointments as $ta) {
+        if (!$ta->start_time) {
+            continue;
+        }
+
+        $key = $ta->customer_id.'|'.$ta->start_time->toDateString();
+
+        if (isset($mainKeys[$key])) {
+            $therapistMatches[$key] = true;
+        } else {
+            // ΜΟΝΟ όσα ανήκουν στις φιλτραρισμένες ημερομηνίες / πελάτες φτάνουν εδώ
+            $therapistMissing[] = $ta;
+        }
+    }
+
+    $filters = [
+        'from'           => $from,
+        'to'             => $to,
+        'customer'       => $customerName,
+        'payment_status' => $paymentStatus ?? 'all',
+        'payment_method' => $paymentMethod ?? 'all',
+    ];
+
+    return view('professionals.show', compact(
+        'professional',
+        'appointments',
+        'appointmentsCount',
+        'totalAmount',
+        'professionalTotalCut',
+        'paidTotal',
+        'outstandingTotal',
+        'professionalPaid',
+        'professionalOutstanding',
+        'filters',
+        'therapistMatches',
+        'therapistMissing'
+    ));
+}
 }

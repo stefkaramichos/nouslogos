@@ -54,6 +54,28 @@
                         value="{{ old('email', $customer->email) }}"
                     >
                 </div>
+                <div class="mb-3">
+                <label class="form-label">ΑΦΜ</label>
+                <input
+                    type="text"
+                    name="vat_number"
+                    class="form-control"
+                    value="{{ old('vat_number', $customer->vat_number) }}"
+                    required
+                >
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">ΔΟΥ</label>
+                <input
+                    type="text"
+                    name="tax_office"
+                    class="form-control"
+                    value="{{ old('tax_office', $customer->tax_office) }}"
+                    required
+                >
+            </div>
+
 
                 <div class="mb-3">
                     <label class="form-label">Εταιρεία</label>
