@@ -61,6 +61,16 @@
                     </select>
                 </div>
 
+                {{-- Πληροφορίες / Σημειώσεις --}} 
+                <div class="mb-3">
+                    <label class="form-label">Πληροφορίες</label>
+                    <textarea
+                        name="informations"
+                        class="form-control"
+                        rows="3"
+                    >{{ old('informations') }}</textarea>
+                </div>
+
                 <button class="btn btn-primary">Αποθήκευση</button>
                 <a href="{{ route('customers.index') }}" class="btn btn-secondary">Ακύρωση</a>
             </form>

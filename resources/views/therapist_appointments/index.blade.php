@@ -88,8 +88,9 @@
 
                         <td>
                             <a href="{{ route('therapist_appointments.edit', $a) }}"
-                               class="btn btn-sm btn-secondary">
-                                ✏️ Επεξεργασία
+                               class="btn btn-sm btn-secondary" 
+                               title="Επεξεργασία Ραντεβού">
+                                    <i class="bi bi-pencil-square"></i>
                             </a>
 
                             <form method="POST"
@@ -99,8 +100,9 @@
                                 @csrf
                                 @method('DELETE')
 
-                                <button class="btn btn-sm btn-danger">
-                                    🗑 Διαγραφή
+                                <button class="btn btn-sm btn-danger"
+                                            title="Διαγραφή Ραντεβού">
+                                        <i class="bi bi-trash"></i>
                                 </button>
                             </form>
                         </td>

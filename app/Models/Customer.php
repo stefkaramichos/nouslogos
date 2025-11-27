@@ -17,6 +17,7 @@ class Customer extends Model
         'company_id',
         'tax_office', 
         'vat_number', 
+        'informations', 
     ];
 
     public function company()

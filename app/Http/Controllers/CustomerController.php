@@ -50,6 +50,8 @@ class CustomerController extends Controller
                 // ΝΕΑ ΠΕΔΙΑ
                 'tax_office' => 'required|string|max:100', // ΔΟΥ
                 'vat_number' => 'required|string|max:20',  // ΑΦΜ
+
+                'informations' => 'nullable|string',       // 👈 ΝΕΟ
             ],
             [
                 'first_name.required' => 'Το μικρό όνομα είναι υποχρεωτικό.',
@@ -67,6 +69,7 @@ class CustomerController extends Controller
     }
 
 
+
     public function edit(Customer $customer)
     {
         $companies = Company::all();
@@ -76,13 +79,14 @@ class CustomerController extends Controller
     public function update(Request $request, Customer $customer)
     {
         $data = $request->validate([
-            'first_name' => 'required|string|max:100',
-            'last_name'  => 'required|string|max:100',
-            'phone'      => 'required|string|max:30',
-            'email'      => 'nullable|email|max:150',
-            'company_id' => 'required|exists:companies,id',
-            'tax_office' => 'required|string|max:100',
-        'vat_number' => 'required|string|max:20',
+            'first_name'   => 'required|string|max:100',
+            'last_name'    => 'required|string|max:100',
+            'phone'        => 'required|string|max:30',
+            'email'        => 'nullable|email|max:150',
+            'company_id'   => 'required|exists:companies,id',
+            'tax_office'   => 'required|string|max:100',
+            'vat_number'   => 'required|string|max:20',
+            'informations' => 'nullable|string',   // 👈 ΝΕΟ
         ]);
 
         $customer->update($data);
@@ -91,6 +95,7 @@ class CustomerController extends Controller
             ->route('customers.index')
             ->with('success', 'Ο πελάτης ενημερώθηκε επιτυχώς.');
     }
+
 
     
    public function show(Request $request, Customer $customer)

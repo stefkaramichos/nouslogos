@@ -14,17 +14,19 @@
         </div>
         <div class="card-body">
             <div class="row mb-3">
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <p><strong>Ονοματεπώνυμο:</strong> {{ $customer->last_name }} {{ $customer->first_name }}</p>
                     <p><strong>Τηλέφωνο:</strong> {{ $customer->phone }}</p>
                     <p><strong>Email:</strong> {{ $customer->email ?? '-' }}</p>
                     <p><strong>Εταιρεία:</strong> {{ $customer->company->name ?? '-' }}</p>
-                    <p><strong>ΑΦΜ:</strong> {{ $customer->vat_number ?? '-' }}</p>
-                    <p><strong>ΔΟΥ:</strong> {{ $customer->tax_office ?? '-' }}</p>
                     <p><strong>Σύνολο Ραντεβού (με βάση τα φίλτρα):</strong> {{ $appointmentsCount }}</p>
                 </div>
-
-                <div class="col-md-6">
+                <div class="col-md-4">
+                    <p><strong>ΑΦΜ:</strong> {{ $customer->vat_number ?? '-' }}</p>
+                    <p><strong>ΔΟΥ:</strong> {{ $customer->tax_office ?? '-' }}</p>
+                    <p><strong>Πληροφορίες:</strong> {{ $customer->informations ? nl2br(e($customer->informations)) : '-' }}</p>
+                </div>
+                <div class="col-md-4">
                     <p>
                         <strong>Συνολικό Ποσό Ραντεβού:</strong><br>
                         <span class="badge bg-primary fs-6">

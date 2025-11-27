@@ -76,6 +76,16 @@
                 >
             </div>
 
+            <div class="mb-3">
+                <label class="form-label">Πληροφορίες</label>
+                <textarea
+                    name="informations"
+                    class="form-control"
+                    rows="3"
+                >{{ old('informations', $customer->informations) }}</textarea>
+            </div>
+
+
 
                 <div class="mb-3">
                     <label class="form-label">Εταιρεία</label>

@@ -49,6 +49,7 @@
                         <th>ΑΦΜ</th>
                         <th>ΔΟΥ</th>
                         <th>Εταιρεία</th>
+                        <th>Πληροφορίες</th>
                         <th>Ενέργειες</th>
                     </tr>
                     </thead>
@@ -74,13 +75,14 @@
 
                             <td>{{ $customer->company->name ?? '-' }}</td>
 
+                            <td>{{ Str::limit($customer->informations, 20) ?? '-' }}</td>
+
                             <td>
                                 {{-- View --}}
-                                <a href="{{ route('customers.show', $customer) }}"
-                                   class="btn btn-sm btn-info"
-                                   title="Προβολή πελάτη">
-                                    <i class="bi bi-eye"></i>
-                                </a>
+                                <a href="{{ route('appointments.create', ['customer_id' => $customer->id, 'redirect' => request()->fullUrl()]) }}"
+                                    class="btn btn-sm btn-info text-white" τιτλε="Προσθήκη Ραντεβού">
+                                        +
+                                    </a>
 
                                 {{-- Edit --}}
                                 <a href="{{ route('customers.edit', $customer) }}"
