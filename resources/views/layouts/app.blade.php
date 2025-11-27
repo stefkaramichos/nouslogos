@@ -2,6 +2,7 @@
 <html lang="el">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'Booking App')</title>
 
     <!-- Bootstrap 5 CDN -->
@@ -9,9 +10,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-  
-        <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
     <style>
         body {
@@ -28,26 +27,45 @@
         .sidebar .nav-link {
             color: #333;
         }
+
+        /* On small screens let sidebar be auto height */
+        @media (max-width: 767.98px) {
+            .sidebar {
+                min-height: auto;
+            }
+        }
     </style>
 </head>
 <body>
-<div class="container-fluid">
-    <div class="row">
+@php $user = Auth::user(); @endphp
 
-        {{-- Sidebar --}}
-        <nav class="col-md-2 col-lg-2 d-md-block bg-light sidebar py-3">
-            <div class="position-sticky">
-                <div class="px-3 mb-4">
-                    <h4 class="fw-bold">Booking App</h4>
-                    <small class="text-muted">Πάνελ Διαχείρισης</small>
-                </div>
+{{-- MOBILE NAVBAR + OFFCANVAS (visible only on < md) --}}
+<nav class="navbar navbar-expand-md navbar-light bg-light d-md-none">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="#">
+            <img src="{{ asset('images/logo.png') }}" 
+                alt="Booking App" 
+                height="32">
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar"
+                aria-controls="mobileSidebar" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</nav>
 
-                <ul class="nav flex-column px-2">
-                    @php $user = Auth::user(); @endphp
-                    @if($user && $user->role !== 'therapist')
+<div class="offcanvas offcanvas-start d-md-none" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title fw-bold" id="mobileSidebarLabel">Πάνελ Διαχείρισης</h5>
+        <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column justify-content-between">
+        <div>
+            <ul class="nav flex-column mb-3">
+                @if($user && $user->role !== 'therapist')
                     <li class="nav-item mb-1">
                         <a class="nav-link @if(request()->routeIs('customers.*')) active @endif"
-                            href="{{ route('customers.index') }}">
+                           href="{{ route('customers.index') }}">
                             👤 Πελάτες
                         </a>
                     </li>
@@ -63,52 +81,136 @@
                             📅 Ραντεβού
                         </a>
                     </li>
-                    <li class="nav-item mb-1">
-                        @if(Auth::check() && Auth::user()->role === 'owner')
+                    @if(Auth::check() && Auth::user()->role === 'owner')
+                        <li class="nav-item mb-1">
                             <a class="nav-link @if(request()->routeIs('settlements.*')) active @endif"
-                            href="{{ route('settlements.index') }}">
+                               href="{{ route('settlements.index') }}">
                                 📑 Εκκαθάριση
                             </a>
-                        @endif
+                        </li>
+                    @endif
+                @endif
+
+                @if($user && $user->role === 'therapist')
+                    <li class="nav-item mb-1">
+                        <a class="nav-link @if(request()->routeIs('therapist_appointments.*')) active @endif"
+                           href="{{ route('therapist_appointments.index') }}">
+                            🗓 Ραντεβού θεραπευτών
+                        </a>
                     </li>
-                    @endif
+                @endif
+            </ul>
+        </div>
 
-                    @if($user && $user->role === 'therapist')
-                     <ul class="nav flex-column px-2">
-                        <li class="nav-item mb-1">
-                            <a class="nav-link @if(request()->routeIs('therapist_appointments.*')) active @endif"
-                            href="{{ route('therapist_appointments.index') }}">
-                                🗓 Τα ραντεβού μου
-                            </a>
-                        </li>
+      <div class="mt-3">
+
+    {{-- Owner: Ραντεβού θεραπευτών --}}
+    @if($user && $user->role === 'owner')
+        <a class="btn btn-outline-primary w-100 mb-2 
+           @if(request()->routeIs('therapist_appointments.*')) active @endif"
+           href="{{ route('therapist_appointments.index') }}">
+            🗓 Ραντεβού θεραπευτών
+        </a>
+    @endif
+
+    {{-- Logout --}}
+    <form action="{{ route('logout') }}" method="POST" class="d-flex align-items-center">
+        @csrf
+        <button class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center">
+            <i class="bi bi-box-arrow-right me-2"></i> Αποσύνδεση
+        </button>
+    </form>
+</div>
+
+    </div>
+</div>
+
+<div class="container-fluid">
+    <div class="row">
+
+        {{-- DESKTOP SIDEBAR (visible only on >= md) --}}
+        <nav class="col-md-2 col-lg-2 d-none d-md-block bg-light sidebar py-3">
+            <div class="position-sticky d-flex flex-column justify-content-between h-100">
+                <div>
+                    <div class="px-3 mb-4">
+                         <a class="navbar-brand fw-bold" href="#">
+                            <img src="{{ asset('images/logo.png') }}" 
+                                alt="Booking App" 
+                                height="32">
+                        </a>
+                    </div>
+                    <hr>
+                    <ul class="nav flex-column px-2">
+                        @if($user && $user->role !== 'therapist')
+                            <li class="nav-item mb-1">
+                                <a class="nav-link @if(request()->routeIs('customers.*')) active @endif"
+                                   href="{{ route('customers.index') }}">
+                                    👤 Πελάτες
+                                </a>
+                            </li>
+                            <li class="nav-item mb-1">
+                                <a class="nav-link @if(request()->routeIs('professionals.*')) active @endif"
+                                   href="{{ route('professionals.index') }}">
+                                    💼 Επαγγελματίες
+                                </a>
+                            </li>
+                            <li class="nav-item mb-1">
+                                <a class="nav-link @if(request()->routeIs('appointments.*')) active @endif"
+                                   href="{{ route('appointments.index') }}">
+                                    📅 Ραντεβού
+                                </a>
+                            </li>
+                            @if(Auth::check() && Auth::user()->role === 'owner')
+                                <li class="nav-item mb-1">
+                                    <a class="nav-link @if(request()->routeIs('settlements.*')) active @endif"
+                                       href="{{ route('settlements.index') }}">
+                                        📑 Εκκαθάριση
+                                    </a>
+                                </li>
+                            @endif
+                        @endif
+
+                        @if($user && $user->role === 'therapist')
+                            <li class="nav-item mb-1">
+                                <a class="nav-link @if(request()->routeIs('therapist_appointments.*')) active @endif"
+                                   href="{{ route('therapist_appointments.index') }}">
+                                    🗓 Ραντεβού θεραπευτών
+                                </a>
+                            </li>
+                        @endif
+
+                      
                     </ul>
-                    @endif
+                </div>
 
-                </ul>
-            </div>
-            <div class="nav-item mt-3 logout-button">
-                  @if($user && $user->role === 'owner')
-                        <li class="nav-item mb-1">
-                            <a class="nav-link @if(request()->routeIs('therapist_appointments.*')) active @endif"
-                            href="{{ route('therapist_appointments.index') }}">
-                                🗓 Τα ραντεβού μου
-                            </a>
-                        </li>
-                    @endif
-                <form action="{{ route('logout') }}" method="POST" class="d-flex align-items-center">
-                    @csrf
-                    <button class="btn w-100 d-flex align-items-center justify-content-center">
-                        <i class="bi bi-box-arrow-right me-2"></i> Αποσύνδεση
-                    </button>
-                </form>
+             <div class="px-2 mt-3">
+
+    {{-- Owner: Ραντεβού θεραπευτών --}}
+    @if($user && $user->role === 'owner')
+        <a class="btn btn-outline-primary w-100 mb-2 
+           @if(request()->routeIs('therapist_appointments.*')) active @endif"
+           href="{{ route('therapist_appointments.index') }}">
+            🗓 Ραντεβού θεραπευτών
+        </a>
+    @endif
+
+    {{-- Logout --}}
+    <form action="{{ route('logout') }}" method="POST" class="d-flex align-items-center">
+        @csrf
+        <button class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center">
+            <i class="bi bi-box-arrow-right me-2"></i> Αποσύνδεση
+        </button>
+    </form>
+</div>
+
             </div>
         </nav>
 
-        {{-- Main Content --}}
-        <main class="col-md-10 ms-sm-auto col-lg-10 px-md-4 py-4">
+        {{-- MAIN CONTENT --}}
+        <main class="col-12 col-md-10 ms-sm-auto col-lg-10 px-3 px-md-4 py-4">
 
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4">
-                <h2 class="h3">@yield('title', 'Επισκόπηση')</h2>
+                <h2 class="h3 mb-0">@yield('title', 'Επισκόπηση')</h2>
             </div>
 
             {{-- Flash messages --}}
