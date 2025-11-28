@@ -84,7 +84,7 @@
                         <td>{{ $a->id }}</td>
                         <td>{{ $a->customer->last_name }} {{ $a->customer->first_name }}</td>
                         <td>{{ \Carbon\Carbon::parse($a->start_time)->format('d/m/Y H:i') }}</td>
-                        <td>{{ $a->notes ?: '-' }}</td>
+                        <td title="{{ $a->notes }}">{{ $a->notes ? Str::limit($a->notes, 30) : '-' }}</td>
 
                         <td>
                             <a href="{{ route('therapist_appointments.edit', $a) }}"

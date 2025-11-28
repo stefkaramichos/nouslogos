@@ -246,7 +246,9 @@ class AppointmentController extends Controller
         $appointment->load(['customer', 'professional', 'company']);
 
         $customers     = Customer::orderBy('last_name')->get();
-        $professionals = Professional::orderBy('last_name')->get();
+         $professionals = Professional::whereIn('role', ['owner', 'therapist'])
+            ->orderBy('last_name')
+            ->get();
         $companies     = Company::all();
 
         return view('appointments.edit', compact('appointment', 'customers', 'professionals', 'companies'));

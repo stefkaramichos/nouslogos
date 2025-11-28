@@ -32,14 +32,17 @@
                     </select>
                 </div>
 
-                {{-- Επαγγελματίας --}}
+               {{-- Επαγγελματίας --}}
                 <div class="mb-3">
                     <label class="form-label">Επαγγελματίας</label>
-                    <select name="professional_id" class="form-select" required>
+                    <select name="professional_id" id="professional_select" class="form-select" required>
                         <option value="">-- Επιλέξτε επαγγελματία --</option>
                         @foreach($professionals as $professional)
-                            <option value="{{ $professional->id }}"
-                                @selected(old('professional_id', $appointment->professional_id) == $professional->id)>
+                            <option
+                                value="{{ $professional->id }}"
+                                data-role="{{ $professional->role }}"
+                                @selected(old('professional_id', $appointment->professional_id) == $professional->id)
+                            >
                                 {{ $professional->last_name }} {{ $professional->first_name }} ({{ $professional->phone }})
                             </option>
                         @endforeach
@@ -110,7 +113,7 @@
                     >
                 </div>
 
-                <div class="mb-3">
+                <div class="mb-3" id="professional_amount_group">
                     <label class="form-label">Ποσό Επαγγελματία (€)</label>
                     <input type="number" step="0.01" name="professional_amount"
                         class="form-control"
@@ -135,10 +138,41 @@
 @endsection
 @push('scripts')
 <script>
-    flatpickr("#start_time", {
-        enableTime: true,
-        dateFormat: "Y-m-d H:i",
-        minuteIncrement: 15
+    document.addEventListener('DOMContentLoaded', function () {
+        // flatpickr init
+        flatpickr("#start_time", {
+            enableTime: true,
+            dateFormat: "Y-m-d H:i",
+            minuteIncrement: 15
+        });
+
+        function toggleProfessionalAmount() {
+            const select  = document.getElementById('professional_select');
+            const group   = document.getElementById('professional_amount_group');
+            const input   = document.querySelector('input[name="professional_amount"]');
+
+            if (!select || !group) return;
+
+            const selectedOption = select.options[select.selectedIndex];
+            const role = selectedOption ? selectedOption.getAttribute('data-role') : null;
+
+            if (role === 'owner') {
+                group.style.display = ''; // show
+            } else {
+                group.style.display = 'none'; // hide
+                if (input) {
+                    input.value = ''; // καθαρισμός τιμής
+                }
+            }
+        }
+
+        const professionalSelect = document.getElementById('professional_select');
+        if (professionalSelect) {
+            professionalSelect.addEventListener('change', toggleProfessionalAmount);
+        }
+
+        // αρχική κατάσταση (τρέχον επαγγελματίας ραντεβού)
+        toggleProfessionalAmount();
     });
 </script>
 @endpush

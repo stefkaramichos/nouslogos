@@ -25,18 +25,23 @@
                     </select>
                 </div>
 
-                {{-- ΕΠΑΓΓΕΛΜΑΤΙΑΣ --}}
+              {{-- ΕΠΑΓΓΕΛΜΑΤΙΑΣ --}}
                 <div class="mb-3">
                     <label class="form-label">Επαγγελματίας</label>
                     <select name="professional_id" id="professional_select" class="form-select select2" required>
                         <option value="">-- Επιλέξτε επαγγελματία --</option>
                         @foreach($professionals as $professional)
-                            <option value="{{ $professional->id }}" @selected(old('professional_id') == $professional->id)>
+                            <option
+                                value="{{ $professional->id }}"
+                                data-role="{{ $professional->role }}"
+                                @selected(old('professional_id') == $professional->id)
+                            >
                                 {{ $professional->last_name }} {{ $professional->first_name }} ({{ $professional->phone }})
                             </option>
                         @endforeach
                     </select>
                 </div>
+
 
                 {{-- ΕΤΑΙΡΕΙΑ --}}
                 <div class="mb-3">
@@ -85,7 +90,7 @@
                 </div>
 
                 {{-- ΠΟΣΟ ΕΠΑΓΓΕΛΜΑΤΙΑ --}}
-                <div class="mb-3">
+                <div class="mb-3" id="professional_amount_group">
                     <label class="form-label">Ποσό Επαγγελματία (€)</label>
                     <input
                         type="number"
@@ -136,6 +141,28 @@ $(function () {
 
     const lastAppointmentUrl      = "{{ route('customers.lastAppointment') }}";
     const professionalCompanyUrl  = "{{ route('professionals.getCompany') }}";
+
+    function toggleProfessionalAmount() {
+        const selectedOption = $('#professional_select').find('option:selected');
+        const role = selectedOption.data('role');
+
+        if (role === 'owner') {
+            $('#professional_amount_group').show();
+        } else {
+            $('#professional_amount_group').hide();
+            // Optional: καθάρισε το πεδίο όταν δεν είναι owner
+            $('#professional_amount_input').val('');
+        }
+    }
+
+    // Bind change event
+    $('#professional_select').on('change', function () {
+        toggleProfessionalAmount();
+        // (κρατάς και τα δικά σου υπάρχοντα actions εδώ)
+    });
+
+    // Αρχική κατάσταση όταν φορτώνει η σελίδα
+    toggleProfessionalAmount();
 
     // === ΕΠΑΓΓΕΛΜΑΤΙΑΣ change -> φέρε εταιρεία ===
     $('#professional_select').on('change', function () {

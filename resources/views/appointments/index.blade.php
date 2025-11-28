@@ -217,8 +217,8 @@
                                 @endif
                             </td>
 
-                             <td>
-                                {{ $appointment->notes ? Str::limit($appointment->notes, 50) : '-' }}
+                             <td title="{{ $appointment->notes }}">
+                                {{ $appointment->notes ? Str::limit($appointment->notes, 30) : '-' }}
                             </td>
 
                             {{-- Ενέργειες --}}
