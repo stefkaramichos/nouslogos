@@ -46,6 +46,7 @@
                         <th>Ονοματεπώνυμο</th>
                         <th>Τηλέφωνο</th>
                         <th>Email</th>
+                        <th>Μισθός</th>
                         <th>Εταιρεία</th>
                         {{-- <th>Χρέωση (€)</th>
                         <th>Ποσό Επαγγελματία</th> --}}
@@ -64,7 +65,14 @@
 
                             <td>{{ $professional->phone }}</td>
                             <td>{{ $professional->email ?? '-' }}</td>
-                            <td>{{ $professional->company->name ?? '-' }}</td>
+                            <td>
+                                @if(!is_null($professional->salary))
+                                    {{ number_format($professional->salary, 2, ',', '.') }} €
+                                @else
+                                    -
+                                @endif
+                            </td>
+                                                <td>{{ $professional->company->name ?? '-' }}</td>
                             {{-- <td>{{ number_format($professional->service_fee, 2, ',', '.') }}</td>
                             <td>{{ number_format($professional->percentage_cut, 2, ',', '.') }}</td> --}}
                             <td>

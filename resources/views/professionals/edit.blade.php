@@ -55,6 +55,19 @@
                     >
                 </div>
 
+                {{-- Μισθός --}}
+                <div class="mb-3">
+                    <label class="form-label">Μισθός (€/μήνα)</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        name="salary"
+                        class="form-control"
+                        value="{{ old('salary', $professional->salary) }}"
+                    >
+                </div>
+
                 <div class="mb-3">
                     <label class="form-label">Εταιρεία</label>
                     <select name="company_id" class="form-select" required>
@@ -69,30 +82,6 @@
                         @endforeach
                     </select>
                 </div>
-
-                {{-- <div class="mb-3">
-                    <label class="form-label">Χρέωση Υπηρεσίας (€)</label>
-                    <input
-                        type="number"
-                        step="0.01"
-                        name="service_fee"
-                        class="form-control"
-                        value="{{ old('service_fee', $professional->service_fee) }}"
-                        required
-                    >
-                </div> --}}
-
-                {{-- <div class="mb-3">
-                    <label class="form-label">Ποσό που παίρνει ο επαγγελματίας</label>
-                    <input
-                        type="number"
-                        step="0.01"
-                        name="percentage_cut"
-                        class="form-control"
-                        value="{{ old('percentage_cut', $professional->percentage_cut) }}"
-                        required
-                    >
-                </div> --}}
 
                 <button class="btn btn-primary">Αποθήκευση Αλλαγών</button>
                 <a href="{{ route('professionals.index') }}" class="btn btn-secondary">Ακύρωση</a>

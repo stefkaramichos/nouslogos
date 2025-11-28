@@ -18,6 +18,7 @@ class Professional extends Authenticatable
         'company_id',
         'service_fee',
         'percentage_cut',
+         'salary',
         'is_active',
         'password',
         'role',

@@ -43,9 +43,9 @@
 <nav class="navbar navbar-expand-md navbar-light bg-light d-md-none">
     <div class="container-fluid">
         <a class="navbar-brand fw-bold" href="#">
-            <img src="{{ asset('images/logo.png') }}" 
-                alt="Booking App" 
-                height="32">
+            <img src="{{ asset('images/logo.png') }}"
+                 alt="Booking App"
+                 height="32">
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar"
                 aria-controls="mobileSidebar" aria-label="Toggle navigation">
@@ -81,6 +81,13 @@
                             📅 Ραντεβού
                         </a>
                     </li>
+                    {{-- NEW: Έξοδα --}}
+                    <li class="nav-item mb-1">
+                        <a class="nav-link @if(request()->routeIs('expenses.*')) active @endif"
+                           href="{{ route('expenses.index') }}">
+                            💸 Έξοδα
+                        </a>
+                    </li>
                     @if(Auth::check() && Auth::user()->role === 'owner')
                         <li class="nav-item mb-1">
                             <a class="nav-link @if(request()->routeIs('settlements.*')) active @endif"
@@ -102,25 +109,25 @@
             </ul>
         </div>
 
-      <div class="mt-3">
+        <div class="mt-3">
 
-    {{-- Owner: Ραντεβού θεραπευτών --}}
-    @if($user && $user->role === 'owner')
-        <a class="btn btn-outline-primary w-100 mb-2 
-           @if(request()->routeIs('therapist_appointments.*')) active @endif"
-           href="{{ route('therapist_appointments.index') }}">
-            🗓 Ραντεβού θεραπευτών
-        </a>
-    @endif
+            {{-- Owner: Ραντεβού θεραπευτών --}}
+            @if($user && $user->role === 'owner')
+                <a class="btn btn-outline-primary w-100 mb-2
+                   @if(request()->routeIs('therapist_appointments.*')) active @endif"
+                   href="{{ route('therapist_appointments.index') }}">
+                    🗓 Ραντεβού θεραπευτών
+                </a>
+            @endif
 
-    {{-- Logout --}}
-    <form action="{{ route('logout') }}" method="POST" class="d-flex align-items-center">
-        @csrf
-        <button class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center">
-            <i class="bi bi-box-arrow-right me-2"></i> Αποσύνδεση
-        </button>
-    </form>
-</div>
+            {{-- Logout --}}
+            <form action="{{ route('logout') }}" method="POST" class="d-flex align-items-center">
+                @csrf
+                <button class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center">
+                    <i class="bi bi-box-arrow-right me-2"></i> Αποσύνδεση
+                </button>
+            </form>
+        </div>
 
     </div>
 </div>
@@ -133,10 +140,10 @@
             <div class="position-sticky d-flex flex-column justify-content-between h-100">
                 <div>
                     <div class="px-3 mb-4">
-                         <a class="navbar-brand fw-bold" href="#">
-                            <img src="{{ asset('images/logo.png') }}" 
-                                alt="Booking App" 
-                                height="32">
+                        <a class="navbar-brand fw-bold" href="#">
+                            <img src="{{ asset('images/logo.png') }}"
+                                 alt="Booking App"
+                                 height="32">
                         </a>
                     </div>
                     <hr>
@@ -160,6 +167,13 @@
                                     📅 Ραντεβού
                                 </a>
                             </li>
+                            {{-- NEW: Έξοδα --}}
+                            <li class="nav-item mb-1">
+                                <a class="nav-link @if(request()->routeIs('expenses.*')) active @endif"
+                                   href="{{ route('expenses.index') }}">
+                                    💸 Έξοδα
+                                </a>
+                            </li>
                             @if(Auth::check() && Auth::user()->role === 'owner')
                                 <li class="nav-item mb-1">
                                     <a class="nav-link @if(request()->routeIs('settlements.*')) active @endif"
@@ -178,30 +192,28 @@
                                 </a>
                             </li>
                         @endif
-
-                      
                     </ul>
                 </div>
 
-             <div class="px-2 mt-3">
+                <div class="px-2 mt-3">
 
-    {{-- Owner: Ραντεβού θεραπευτών --}}
-    @if($user && $user->role === 'owner')
-        <a class="btn btn-outline-primary w-100 mb-2 
-           @if(request()->routeIs('therapist_appointments.*')) active @endif"
-           href="{{ route('therapist_appointments.index') }}">
-            🗓 Ραντεβού θεραπευτών
-        </a>
-    @endif
+                    {{-- Owner: Ραντεβού θεραπευτών --}}
+                    @if($user && $user->role === 'owner')
+                        <a class="btn btn-outline-primary w-100 mb-2
+                           @if(request()->routeIs('therapist_appointments.*')) active @endif"
+                           href="{{ route('therapist_appointments.index') }}">
+                            🗓 Ραντεβού θεραπευτών
+                        </a>
+                    @endif
 
-    {{-- Logout --}}
-    <form action="{{ route('logout') }}" method="POST" class="d-flex align-items-center">
-        @csrf
-        <button class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center">
-            <i class="bi bi-box-arrow-right me-2"></i> Αποσύνδεση
-        </button>
-    </form>
-</div>
+                    {{-- Logout --}}
+                    <form action="{{ route('logout') }}" method="POST" class="d-flex align-items-center">
+                        @csrf
+                        <button class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center">
+                            <i class="bi bi-box-arrow-right me-2"></i> Αποσύνδεση
+                        </button>
+                    </form>
+                </div>
 
             </div>
         </nav>

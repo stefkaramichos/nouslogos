@@ -25,7 +25,20 @@
                     <label class="form-label">Τηλέφωνο</label>
                     <input type="text" name="phone" class="form-control" value="{{ old('phone') }}" required>
                 </div>
-                
+
+                {{-- Μισθός --}}
+                <div class="mb-3">
+                    <label class="form-label">Μισθός (€/μήνα)</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        name="salary"
+                        class="form-control"
+                        value="{{ old('salary') }}"
+                    >
+                </div>
+
                 <div class="mb-3">
                     <label class="form-label">Εταιρεία</label>
                     <select name="company_id" class="form-select" required>
@@ -51,19 +64,6 @@
                     <label class="form-label">Επιβεβαίωση Κωδικού</label>
                     <input type="password" name="password_confirmation" class="form-control" required>
                 </div>
-
-{{-- 
-                <div class="mb-3">
-                    <label class="form-label">Χρέωση Υπηρεσίας (€)</label>
-                    <input type="number" step="0.01" name="service_fee" class="form-control"
-                           value="{{ old('service_fee') }}" required>
-                </div> --}}
-
-                {{-- <div class="mb-3">
-                    <label class="form-label">Ποσό που παίρνει ο επαγγελματίας</label>
-                    <input type="number" step="0.01" name="percentage_cut" class="form-control"
-                           value="{{ old('percentage_cut') }}" >
-                </div> --}}
 
                 <button class="btn btn-primary">Αποθήκευση</button>
                 <a href="{{ route('professionals.index') }}" class="btn btn-secondary">Ακύρωση</a>

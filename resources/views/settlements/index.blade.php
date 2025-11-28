@@ -71,6 +71,8 @@
                 </div>
             </div>
 
+          
+
             <hr>
 
             {{-- Τελική εκκαθάριση ανά συνεταίρο --}}
@@ -116,6 +118,59 @@
                 </div>
             </div>
 
+              {{-- Έξοδα & Μισθοί --}}
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="border rounded p-3 h-100">
+                        <h6 class="text-muted mb-1">Συνολικά καταγεγραμμένα έξοδα περιόδου</h6>
+                        <strong>{{ number_format($expensesTotal, 2, ',', '.') }} €</strong>
+                        {{-- <p class="mb-0 mt-2">
+                            <small class="text-muted">
+                                Προέρχονται από τον πίνακα <code>expenses</code>.
+                            </small>
+                        </p> --}}
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="border rounded p-3 h-100">
+                        <h6 class="text-muted mb-1">
+                            Μισθοί υπαλλήλων για το διάστημα
+                        </h6>
+                        <p class="mb-1">
+                            <small class="text-muted d-block">
+                                Αριθμός μηνών στο διάστημα:
+                            </small>
+                            <strong>{{ $monthsCount }}</strong>
+                        </p>
+                        <p class="mb-0">
+                            <strong>Σύνολο μισθών (όλοι οι υπάλληλοι):</strong><br>
+                            <span class="badge bg-secondary fs-6">
+                                {{ number_format($employeesTotalSalary, 2, ',', '.') }} €
+                            </span>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="border rounded p-3 h-100">
+                        <h6 class="text-muted mb-1">Σύνολο εξόδων & Net εταιρείας</h6>
+                        <p class="mb-1">
+                            <strong>Σύνολο εξόδων (έξοδα + μισθοί):</strong><br>
+                            <span class="badge bg-danger fs-6">
+                                {{ number_format($totalOutflow, 2, ',', '.') }} €
+                            </span>
+                        </p>
+                        {{-- <p class="mb-0">
+                            <strong>Net εταιρείας μετά έξοδα:</strong><br>
+                            <span class="badge bg-info fs-6">
+                                {{ number_format($companyNetAfterExpenses, 2, ',', '.') }} €
+                            </span>
+                        </p> --}}
+                    </div>
+                </div>
+            </div>
+
             {{-- Γραφήματα --}}
             <div class="row g-3 mb-4">
                 <div class="col-md-6">
@@ -142,7 +197,7 @@
             </div>
 
             {{-- Αναλυτικός πίνακας πληρωμών --}}
-            <div class="card">
+            <div class="card mb-4">
                 <div class="card-header">
                     Αναλυτικές Πληρωμές Περιόδου
                 </div>
@@ -213,6 +268,103 @@
                                 </tr>
                             @endforelse
                             </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Αναλυτικοί μισθοί υπαλλήλων --}}
+            <div class="card mb-4">
+                <div class="card-header">
+                    Μισθοί Υπαλλήλων για το διάστημα ({{ $monthsCount }} μήνες)
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0 align-middle">
+                            <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Ονοματεπώνυμο</th>
+                                <th>Ρόλος</th>
+                                <th>Μηνιαίος μισθός (€)</th>
+                                <th>Μήνες</th>
+                                <th>Σύνολο περιόδου (€)</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @forelse($employeesSalaryRows as $row)
+                                @php
+                                    $p = $row['professional'];
+                                @endphp
+                                <tr>
+                                    <td>{{ $p->id }}</td>
+                                    <td>{{ $p->last_name }} {{ $p->first_name }}</td>
+                                    <td>{{ $p->role }}</td>
+                                    <td>{{ number_format($row['monthly_salary'], 2, ',', '.') }}</td>
+                                    <td>{{ $row['months'] }}</td>
+                                    <td>{{ number_format($row['period_salary'], 2, ',', '.') }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">
+                                        Δεν υπάρχουν υπάλληλοι με καταχωρημένο μισθό.
+                                    </td>
+                                </tr>
+                            @endforelse
+                            </tbody>
+                            @if(count($employeesSalaryRows) > 0)
+                                <tfoot>
+                                <tr>
+                                    <th colspan="5" class="text-end">Σύνολο μισθών περιόδου:</th>
+                                    <th>{{ number_format($employeesTotalSalary, 2, ',', '.') }} €</th>
+                                </tr>
+                                </tfoot>
+                            @endif
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Αναλυτικά Έξοδα Περιόδου --}}
+            <div class="card">
+                <div class="card-header">
+                    Αναλυτικά Έξοδα Περιόδου
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0 align-middle">
+                            <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Ημ/νία</th>
+                                <th>Περιγραφή</th>
+                                <th>Ποσό (€)</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @forelse($expensesList as $exp)
+                                <tr>
+                                    <td>{{ $exp->id }}</td>
+                                    <td>{{ $exp->created_at?->format('d/m/Y H:i') ?? '-' }}</td>
+                                    <td>{{ $exp->description ?? '-' }}</td>
+                                    <td>{{ number_format($exp->amount, 2, ',', '.') }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-4">
+                                        Δεν υπάρχουν καταγεγραμμένα έξοδα στο επιλεγμένο διάστημα.
+                                    </td>
+                                </tr>
+                            @endforelse
+                            </tbody>
+                            @if(count($expensesList) > 0)
+                                <tfoot>
+                                <tr>
+                                    <th colspan="3" class="text-end">Σύνολο εξόδων:</th>
+                                    <th>{{ number_format($expensesTotal, 2, ',', '.') }} €</th>
+                                </tr>
+                                </tfoot>
+                            @endif
                         </table>
                     </div>
                 </div>

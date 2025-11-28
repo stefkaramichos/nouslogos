@@ -8,6 +8,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Hash;
 use App\Models\Professional;
+use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\TherapistAppointmentController;
 use App\Http\Controllers\SettlementController;
 
@@ -56,6 +57,10 @@ Route::middleware('auth')->group(function () {
  
     Route::get('/settlements', [SettlementController::class, 'index'])
             ->name('settlements.index');
+
+    Route::resource('expenses', ExpenseController::class)
+    ->middleware(['auth', 'role:owner,grammatia']);
+
 
 });
 

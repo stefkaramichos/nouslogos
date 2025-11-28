@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Payment;
+use App\Models\Expense;
+use App\Models\Professional;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -74,7 +76,6 @@ class SettlementController extends Controller
         $partnerCashNoTaxProfessional = 0;
 
         // για διαγράμματα ανά μέρα
-        // ΤΩΡΑ: μόνο προσωπικά έσοδα Γιάννη / Ελένης
         // ['Y-m-d' => ['giannis' => ..., 'eleni' => ... ]]
         $daily = [];
 
@@ -222,6 +223,67 @@ class SettlementController extends Controller
             'eleni'   => array_map(fn($d) => round($d['eleni'], 2), $daily),
         ];
 
+        // ----------------- ΕΞΟΔΑ & ΜΙΣΘΟΙ -----------------
+
+        // Έξοδα από πίνακα expenses στο ίδιο διάστημα
+        $expensesQuery = Expense::query();
+
+        if ($from) {
+            $expensesQuery->whereDate('created_at', '>=', $from);
+        }
+        if ($to) {
+            $expensesQuery->whereDate('created_at', '<=', $to);
+        }
+
+        $expensesList  = $expensesQuery->orderBy('created_at', 'desc')->get();
+        $expensesTotal = (float) $expensesList->sum('amount');
+
+        // Πόσοι μήνες καλύπτει το διάστημα (π.χ. 2 μήνες => 2 μισθοί)
+        // Πόσες μέρες καλύπτει το διάστημα (inclusive)
+        $startDate = Carbon::parse($from);
+        $endDate   = Carbon::parse($to);
+
+        // diffInDays = διαφορά χωρίς να μετράει και τις 2 άκρες, οπότε +1 για inclusive
+        $daysDiff = $startDate->diffInDays($endDate) + 1;
+
+        // Από 0–31 ημέρες => 1 μισθός, 32–62 => 2, κ.ο.κ.
+        $monthsCount = (int) ceil($daysDiff / 31);
+
+        // ασφαλιστική δικλείδα: τουλάχιστον 1
+        if ($monthsCount < 1) {
+            $monthsCount = 1;
+        }
+
+
+        // Υπάλληλοι με μισθό
+        $employees           = Professional::whereNotNull('salary')
+            ->where('salary', '>', 0)
+            ->orderBy('last_name')
+            ->get();
+
+        $employeesSalaryRows  = [];
+        $employeesTotalSalary = 0.0;
+
+        foreach ($employees as $employee) {
+            $monthly = (float) $employee->salary;
+            $period  = $monthly * $monthsCount;
+
+            $employeesSalaryRows[] = [
+                'professional'   => $employee,
+                'monthly_salary' => $monthly,
+                'months'         => $monthsCount,
+                'period_salary'  => $period,
+            ];
+
+            $employeesTotalSalary += $period;
+        }
+
+        // Σύνολο εξόδων = έξοδα + μισθοί όλων των υπαλλήλων
+        $totalOutflow = $expensesTotal + $employeesTotalSalary;
+
+        // "Net" της επιχείρησης στην τράπεζα μετά τα έξοδα
+        $companyNetAfterExpenses = $companyBankTotal - $totalOutflow;
+
         $filters = [
             'from' => $from,
             'to'   => $to,
@@ -243,7 +305,15 @@ class SettlementController extends Controller
             'partner2Total',
             'chartDistribution',
             'dailyChart',
-            'payments'
+            'payments',
+            // ΝΕΑ δεδομένα για έξοδα + μισθούς
+            'expensesList',
+            'expensesTotal',
+            'monthsCount',
+            'employeesSalaryRows',
+            'employeesTotalSalary',
+            'totalOutflow',
+            'companyNetAfterExpenses'
         ));
     }
 }
