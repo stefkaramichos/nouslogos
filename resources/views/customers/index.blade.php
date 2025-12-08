@@ -92,7 +92,7 @@
                                 </a>
 
                                 {{-- Delete --}}
-                                <form action="{{ route('customers.destroy', $customer) }}"
+                                {{-- <form action="{{ route('customers.destroy', $customer) }}"
                                       method="POST"
                                       class="d-inline"
                                       onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτόν τον πελάτη;');">
@@ -102,7 +102,7 @@
                                             title="Διαγραφή πελάτη">
                                         <i class="bi bi-trash"></i>
                                     </button>
-                                </form>
+                                </form> --}}
                             </td>
 
                         </tr>

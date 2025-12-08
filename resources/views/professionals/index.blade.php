@@ -91,7 +91,7 @@
                                 </a>
 
                                 {{-- Παλιά διαγραφή – κρατάω σχολιασμένη --}}
-                                
+{{--                                 
                                 <form action="{{ route('professionals.destroy', $professional) }}"
                                     method="POST"
                                     class="d-inline"
@@ -103,7 +103,7 @@
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
-                               
+                                --}}
 
                               
                           @if(auth()->user()->role === 'owner' && $professional->role != 'owner')
