@@ -26,7 +26,7 @@
                 <div class="mb-3">
                     <label class="form-label">Τηλέφωνο</label>
                     <input type="text" name="phone" class="form-control"
-                           value="{{ old('phone') }}" required>
+                           value="{{ old('phone') }}" >
                 </div>
 
                 <div class="mb-3">
@@ -51,7 +51,7 @@
 
                 <div class="mb-3">
                     <label class="form-label">Εταιρεία</label>
-                    <select name="company_id" class="form-select" required>
+                    <select name="company_id" class="form-select" >
                         <option value="">-- Επιλέξτε εταιρεία --</option>
                         @foreach($companies as $company)
                             <option value="{{ $company->id }}" @selected(old('company_id') == $company->id)>

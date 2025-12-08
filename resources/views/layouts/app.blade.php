@@ -41,7 +41,7 @@
 
 {{-- MOBILE NAVBAR + OFFCANVAS (visible only on < md) --}}
 <nav class="navbar navbar-expand-md navbar-light bg-light d-md-none">
-    <div class="container-fluid">
+    <div class="container-fluid logo-img ">
         <a class="navbar-brand fw-bold" href="#">
             <img src="{{ asset('images/logo.png') }}"
                  alt="Booking App"
@@ -136,10 +136,10 @@
     <div class="row">
 
         {{-- DESKTOP SIDEBAR (visible only on >= md) --}}
-        <nav class="col-md-2 col-lg-2 d-none d-md-block bg-light sidebar py-3">
+        <nav class="col-md-2  col-lg-2 d-none d-md-block bg-light sidebar py-3">
             <div class="position-sticky d-flex flex-column justify-content-between h-100">
                 <div>
-                    <div class="px-3 mb-4">
+                    <div class="px-3 logo-img mb-4">
                         <a class="navbar-brand fw-bold" href="#">
                             <img src="{{ asset('images/logo.png') }}"
                                  alt="Booking App"

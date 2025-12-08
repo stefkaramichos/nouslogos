@@ -75,8 +75,8 @@ class TherapistAppointmentController extends Controller
         $customers = Customer::orderBy('last_name')->get();
         $professionals = [];
 
-        if ($user->role === 'owner') {
-            $professionals = Professional::where('company_id', $user->company_id)
+       if ($user->role === 'owner') {
+            $professionals = Professional::whereIn('role', ['therapist', 'owner'])
                 ->orderBy('last_name')
                 ->get();
         }

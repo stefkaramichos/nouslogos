@@ -44,7 +44,7 @@ class ProfessionalController extends Controller
         $data = $request->validate(
             [
                 'first_name'     => 'required|string|max:100',
-                'last_name'      => 'required|string|max:100',
+                'last_name'      => 'nullable|string|max:100',
                 'phone'          => 'nullable|string|max:30',
                 'email'          => 'nullable|email|max:150',
                 'companies'      => 'required|array',
@@ -128,7 +128,7 @@ class ProfessionalController extends Controller
         // Βασικοί κανόνες για όλους
         $rules = [
             'first_name'     => 'required|string|max:100',
-            'last_name'      => 'required|string|max:100',
+            'last_name'      => 'nullable|string|max:100',
             'phone'          => 'nullable|string|max:30',
             'email'          => 'nullable|email|max:150',
             'companies'      => 'required|array',

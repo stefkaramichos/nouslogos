@@ -53,3 +53,8 @@ label {
 .nav-link{
     border-radius: 5px;
 }
+
+.logo-img  img{
+    max-width: 200px;
+    margin: auto;
+}

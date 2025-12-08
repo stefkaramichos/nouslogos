@@ -30,7 +30,7 @@
                         name="last_name"
                         class="form-control"
                         value="{{ old('last_name', $professional->last_name) }}"
-                        required
+                        
                     >
                 </div>
 

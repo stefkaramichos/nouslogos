@@ -41,7 +41,6 @@
                         name="phone"
                         class="form-control"
                         value="{{ old('phone', $customer->phone) }}"
-                        required
                     >
                 </div>
 
@@ -61,7 +60,7 @@
                     name="vat_number"
                     class="form-control"
                     value="{{ old('vat_number', $customer->vat_number) }}"
-                    required
+                    
                 >
             </div>
 
@@ -72,7 +71,7 @@
                     name="tax_office"
                     class="form-control"
                     value="{{ old('tax_office', $customer->tax_office) }}"
-                    required
+                    
                 >
             </div>
 

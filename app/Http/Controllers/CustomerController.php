@@ -24,7 +24,9 @@ class CustomerController extends Controller
                     });
             })
             ->orderBy('last_name')
-            ->get();
+            ->paginate(25)
+            ->withQueryString();   // <-- keeps search when switching page
+
 
         return view('customers.index', compact('customers', 'search'));
     }
@@ -43,13 +45,13 @@ class CustomerController extends Controller
             [
                 'first_name' => 'required|string|max:100',
                 'last_name'  => 'required|string|max:100',
-                'phone'      => 'required|string|max:30',
-                'email'      => 'required|email|max:150',
-                'company_id' => 'required|exists:companies,id',
+                'phone'      => 'nullable|string|max:30',
+                'email'      => 'nullable|email|max:150',
+                'company_id' => 'nullable|exists:companies,id',
 
                 // ΝΕΑ ΠΕΔΙΑ
-                'tax_office' => 'required|string|max:100', // ΔΟΥ
-                'vat_number' => 'required|string|max:20',  // ΑΦΜ
+                'tax_office' => 'nullable|string|max:100', // ΔΟΥ
+                'vat_number' => 'nullable|string|max:20',  // ΑΦΜ
 
                 'informations' => 'nullable|string',       // 👈 ΝΕΟ
             ],
@@ -81,11 +83,11 @@ class CustomerController extends Controller
         $data = $request->validate([
             'first_name'   => 'required|string|max:100',
             'last_name'    => 'required|string|max:100',
-            'phone'        => 'required|string|max:30',
+            'phone'        => 'nullable|string|max:30',
             'email'        => 'nullable|email|max:150',
-            'company_id'   => 'required|exists:companies,id',
-            'tax_office'   => 'required|string|max:100',
-            'vat_number'   => 'required|string|max:20',
+            'company_id'   => 'nullable|exists:companies,id',
+            'tax_office'   => 'nullable|string|max:100',
+            'vat_number'   => 'nullable|string|max:20',
             'informations' => 'nullable|string',   // 👈 ΝΕΟ
         ]);
 

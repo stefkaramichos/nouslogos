@@ -58,9 +58,9 @@
                         <tr>
                             <td>{{ $professional->id }}</td>
                             <td>
-                                <a href="{{ route('professionals.show', $professional) }}">
+                                @if($professional->role != 'grammatia') <a href="{{ route('professionals.show', $professional) }}"> @endif
                                     {{ $professional->last_name }} {{ $professional->first_name }}
-                                </a>
+                                @if($professional->role != 'grammatia')</a> @endif
                             </td>
 
                             <td>{{ $professional->phone }}</td>
@@ -106,7 +106,7 @@
                                
 
                               
-                          @if(auth()->user()->role === 'owner')
+                          @if(auth()->user()->role === 'owner' && $professional->role != 'owner')
                             <!-- Toggle ενεργός / ανενεργός -->
                             <form action="{{ route('professionals.toggle-active', $professional) }}"
                                 method="POST"
