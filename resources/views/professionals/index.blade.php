@@ -72,7 +72,14 @@
                                     -
                                 @endif
                             </td>
-                                                <td>{{ $professional->company->name ?? '-' }}</td>
+                            <td>
+                                @forelse($professional->companies as $company)
+                                    <span class="badge bg-primary">{{ $company->name }}</span>
+                                @empty
+                                    -
+                                @endforelse
+                            </td>
+
                             {{-- <td>{{ number_format($professional->service_fee, 2, ',', '.') }}</td>
                             <td>{{ number_format($professional->percentage_cut, 2, ',', '.') }}</td> --}}
                             <td>
@@ -83,7 +90,8 @@
                                     <i class="bi bi-pencil-square"></i>
                                 </a>
 
-                                <!-- Delete -->
+                                {{-- Παλιά διαγραφή – κρατάω σχολιασμένη --}}
+                                
                                 <form action="{{ route('professionals.destroy', $professional) }}"
                                     method="POST"
                                     class="d-inline"
@@ -95,6 +103,31 @@
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
+                               
+
+                              
+                          @if(auth()->user()->role === 'owner')
+                            <!-- Toggle ενεργός / ανενεργός -->
+                            <form action="{{ route('professionals.toggle-active', $professional) }}"
+                                method="POST"
+                                class="d-inline">
+                                @csrf
+                                @method('PATCH')
+
+                                @if($professional->is_active)
+                                    <button class="btn btn-sm btn-success"
+                                            title="Απενεργοποίηση επαγγελματία">
+                                        <i class="bi bi-toggle-on"></i>
+                                    </button>
+                                @else
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            title="Ενεργοποίηση επαγγελματία">
+                                        <i class="bi bi-toggle-off"></i>
+                                    </button>
+                                @endif
+                            </form>
+                        @endif
+
                             </td>
 
                         </tr>

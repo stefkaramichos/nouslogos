@@ -23,7 +23,7 @@
 
                 <div class="mb-3">
                     <label class="form-label">Τηλέφωνο</label>
-                    <input type="text" name="phone" class="form-control" value="{{ old('phone') }}" required>
+                    <input type="text" name="phone" class="form-control" value="{{ old('phone') }}" >
                 </div>
 
                 {{-- Μισθός --}}
@@ -40,16 +40,19 @@
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">Εταιρεία</label>
-                    <select name="company_id" class="form-select" required>
-                        <option value="">-- Επιλέξτε εταιρεία --</option>
+                    <label class="form-label">Εταιρείες</label>
+                    <select name="companies[]" class="form-select" multiple required>
                         @foreach($companies as $company)
-                            <option value="{{ $company->id }}" @selected(old('company_id') == $company->id)>
+                            <option value="{{ $company->id }}">
                                 {{ $company->name }} ({{ $company->city }})
                             </option>
                         @endforeach
                     </select>
+                    <small class="text-muted">
+                        Κρατήστε πατημένο Ctrl (Windows) ή Command (Mac) για πολλαπλή επιλογή.
+                    </small>
                 </div>
+
                 <div class="mb-3">
                     <label class="form-label">Email</label>
                     <input type="email" name="email" class="form-control" value="{{ old('email') }}" required>

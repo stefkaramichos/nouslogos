@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Company;
 use App\Models\TherapistAppointment;
 use App\Models\Professional;
+  use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 
 class ProfessionalController extends Controller
@@ -13,22 +15,22 @@ class ProfessionalController extends Controller
     {
         $search = $request->input('search');
 
-        $professionals = Professional::with('company')
+        $professionals = Professional::with('companies')
             ->when($search, function ($query) use ($search) {
                 $query->where('first_name', 'like', "%$search%")
                     ->orWhere('last_name', 'like', "%$search%")
                     ->orWhere('phone', 'like', "%$search%")
                     ->orWhere('email', 'like', "%$search%")
-                    ->orWhereHas('company', function ($q) use ($search) {
+                    ->orWhereHas('companies', function ($q) use ($search) {
                         $q->where('name', 'like', "%$search%");
                     });
             })
-            // ->whereIn('role', ['therapist', 'owner'])
             ->orderBy('last_name')
             ->get();
 
         return view('professionals.index', compact('professionals', 'search'));
     }
+
 
     public function create()
     {
@@ -43,9 +45,10 @@ class ProfessionalController extends Controller
             [
                 'first_name'     => 'required|string|max:100',
                 'last_name'      => 'required|string|max:100',
-                'phone'          => 'required|string|max:30',
+                'phone'          => 'nullable|string|max:30',
                 'email'          => 'nullable|email|max:150',
-                'company_id'     => 'required|exists:companies,id',
+                'companies'      => 'required|array',
+                'companies.*'    => 'exists:companies,id',
                 'service_fee'    => 'nullable|numeric|min:0',
                 'percentage_cut' => 'nullable|numeric|min:0',
                 'salary'         => 'nullable|numeric|min:0',
@@ -59,16 +62,43 @@ class ProfessionalController extends Controller
             ]
         );
 
-        // Hash the password
+        // Hash το password
         $data['password'] = \Hash::make($request->password);
 
-        Professional::create($data);
+        // Πάρε τις εταιρείες σε ξεχωριστή μεταβλητή
+        $companyIds = $data['companies'];
+        unset($data['companies']);
+
+        // ✅ Γέμισε και το παλιό πεδίο company_id (π.χ. με την πρώτη εταιρεία)
+        $data['company_id'] = $companyIds[0]; // είναι safe, γιατί companies είναι required & array
+
+        // Δημιουργία επαγγελματία
+        $professional = Professional::create($data);
+
+        // Πολλές εταιρείες στο pivot
+        $professional->companies()->sync($companyIds);
 
         return redirect()
             ->route('professionals.index')
             ->with('success', 'Ο επαγγελματίας δημιουργήθηκε επιτυχώς.');
     }
 
+
+
+    public function toggleActive(Professional $professional)
+    {
+        $professional->is_active = !$professional->is_active;
+        $professional->save();
+
+        return redirect()
+            ->route('professionals.index')
+            ->with(
+                'success',
+                $professional->is_active
+                    ? 'Ο επαγγελματίας ενεργοποιήθηκε επιτυχώς.'
+                    : 'Ο επαγγελματίας απενεργοποιήθηκε επιτυχώς.'
+            );
+    }
 
 
     public function edit(Professional $professional)
@@ -91,33 +121,67 @@ class ProfessionalController extends Controller
         ]);
     }
 
+  
+
     public function update(Request $request, Professional $professional)
     {
-        $data = $request->validate(
-            [
-                'first_name'     => 'required|string|max:100',
-                'last_name'      => 'required|string|max:100',
-                'phone'          => 'required|string|max:30',
-                'email'          => 'nullable|email|max:150',
-                'company_id'     => 'required|exists:companies,id',
-                'service_fee'    => 'nullable|numeric|min:0',
-                'percentage_cut' => 'nullable|numeric|min:0',
-                'salary'         => 'nullable|numeric|min:0',
-            ],
-            [
-                'first_name.required' => 'Το μικρό όνομα είναι υποχρεωτικό.',
-                'last_name.required'  => 'Το επίθετο είναι υποχρεωτικό.',
-                'phone.required'      => 'Το τηλέφωνο είναι υποχρεωτικό.',
-                'company_id.required' => 'Η εταιρεία είναι υποχρεωτική.',
-            ]
-        );
+        // Βασικοί κανόνες για όλους
+        $rules = [
+            'first_name'     => 'required|string|max:100',
+            'last_name'      => 'required|string|max:100',
+            'phone'          => 'nullable|string|max:30',
+            'email'          => 'nullable|email|max:150',
+            'companies'      => 'required|array',
+            'companies.*'    => 'exists:companies,id',
+            'service_fee'    => 'nullable|numeric|min:0',
+            'percentage_cut' => 'nullable|numeric|min:0',
+            'salary'         => 'nullable|numeric|min:0',
+        ];
 
+        // Αν ο τρέχων χρήστης είναι owner, επιτρέπουμε αλλαγή κωδικού
+        if (Auth::user()->role === 'owner') {
+            $rules['password'] = 'nullable|string|min:6|confirmed';
+        }
+
+        $messages = [
+            'first_name.required' => 'Το μικρό όνομα είναι υποχρεωτικό.',
+            'last_name.required'  => 'Το επίθετο είναι υποχρεωτικό.',
+            // 'phone.required'      => 'Το τηλέφωνο είναι υποχρεωτικό.', // το έχεις nullable πάνω
+            'password.confirmed'  => 'Οι κωδικοί δεν ταιριάζουν.',
+            'password.min'        => 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες.',
+        ];
+
+        $data = $request->validate($rules, $messages);
+
+        // Password για owner
+        if (Auth::user()->role === 'owner' && !empty($data['password'])) {
+            $professional->password = Hash::make($data['password']);
+        }
+
+        // Κρατάμε τις εταιρείες ξεχωριστά
+        $companyIds = $data['companies'] ?? [];
+        unset($data['password'], $data['password_confirmation'], $data['companies']);
+
+        // Optional: ενημέρωσε και το παλιό company_id με την πρώτη εταιρεία
+        // $data['company_id'] = $companyIds[0] ?? null;
+
+        if (!empty($companyIds)) {
+            $data['company_id'] = $companyIds[0];
+        }
+
+        // Update βασικών πεδίων
         $professional->update($data);
+
+        // Sync εταιρειών
+        if (!empty($companyIds)) {
+            $professional->companies()->sync($companyIds);
+        }
 
         return redirect()
             ->route('professionals.index')
             ->with('success', 'Ο επαγγελματίας ενημερώθηκε επιτυχώς.');
     }
+
 
 
     public function destroy(Professional $professional)

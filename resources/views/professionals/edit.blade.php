@@ -41,12 +41,11 @@
                         name="phone"
                         class="form-control"
                         value="{{ old('phone', $professional->phone) }}"
-                        required
                     >
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">Email (προαιρετικό)</label>
+                    <label class="form-label">Email</label>
                     <input
                         type="email"
                         name="email"
@@ -69,19 +68,45 @@
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">Εταιρεία</label>
-                    <select name="company_id" class="form-select" required>
-                        <option value="">-- Επιλέξτε εταιρεία --</option>
+                    <label class="form-label">Εταιρείες</label>
+                    <select name="companies[]" class="form-select" multiple required>
                         @foreach($companies as $company)
-                            <option
-                                value="{{ $company->id }}"
-                                @selected(old('company_id', $professional->company_id) == $company->id)
+                            <option value="{{ $company->id }}"
+                                @selected($professional->companies->pluck('id')->contains($company->id))
                             >
                                 {{ $company->name }} ({{ $company->city }})
                             </option>
                         @endforeach
                     </select>
                 </div>
+
+                  @if(auth()->user()->role === 'owner')
+                    <hr>
+
+                    <div class="mb-3">
+                        <label class="form-label">Νέος Κωδικός (μόνο για αλλαγή)</label>
+                        <input
+                            type="password"
+                            name="password"
+                            class="form-control"
+                        >
+                        <small class="text-muted">
+                            Αφήστε το κενό αν δεν θέλετε να αλλάξετε τον κωδικό.
+                        </small>
+                        @error('password')
+                            <div class="text-danger small">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Επιβεβαίωση Νέου Κωδικού</label>
+                        <input
+                            type="password"
+                            name="password_confirmation"
+                            class="form-control"
+                        >
+                    </div>
+                @endif
 
                 <button class="btn btn-primary">Αποθήκευση Αλλαγών</button>
                 <a href="{{ route('professionals.index') }}" class="btn btn-secondary">Ακύρωση</a>

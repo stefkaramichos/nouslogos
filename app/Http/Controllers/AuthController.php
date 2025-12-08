@@ -36,6 +36,13 @@ class AuthController extends Controller
                 ->withInput();
         }
 
+        // ➤ NEW: Έλεγχος αν ο λογαριασμός είναι ενεργός
+        if (!$professional->is_active) {
+            return back()
+                ->withErrors(['email' => 'Ο λογαριασμός σας είναι απενεργοποιημένος.'])
+                ->withInput();
+        }
+
         // Έλεγχος ρόλου
         if (!in_array($professional->role, ['owner', 'grammatia', 'therapist'])) {
             return back()
@@ -48,12 +55,11 @@ class AuthController extends Controller
 
             $request->session()->regenerate();
 
-            // 👇 REDIRECT BASED ON ROLE
+            // Redirect based on role
             if ($professional->role === 'therapist') {
                 return redirect()->route('therapist_appointments.index');
             }
 
-            // Για owner & γραμματεία
             return redirect()->intended(route('customers.index'));
         }
 
@@ -61,6 +67,7 @@ class AuthController extends Controller
             ->withErrors(['email' => 'Λάθος email ή κωδικός.'])
             ->withInput();
     }
+
 
     public function logout(Request $request)
     {

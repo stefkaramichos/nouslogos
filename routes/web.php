@@ -61,6 +61,11 @@ Route::middleware('auth')->group(function () {
     Route::resource('expenses', ExpenseController::class)
     ->middleware(['auth', 'role:owner,grammatia']);
 
+    Route::patch(
+            '/professionals/{professional}/toggle-active',
+            [ProfessionalController::class, 'toggleActive']
+        )->name('professionals.toggle-active');
+
 
 });
 
