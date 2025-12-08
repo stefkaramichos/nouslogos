@@ -263,7 +263,8 @@
                     </tbody>
                 </table>
             </div>
-
         </div>
+        <div class="card-footer d-flex justify-content-center">
+            {{ $appointments->withQueryString()->links() }}
     </div>
 @endsection

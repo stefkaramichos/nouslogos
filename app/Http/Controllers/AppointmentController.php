@@ -9,31 +9,33 @@ use App\Models\Professional;
 use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
+
 
 class AppointmentController extends Controller
 {
     public function index(Request $request)
     {
-        // Λίστες για dropdowns
+        // dropdown lists
         $customers     = Customer::orderBy('last_name')->get();
         $professionals = Professional::orderBy('last_name')->get();
         $companies     = Company::orderBy('name')->get();
 
-        // Παίρνουμε τις τιμές των φίλτρων
+        // filters
         $from            = $request->input('from');
         $to              = $request->input('to');
         $customerId      = $request->input('customer_id');
         $professionalId  = $request->input('professional_id');
         $companyId       = $request->input('company_id');
-        $status          = $request->input('status');          // all / ...
-        $paymentStatus   = $request->input('payment_status');  // all / unpaid / partial / full
-        $paymentMethod   = $request->input('payment_method');  // all / cash / card
+        $status          = $request->input('status');
+        $paymentStatus   = $request->input('payment_status');
+        $paymentMethod   = $request->input('payment_method');
 
-        // Βασικό query
+        // base query
         $query = Appointment::with(['customer', 'professional', 'company', 'payment'])
             ->orderBy('start_time', 'desc');
 
-        // Φίλτρα που μπορούν να μπουν στο query
         if ($from) {
             $query->whereDate('start_time', '>=', $from);
         }
@@ -58,10 +60,10 @@ class AppointmentController extends Controller
             $query->where('status', $status);
         }
 
-        // Παίρνουμε τα αποτελέσματα
+        // get results
         $appointments = $query->get();
 
-        // Φίλτρα που έχουν να κάνουν με payments, τα κρατάμε σε collection
+        // collection filters for payments
         if ($paymentStatus && $paymentStatus !== 'all') {
             $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
                 $total = $a->total_price ?? 0;
@@ -92,7 +94,26 @@ class AppointmentController extends Controller
             });
         }
 
-        // Φίλτρα για το view
+        // ✅ manual pagination (25 per page)
+        $perPage = 25;
+        $currentPage = Paginator::resolveCurrentPage() ?: 1;
+
+        $currentItems = $appointments
+            ->values() // reset keys
+            ->forPage($currentPage, $perPage);
+
+        $appointments = new LengthAwarePaginator(
+            $currentItems,
+            $appointments->count(),
+            $perPage,
+            $currentPage,
+            [
+                'path'  => $request->url(),
+                'query' => $request->query(), // keep filters in pagination links
+            ]
+        );
+
+        // filters for view
         $filters = [
             'from'            => $from,
             'to'              => $to,
@@ -112,6 +133,7 @@ class AppointmentController extends Controller
             'companies'
         ));
     }
+
 
     public function getLastForCustomer(Request $request)
     {
