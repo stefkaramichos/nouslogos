@@ -222,7 +222,7 @@
         <main class="col-12 col-md-10 ms-sm-auto col-lg-10 px-3 px-md-4 py-4">
 
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4">
-                <h2 class="h3 mb-0">@yield('title', 'Επισκόπηση')</h2>
+                <h2 class="h3 mb-0" style="color:#b21691">@yield('title', 'Επισκόπηση')</h2>
             </div>
 
             {{-- Flash messages --}}

@@ -37,12 +37,12 @@ label {
 }
 
 .nav-link:hover {
-    background-color: #0d6efd !important; /* σκούρο πράσινο */
+    background-color: #b21691 !important; /* σκούρο πράσινο */
     color: #ffffff !important; /* λευκό κείμενο */
 }
 
 .nav-link.active {
-    background: #0d6efd;
+    background: #b21691  !important;
     color: #fff !important;
 }
 
@@ -57,4 +57,9 @@ label {
 .logo-img  img{
     max-width: 200px;
     margin: auto;
+}
+
+.btn-primary,.btn:hover{
+    background-color: #b21691;
+    border-color: #b21691;
 }
