@@ -42,7 +42,7 @@
                 <table class="table table-striped mb-0 align-middle">
                     <thead>
                     <tr>
-                        <th>#</th>
+                        <th>Φωτο</th>
                         <th>Ονοματεπώνυμο</th>
                         <th>Τηλέφωνο</th>
                         <th>Email</th>
@@ -56,7 +56,17 @@
                     <tbody>
                     @forelse($professionals as $professional)
                         <tr>
-                            <td>{{ $professional->id }}</td>
+                           <td>
+                                @if($professional->profile_image)
+                                    <img src="{{ asset('storage/'.$professional->profile_image) }}"
+                                        alt="Profile image"
+                                        class="rounded-circle"
+                                        style="width: 40px; height: 40px; object-fit: cover;">
+                                @else
+                                    <span class="badge bg-secondary">{{ mb_substr($professional->first_name, 0, 1) }}</span>
+                                @endif
+                            </td>
+  
                             <td>
                                 @if($professional->role != 'grammatia') <a href="{{ route('professionals.show', $professional) }}"> @endif
                                     {{ $professional->last_name }} {{ $professional->first_name }}

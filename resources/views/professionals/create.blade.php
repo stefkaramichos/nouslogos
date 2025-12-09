@@ -8,7 +8,7 @@
             Νέος Επαγγελματίας
         </div>
         <div class="card-body">
-            <form action="{{ route('professionals.store') }}" method="POST">
+            <form action="{{ route('professionals.store') }}" method="POST"  enctype="multipart/form-data">
                 @csrf
 
                 <div class="mb-3">
@@ -25,6 +25,13 @@
                     <label class="form-label">Τηλέφωνο</label>
                     <input type="text" name="phone" class="form-control" value="{{ old('phone') }}" >
                 </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Φωτογραφία Προφίλ</label>
+                    <input type="file" name="profile_image" class="form-control" accept="image/*">
+                    <small class="text-muted">Επιτρέπονται εικόνες (jpg, png, webp, μέχρι 2MB).</small>
+                </div>
+
 
                 {{-- Μισθός --}}
                 <div class="mb-3">

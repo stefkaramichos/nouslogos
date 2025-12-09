@@ -14,7 +14,20 @@
             Στοιχεία Επαγγελματία
         </div>
         <div class="card-body row">
-          <div class="col-md-6">
+            <div class="col-md-4 text-center mb-3">
+                @if($professional->profile_image)
+                    <img src="{{ asset('storage/'.$professional->profile_image) }}"
+                        alt="Profile image"
+                        class="img-thumbnail mb-2"
+                        style="max-width: 200px;">
+                @else
+                    <div class="border rounded-circle d-inline-flex justify-content-center align-items-center mb-2"
+                        style="width: 120px; height: 120px; font-size: 48px;">
+                        {{ mb_substr($professional->first_name, 0, 1) }}
+                    </div>
+                @endif
+            </div>
+          <div class="col-md-4">
             <p><strong>Ονοματεπώνυμο:</strong> {{ $professional->last_name }} {{ $professional->first_name }}</p>
             <p><strong>Τηλέφωνο:</strong> {{ $professional->phone }}</p>
             <p><strong>Email:</strong> {{ $professional->email ?? '-' }}</p>
@@ -28,7 +41,7 @@
                 {{ number_format($professional->percentage_cut, 2, ',', '.') }} €
             </p> --}}
           </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
              <p>
                 <strong>Σύνολο Ραντεβού:</strong>
                 <span class="badge bg-primary fs-6">{{ $appointmentsCount }}</span>

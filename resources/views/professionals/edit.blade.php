@@ -8,7 +8,7 @@
             Επεξεργασία Επαγγελματία
         </div>
         <div class="card-body">
-            <form action="{{ route('professionals.update', $professional) }}" method="POST">
+            <form action="{{ route('professionals.update', $professional) }}" method="POST"  enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
 
@@ -43,6 +43,25 @@
                         value="{{ old('phone', $professional->phone) }}"
                     >
                 </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Φωτογραφία Προφίλ</label>
+
+                    @if($professional->profile_image)
+                        <div class="mb-2">
+                            <img src="{{ asset('storage/'.$professional->profile_image) }}"
+                                alt="Profile image"
+                                class="img-thumbnail"
+                                style="max-width: 150px;">
+                        </div>
+                    @endif
+
+                    <input type="file" name="profile_image" class="form-control" accept="image/*">
+                    <small class="text-muted">
+                        Αν ανεβάσετε νέα εικόνα, θα αντικαταστήσει την παλιά.
+                    </small>
+                </div>
+
 
                 <div class="mb-3">
                     <label class="form-label">Email</label>

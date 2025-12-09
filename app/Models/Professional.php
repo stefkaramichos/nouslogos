@@ -23,6 +23,7 @@ class Professional extends Authenticatable
         'is_active',
         'password',
         'role',
+        'profile_image', 
     ];
 
     protected $hidden = [
