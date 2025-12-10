@@ -7,6 +7,9 @@ use App\Models\TherapistAppointment;
 use App\Models\Professional;
   use Illuminate\Support\Facades\Hash;
   use Illuminate\Support\Facades\Storage;
+  use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
+
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 
@@ -219,28 +222,36 @@ class ProfessionalController extends Controller
         $paymentStatus  = $request->input('payment_status');  // all / unpaid / partial / full
         $paymentMethod  = $request->input('payment_method');  // all / cash / card
 
+        // ✅ Default: σημερινή ημέρα, αν δεν έχει σταλεί ΚΑΝΕΝΑ φίλτρο
+        if (!$request->hasAny(['from', 'to', 'customer', 'payment_status', 'payment_method'])) {
+            $from = now()->toDateString();
+            $to   = now()->toDateString();
+        }
+
         // ----------------- MAIN APPOINTMENTS -----------------
-        $appointments = $professional->appointments()
+        $appointmentsCollection = $professional->appointments()
             ->with(['customer', 'company', 'payment'])
             ->orderBy('start_time', 'desc')
             ->get();
 
         // Φίλτρα πάνω στην collection (appointments)
+        $filteredAppointments = $appointmentsCollection;
+
         if ($from) {
-            $appointments = $appointments->filter(function ($a) use ($from) {
+            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($from) {
                 return $a->start_time && $a->start_time->toDateString() >= $from;
             });
         }
 
         if ($to) {
-            $appointments = $appointments->filter(function ($a) use ($to) {
+            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($to) {
                 return $a->start_time && $a->start_time->toDateString() <= $to;
             });
         }
 
         if ($customerName) {
             $name = mb_strtolower($customerName);
-            $appointments = $appointments->filter(function ($a) use ($name) {
+            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($name) {
                 if (!$a->customer) {
                     return false;
                 }
@@ -251,7 +262,7 @@ class ProfessionalController extends Controller
         }
 
         if ($paymentStatus && $paymentStatus !== 'all') {
-            $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
+            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentStatus) {
                 $total = $a->total_price ?? 0;
                 $paid  = $a->payment->amount ?? 0;
 
@@ -272,7 +283,7 @@ class ProfessionalController extends Controller
         }
 
         if ($paymentMethod && $paymentMethod !== 'all') {
-            $appointments = $appointments->filter(function ($a) use ($paymentMethod) {
+            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentMethod) {
                 if (!$a->payment) {
                     return false;
                 }
@@ -280,21 +291,21 @@ class ProfessionalController extends Controller
             });
         }
 
-        // Μετά τα φίλτρα
-        $appointmentsCount = $appointments->count();
-        $totalAmount = $appointments->sum(fn($a) => $a->total_price ?? 0);
+        // Μετά τα φίλτρα – ΣΤΑΤΙΣΤΙΚΑ ΣΕ ΟΛΑ ΤΑ ΦΙΛΤΡΑΡΙΣΜΕΝΑ
+        $appointmentsCount = $filteredAppointments->count();
+        $totalAmount = $filteredAppointments->sum(fn($a) => $a->total_price ?? 0);
 
-        $professionalTotalCut = $appointments->sum(function ($a) use ($professional) {
+        $professionalTotalCut = $filteredAppointments->sum(function ($a) use ($professional) {
             if (!is_null($a->professional_amount)) {
                 return $a->professional_amount;
             }
             return $professional->percentage_cut;
         });
 
-        $paidTotal = $appointments->sum(fn($a) => $a->payment->amount ?? 0);
+        $paidTotal = $filteredAppointments->sum(fn($a) => $a->payment->amount ?? 0);
         $outstandingTotal = max($totalAmount - $paidTotal, 0);
 
-        $professionalPaid = $appointments->sum(function ($a) {
+        $professionalPaid = $filteredAppointments->sum(function ($a) {
             if (!$a->payment) {
                 return 0;
             }
@@ -333,7 +344,7 @@ class ProfessionalController extends Controller
 
         // Map για main appointments (customer + date) για εύκολο matching
         $mainKeys = [];
-        foreach ($appointments as $a) {
+        foreach ($filteredAppointments as $a) {
             if ($a->customer_id && $a->start_time) {
                 $key = $a->customer_id.'|'.$a->start_time->toDateString();
                 $mainKeys[$key] = true;
@@ -353,10 +364,28 @@ class ProfessionalController extends Controller
             if (isset($mainKeys[$key])) {
                 $therapistMatches[$key] = true;
             } else {
-                // ΜΟΝΟ όσα ανήκουν στις φιλτραρισμένες ημερομηνίες / πελάτες φτάνουν εδώ
                 $therapistMissing[] = $ta;
             }
         }
+
+        // ✅ Manual pagination για τα φιλτραρισμένα ραντεβού
+        $perPage = 25;
+        $currentPage = Paginator::resolveCurrentPage() ?: 1;
+
+        $currentItems = $filteredAppointments
+            ->values()
+            ->forPage($currentPage, $perPage);
+
+        $appointments = new LengthAwarePaginator(
+            $currentItems,
+            $filteredAppointments->count(),
+            $perPage,
+            $currentPage,
+            [
+                'path'  => $request->url(),
+                'query' => $request->query(), // κρατάμε τα φίλτρα στα links
+            ]
+        );
 
         $filters = [
             'from'           => $from,
@@ -380,5 +409,6 @@ class ProfessionalController extends Controller
             'therapistMatches',
             'therapistMissing'
         ));
-    }
+}
+
 }

@@ -299,6 +299,10 @@
                     </tbody>
 
                 </table>
+                  {{-- Σελιδοποίηση ραντεβών επαγγελματία --}}
+                <div class="d-flex justify-content-center mt-3">
+                    {{ $appointments->links() }}
+                </div>
                 {{-- Ραντεβού που υπάρχουν ΜΟΝΟ στον πίνακα therapist_appointments --}}
                 @if(!empty($therapistMissing) && count($therapistMissing) > 0)
                     <hr>

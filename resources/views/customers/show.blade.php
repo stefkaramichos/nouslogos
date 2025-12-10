@@ -247,6 +247,16 @@
                     </tbody>
                 </table>
             </div>
+              {{-- Σελιδοποίηση ραντεβών --}}
+            <div class="d-flex justify-content-center mb-3">
+                {{ $appointments->links() }}
+            </div>
+
+            {{-- Φόρμα για μαζική πληρωμή επιλεγμένων ραντεβών --}}
+            <form id="payAllForm"
+                  method="POST"
+                  action="{{ route('customers.payAll', $customer) }}"
+                  onsubmit="return preparePayAllForm();">
 
             {{-- Φόρμα για μαζική πληρωμή επιλεγμένων ραντεβών --}}
             <form id="payAllForm"

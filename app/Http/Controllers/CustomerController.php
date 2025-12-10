@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Company;
 use App\Models\Payment;  
 use App\Models\Customer;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
+
 use Illuminate\Http\Request;
 
 class CustomerController extends Controller
@@ -100,7 +103,7 @@ class CustomerController extends Controller
 
 
     
-   public function show(Request $request, Customer $customer)
+    public function show(Request $request, Customer $customer)
     {
         $customer->load([
             'company',
@@ -116,33 +119,40 @@ class CustomerController extends Controller
         $paymentStatus = $request->input('payment_status');   // all / unpaid / partial / full
         $paymentMethod = $request->input('payment_method');   // all / cash / card
 
+        // ✅ Default filter: τρέχων μήνας (αν δεν έχουν σταλεί καθόλου φίλτρα)
+        if (!$request->hasAny(['from', 'to', 'status', 'payment_status', 'payment_method'])) {
+            $from = now()->startOfMonth()->toDateString();
+            $to   = now()->endOfMonth()->toDateString();
+        }
+
         // Βασικό σύνολο ραντεβών πελάτη (πριν τα φίλτρα)
-        $appointments = $customer->appointments
+        $appointmentsCollection = $customer->appointments
             ->sortByDesc('start_time')
-            ->values(); // to reset keys
+            ->values(); // reset keys
 
         // Εφαρμογή φίλτρων σε collection
+        $filteredAppointments = $appointmentsCollection;
 
         if ($from) {
-            $appointments = $appointments->filter(function ($a) use ($from) {
+            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($from) {
                 return $a->start_time && $a->start_time->toDateString() >= $from;
             });
         }
 
         if ($to) {
-            $appointments = $appointments->filter(function ($a) use ($to) {
+            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($to) {
                 return $a->start_time && $a->start_time->toDateString() <= $to;
             });
         }
 
         if ($status && $status !== 'all') {
-            $appointments = $appointments->filter(function ($a) use ($status) {
+            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($status) {
                 return $a->status === $status;
             });
         }
 
         if ($paymentStatus && $paymentStatus !== 'all') {
-            $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
+            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentStatus) {
                 $total = $a->total_price ?? 0;
                 $paid  = $a->payment->amount ?? 0;
 
@@ -163,7 +173,7 @@ class CustomerController extends Controller
         }
 
         if ($paymentMethod && $paymentMethod !== 'all') {
-            $appointments = $appointments->filter(function ($a) use ($paymentMethod) {
+            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentMethod) {
                 if (!$a->payment) {
                     return false;
                 }
@@ -171,30 +181,49 @@ class CustomerController extends Controller
             });
         }
 
-        // Τώρα τα ραντεβού είναι φιλτραρισμένα
-        $appointmentsCount = $appointments->count();
+        // ✅ Στατιστικά με βάση ΟΛΑ τα φιλτραρισμένα ραντεβού (όχι μόνο τη σελίδα)
+        $appointmentsCount = $filteredAppointments->count();
 
-        $totalAmount = $appointments->sum(function ($a) {
+        $totalAmount = $filteredAppointments->sum(function ($a) {
             return $a->total_price ?? 0;
         });
 
-        $paidTotal = $appointments->sum(function ($a) {
+        $paidTotal = $filteredAppointments->sum(function ($a) {
             return $a->payment->amount ?? 0;
         });
 
         $outstandingTotal = max($totalAmount - $paidTotal, 0);
 
-        $cashTotal = $appointments->sum(function ($a) {
+        $cashTotal = $filteredAppointments->sum(function ($a) {
             return ($a->payment && $a->payment->method === 'cash')
                 ? $a->payment->amount
                 : 0;
         });
 
-        $cardTotal = $appointments->sum(function ($a) {
+        $cardTotal = $filteredAppointments->sum(function ($a) {
             return ($a->payment && $a->payment->method === 'card')
                 ? $a->payment->amount
                 : 0;
         });
+
+        // ✅ Manual pagination για τα φιλτραρισμένα ραντεβού
+        $perPage = 25;
+        $currentPage = Paginator::resolveCurrentPage() ?: 1;
+
+        $currentItems = $filteredAppointments
+            ->values()
+            ->forPage($currentPage, $perPage);
+
+        $appointments = new LengthAwarePaginator(
+            $currentItems,
+            $filteredAppointments->count(),
+            $perPage,
+            $currentPage,
+            [
+                'path'  => $request->url(),
+                'query' => $request->query(), // κρατάμε τα φίλτρα στα links
+            ]
+        );
 
         // Για να κρατάμε τις τιμές στα inputs
         $filters = [
@@ -219,60 +248,61 @@ class CustomerController extends Controller
     }
 
 
+
     public function payAll(Request $request, Customer $customer)
-{
-    // IDs των επιλεγμένων ραντεβών
-    $appointmentIds = $request->input('appointments', []);
+    {
+        // IDs των επιλεγμένων ραντεβών
+        $appointmentIds = $request->input('appointments', []);
 
-    if (empty($appointmentIds)) {
-        return back()->with('error', 'Δεν επιλέχθηκαν ραντεβού για πληρωμή.');
-    }
-
-    // Κοινός τρόπος πληρωμής για όλα
-    $method = $request->input('method');
-
-    if (!in_array($method, ['cash', 'card'], true)) {
-        return back()->with('error', 'Πρέπει να επιλέξετε τρόπο πληρωμής (μετρητά ή κάρτα).');
-    }
-
-    // TAX – κοινό για όλα
-    if ($method === 'card') {
-        // Κάρτα ⇒ πάντα με απόδειξη
-        $tax = 'Y';
-    } else {
-        // Μετρητά ⇒ επιλογή χρήστη
-        $tax = $request->input('tax') === 'Y' ? 'Y' : 'N';
-    }
-
-    // Φορτώνουμε ραντεβού του συγκεκριμένου πελάτη για ασφάλεια
-    $customer->load(['appointments.payment']);
-
-    foreach ($customer->appointments as $appointment) {
-        if (!in_array($appointment->id, $appointmentIds)) {
-            continue;
+        if (empty($appointmentIds)) {
+            return back()->with('error', 'Δεν επιλέχθηκαν ραντεβού για πληρωμή.');
         }
 
-        $total = $appointment->total_price ?? 0;
-        if ($total <= 0) {
-            continue;
+        // Κοινός τρόπος πληρωμής για όλα
+        $method = $request->input('method');
+
+        if (!in_array($method, ['cash', 'card'], true)) {
+            return back()->with('error', 'Πρέπει να επιλέξετε τρόπο πληρωμής (μετρητά ή κάρτα).');
         }
 
-        Payment::updateOrCreate(
-            ['appointment_id' => $appointment->id],
-            [
-                'customer_id' => $customer->id,
-                'amount'      => $total,
-                'is_full'     => true,
-                'paid_at'     => now(),
-                'method'      => $method,
-                'tax'         => $tax,
-                'notes'       => 'Μαζική πληρωμή επιλεγμένων ραντεβού.',
-            ]
-        );
-    }
+        // TAX – κοινό για όλα
+        if ($method === 'card') {
+            // Κάρτα ⇒ πάντα με απόδειξη
+            $tax = 'Y';
+        } else {
+            // Μετρητά ⇒ επιλογή χρήστη
+            $tax = $request->input('tax') === 'Y' ? 'Y' : 'N';
+        }
 
-    return back()->with('success', 'Οι πληρωμές για τα επιλεγμένα ραντεβού ενημερώθηκαν επιτυχώς.');
-}
+        // Φορτώνουμε ραντεβού του συγκεκριμένου πελάτη για ασφάλεια
+        $customer->load(['appointments.payment']);
+
+        foreach ($customer->appointments as $appointment) {
+            if (!in_array($appointment->id, $appointmentIds)) {
+                continue;
+            }
+
+            $total = $appointment->total_price ?? 0;
+            if ($total <= 0) {
+                continue;
+            }
+
+            Payment::updateOrCreate(
+                ['appointment_id' => $appointment->id],
+                [
+                    'customer_id' => $customer->id,
+                    'amount'      => $total,
+                    'is_full'     => true,
+                    'paid_at'     => now(),
+                    'method'      => $method,
+                    'tax'         => $tax,
+                    'notes'       => 'Μαζική πληρωμή επιλεγμένων ραντεβού.',
+                ]
+            );
+        }
+
+        return back()->with('success', 'Οι πληρωμές για τα επιλεγμένα ραντεβού ενημερώθηκαν επιτυχώς.');
+    }
 
 
 
