@@ -25,6 +25,10 @@ class AppointmentController extends Controller
         // filters
         $from            = $request->input('from');
         $to              = $request->input('to');
+        if (!$request->hasAny(['from','to','customer_id','professional_id','company_id','status','payment_status','payment_method'])) {
+            $from = now()->toDateString();
+            $to   = now()->toDateString();
+        }
         $customerId      = $request->input('customer_id');
         $professionalId  = $request->input('professional_id');
         $companyId       = $request->input('company_id');
