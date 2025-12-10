@@ -4,8 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Database\Eloquent\Model;
-
 
 class Professional extends Authenticatable
 {
@@ -23,17 +21,33 @@ class Professional extends Authenticatable
         'is_active',
         'password',
         'role',
-        'profile_image', 
+        'profile_image',
     ];
 
     protected $hidden = [
         'password',
-        'remember_token',
+        // 'remember_token', // προαιρετικά αφαιρείς αυτό, αφού δεν υπάρχει στήλη
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
     ];
+
+    // 🔒 Απενεργοποίηση remember_token για αυτό το model
+    public function getRememberTokenName()
+    {
+        return null; // Πες στο Laravel ότι δεν υπάρχει remember_token
+    }
+
+    public function setRememberToken($value)
+    {
+        // Μη κάνεις τίποτα – έτσι αποφεύγουμε απόπειρα αποθήκευσης σε ανύπαρκτη στήλη
+    }
+
+    public function getRememberToken()
+    {
+        return null;
+    }
 
     // 👇 primary / legacy company (company_id)
     public function company()
