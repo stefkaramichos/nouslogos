@@ -10,29 +10,49 @@ use Illuminate\Support\Facades\Auth;
 
 class TherapistAppointmentController extends Controller
 {
-    // Λίστα ραντεβού θεραπευτών
+    /**
+     * Λίστα ραντεβού θεραπευτών
+     */
     public function index(Request $request)
     {
-        $user = Auth::user();
+        $user = Auth::user(); // εδώ είναι Professional (με role owner/therapist/grammatia)
 
-        // Μόνο therapist ή owner (όπως τους χειρίζεσαι μέσω guards)
-        if (!$user || ($user->role !== 'therapist' && $user->role !== 'owner' && $user->role !== 'grammatia')) {
+        if (!$user || ($user->role !== 'therapist' && $user->role !== 'owner')) {
             abort(403, 'Δεν έχετε πρόσβαση σε αυτή τη σελίδα.');
         }
 
-        $from           = $request->input('from');
-        $to             = $request->input('to');
-        $customerId     = $request->input('customer_id');
-        $professionalId = $request->input('professional_id'); // από τα φίλτρα, nullable
+        $from       = $request->input('from');
+        $to         = $request->input('to');
+        $customerId = $request->input('customer_id');
+
+        // ---------------------------
+        // professional_id με default τον owner
+        // ---------------------------
+        $professionalId = null;
+
+        if ($user->role === 'owner') {
+            if ($request->has('professional_id')) {
+                // Αν υπάρχει στο query:
+                //  - "" → όλοι οι επαγγελματίες
+                //  - "14" → συγκεκριμένος επαγγελματίας
+                $professionalId = $request->input('professional_id') ?: null;
+            } else {
+                // Πρώτη φόρτωση → default ο συνδεδεμένος owner
+                // π.χ. owner με id=1 → βλέπει ραντεβού του professional_id = 1
+                $professionalId = $user->id;
+            }
+        }
 
         $query = TherapistAppointment::with(['customer', 'professional']);
 
         if ($user->role === 'therapist') {
-            // Αν συνδέεσαι ως therapist (μέσω Professional guard)
+            // Therapist βλέπει ΜΟΝΟ τα δικά του
             $query->where('professional_id', $user->id);
-        } elseif ($user->role === 'owner' || $user->role === 'grammatia') {
-            // Owner / γραμματεία → βλέπουν όλα τα ραντεβού, ανεξαρτήτως company
+        }
 
+        if ($user->role === 'owner') {
+            // Owner βλέπει ΟΛΑ τα ραντεβού (χωρίς company restriction)
+            // Αν έχει οριστεί professionalId (είτε default owner, είτε επιλεγμένος από φίλτρο)
             if (!empty($professionalId)) {
                 $query->where('professional_id', $professionalId);
             }
@@ -52,11 +72,11 @@ class TherapistAppointmentController extends Controller
 
         $appointments = $query->orderBy('start_time', 'asc')->get();
 
-        $customers = Customer::orderBy('last_name')->get();
+        $customers     = Customer::orderBy('last_name')->get();
         $professionals = [];
 
-        // Owner: λίστα με ΟΛΟΥΣ τους επαγγελματίες εκτός από όσους έχουν ρόλο "grammatia"
-        if ($user->role === 'owner' || $user->role === 'grammatia') {
+        if ($user->role === 'owner') {
+            // Όλοι οι επαγγελματίες εκτός από role=grammatia
             $professionals = Professional::where('role', '!=', 'grammatia')
                 ->orderBy('last_name')
                 ->get();
@@ -74,12 +94,14 @@ class TherapistAppointmentController extends Controller
         ));
     }
 
-    // Φόρμα δημιουργίας
+    /**
+     * Φόρμα δημιουργίας ραντεβού
+     */
     public function create()
     {
         $user = Auth::user();
 
-        if (!$user || ($user->role !== 'therapist' && $user->role !== 'owner' && $user->role !== 'grammatia')) {
+        if (!$user || ($user->role !== 'therapist' && $user->role !== 'owner')) {
             abort(403, 'Δεν έχετε πρόσβαση σε αυτή τη σελίδα.');
         }
 
@@ -88,12 +110,14 @@ class TherapistAppointmentController extends Controller
         return view('therapist_appointments.create', compact('customers', 'user'));
     }
 
-    // Αποθήκευση νέου ραντεβού
+    /**
+     * Αποθήκευση νέου ραντεβού
+     */
     public function store(Request $request)
     {
         $user = Auth::user();
 
-        if (!$user || ($user->role !== 'therapist' && $user->role !== 'owner' && $user->role !== 'grammatia')) {
+        if (!$user || ($user->role !== 'therapist' && $user->role !== 'owner')) {
             abort(403, 'Δεν έχετε πρόσβαση σε αυτή τη σελίδα.');
         }
 
@@ -109,10 +133,8 @@ class TherapistAppointmentController extends Controller
             ]
         );
 
-        // Αν οι therapists κάνουν login από τον πίνακα professionals,
-        // ίσως εδώ να θες `professional_id` από άλλο guard.
         TherapistAppointment::create([
-            'professional_id' => $user->id,
+            'professional_id' => $user->id, // ο συνδεδεμένος επαγγελματίας (owner ή therapist)
             'customer_id'     => $data['customer_id'],
             'start_time'      => $data['start_time'],
             'notes'           => $data['notes'] ?? null,
@@ -123,12 +145,14 @@ class TherapistAppointmentController extends Controller
             ->with('success', 'Το ραντεβού καταχωρήθηκε επιτυχώς.');
     }
 
-    // ✏️ Φόρμα επεξεργασίας ραντεβού
+    /**
+     * ✏️ Φόρμα επεξεργασίας ραντεβού
+     */
     public function edit(TherapistAppointment $therapistAppointment)
     {
         $user = Auth::user();
 
-        if (!$user || ($user->role !== 'therapist' && $user->role !== 'owner' && $user->role !== 'grammatia')) {
+        if (!$user || ($user->role !== 'therapist' && $user->role !== 'owner')) {
             abort(403, 'Δεν έχετε πρόσβαση σε αυτό το ραντεβού.');
         }
 
@@ -138,7 +162,7 @@ class TherapistAppointmentController extends Controller
             abort(403, 'Δεν έχετε πρόσβαση σε αυτό το ραντεβού.');
         }
 
-        // Owner / γραμματεία: μπορούν να επεξεργαστούν όλα τα ραντεβού
+        // Owner: μπορεί να επεξεργαστεί οποιοδήποτε ραντεβού
 
         $customers = Customer::orderBy('last_name')->get();
 
@@ -149,12 +173,14 @@ class TherapistAppointmentController extends Controller
         ]);
     }
 
-    // 💾 Αποθήκευση αλλαγών ραντεβού
+    /**
+     * 💾 Αποθήκευση αλλαγών ραντεβού
+     */
     public function update(Request $request, TherapistAppointment $therapistAppointment)
     {
         $user = Auth::user();
 
-        if (!$user || ($user->role !== 'therapist' && $user->role !== 'owner' && $user->role !== 'grammatia')) {
+        if (!$user || ($user->role !== 'therapist' && $user->role !== 'owner')) {
             abort(403, 'Δεν έχετε πρόσβαση σε αυτό το ραντεβού.');
         }
 
@@ -164,7 +190,7 @@ class TherapistAppointmentController extends Controller
             abort(403, 'Δεν έχετε πρόσβαση σε αυτό το ραντεβού.');
         }
 
-        // Owner / γραμματεία: μπορούν να ενημερώσουν όλα τα ραντεβού
+        // Owner: μπορεί να ενημερώσει οποιοδήποτε ραντεβού
 
         $data = $request->validate(
             [
@@ -189,12 +215,14 @@ class TherapistAppointmentController extends Controller
             ->with('success', 'Το ραντεβού ενημερώθηκε επιτυχώς.');
     }
 
-    // 🗑 Διαγραφή ραντεβού
+    /**
+     * 🗑 Διαγραφή ραντεβού
+     */
     public function destroy(TherapistAppointment $therapistAppointment)
     {
         $user = Auth::user();
 
-        if (!$user || ($user->role !== 'therapist' && $user->role !== 'owner' && $user->role !== 'grammatia')) {
+        if (!$user || ($user->role !== 'therapist' && $user->role !== 'owner')) {
             abort(403, 'Δεν έχετε πρόσβαση σε αυτό το ραντεβού.');
         }
 
@@ -204,7 +232,7 @@ class TherapistAppointmentController extends Controller
             abort(403, 'Δεν έχετε πρόσβαση σε αυτό το ραντεβού.');
         }
 
-        // Owner / γραμματεία: μπορούν να διαγράψουν όλα τα ραντεβού
+        // Owner: μπορεί να διαγράψει οποιοδήποτε ραντεβού
 
         $therapistAppointment->delete();
 
