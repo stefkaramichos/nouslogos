@@ -150,7 +150,10 @@
                             {{-- Πελάτης --}}
                             <td>
                                 @if($appointment->customer)
-                                    {{ $appointment->customer->last_name }} {{ $appointment->customer->first_name }}<br>
+                                    <a href="{{ route('customers.show', $appointment->customer) }}">
+                                        {{ $appointment->customer->last_name }} {{ $appointment->customer->first_name }}
+                                    </a>
+                                    <br>
                                     <small class="text-muted">{{ $appointment->customer->phone }}</small>
                                 @else
                                     <span class="text-muted">-</span>
@@ -160,7 +163,10 @@
                             {{-- Επαγγελματίας --}}
                             <td>
                                 @if($appointment->professional)
-                                    {{ $appointment->professional->last_name }} {{ $appointment->professional->first_name }}<br>
+                                    <a href="{{ route('professionals.show', $appointment->professional) }}">
+                                        {{ $appointment->professional->last_name }} {{ $appointment->professional->first_name }}
+                                    </a>
+                                    <br>
                                     <small class="text-muted">{{ $appointment->professional->phone }}</small>
                                 @else
                                     <span class="text-muted">-</span>

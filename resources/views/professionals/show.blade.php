@@ -330,9 +330,7 @@
                                             <span class="text-muted">-</span>
                                         @endif
                                     </td>
-                                    <td>
-                                        {{ $ta->notes ?: '-' }}
-                                    </td>
+                                    <td>{{ $ta->notes ? Str::limit($ta->notes, 30) : '-' }}</td>
                                     <td>
                                         <span class="badge bg-warning text-dark" title="Δεν υπάρχει στο κεντρικό σύστημα ραντεβού">
                                             ⚠ Δεν έχει καταχωρηθεί στο κύριο σύστημα
