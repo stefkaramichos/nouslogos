@@ -14,39 +14,105 @@
         </div>
         <div class="card-body">
             <div class="row mb-3">
-                <div class="col-md-4">
-                    <p><strong>Ονοματεπώνυμο:</strong> {{ $customer->last_name }} {{ $customer->first_name }}</p>
-                    <p><strong>Τηλέφωνο:</strong> {{ $customer->phone }}</p>
-                    <p><strong>Email:</strong> {{ $customer->email ?? '-' }}</p>
-                    <p><strong>Εταιρεία:</strong> {{ $customer->company->name ?? '-' }}</p>
-                    <p><strong>Σύνολο Ραντεβού (με βάση τα φίλτρα):</strong> {{ $appointmentsCount }}</p>
-                </div>
-                <div class="col-md-4">
-                    <p><strong>ΑΦΜ:</strong> {{ $customer->vat_number ?? '-' }}</p>
-                    <p><strong>ΔΟΥ:</strong> {{ $customer->tax_office ?? '-' }}</p>
-                    <p><strong>Πληροφορίες:</strong> {!! $customer->informations ? nl2br(e($customer->informations)) : '-' !!}</p>
-                </div>
-                <div class="col-md-4">
-                    <p>
-                        <strong>Συνολικό Ποσό Ραντεβού:</strong><br>
-                        <span class="badge bg-primary fs-6">
-                            {{ number_format($totalAmount, 2, ',', '.') }} €
+    <div class="col-md-3">
+        <p><strong>Ονοματεπώνυμο:</strong> {{ $customer->last_name }} {{ $customer->first_name }}</p>
+        <p><strong>Τηλέφωνο:</strong> {{ $customer->phone }}</p>
+        <p><strong>Email:</strong> {{ $customer->email ?? '-' }}</p>
+        <p><strong>Εταιρεία:</strong> {{ $customer->company->name ?? '-' }}</p>
+        <p><strong>Σύνολο Ραντεβού (με βάση τα φίλτρα):</strong> {{ $appointmentsCount }}</p>
+    </div>
+
+    <div class="col-md-3">
+        <p><strong>ΑΦΜ:</strong> {{ $customer->vat_number ?? '-' }}</p>
+        <p><strong>ΔΟΥ:</strong> {{ $customer->tax_office ?? '-' }}</p>
+        <p><strong>Πληροφορίες:</strong> {!! $customer->informations ? nl2br(e($customer->informations)) : '-' !!}</p>
+    </div>
+
+    <div class="col-md-3">
+        <p>
+            <strong>Συνολικό Ποσό Ραντεβού:</strong><br>
+            <span class="badge bg-primary fs-6">
+                {{ number_format($totalAmount, 2, ',', '.') }} €
+            </span>
+        </p>
+        <p>
+            <strong>Συνολικό Ποσό που Έχει Πληρώσει:</strong><br>
+            <span class="badge bg-success fs-6">
+                {{ number_format($paidTotal, 2, ',', '.') }} €
+            </span>
+        </p>
+        <p>
+            <strong>Υπόλοιπο (απλήρωτο):</strong><br>
+            <span class="badge {{ $outstandingTotal > 0 ? 'bg-danger' : 'bg-secondary' }} fs-6">
+                {{ number_format($outstandingTotal, 2, ',', '.') }} €
+            </span>
+        </p>
+    </div>
+
+    {{-- ⭐ ΝΕΑ ΣΤΗΛΗ: Ιστορικό πληρωμών ομαδοποιημένο ανά ημερομηνία --}}
+    <div class="col-md-3">
+        <p><strong>Ιστορικό Πληρωμών:</strong></p>
+
+        <div class="border rounded p-2"
+             style="max-height: 180px; overflow-y: auto; font-size: 0.8rem; background-color: #f8f9fa;">
+            @forelse($paymentsByDate as $dateKey => $dayPayments)
+                @php
+                    // Αν είναι "Χωρίς ημερομηνία" το αφήνουμε έτσι, αλλιώς το κάνουμε d/m/Y
+                    $dateLabel = $dateKey === 'Χωρίς ημερομηνία'
+                        ? 'Χωρίς ημερομηνία'
+                        : \Carbon\Carbon::parse($dateKey)->format('d/m/Y');
+
+                    $dayTotal = $dayPayments->sum('amount');
+                @endphp
+
+                <div class="mb-2">
+                    {{-- Γραμμή ημερομηνίας + σύνολο --}}
+                    <div>
+                        <strong>{{ $dateLabel }}</strong>
+                        <span class="badge bg-primary ms-1">
+                            {{ number_format($dayTotal, 2, ',', '.') }} €
                         </span>
-                    </p>
-                    <p>
-                        <strong>Συνολικό Ποσό που Έχει Πληρώσει:</strong><br>
-                        <span class="badge bg-success fs-6">
-                            {{ number_format($paidTotal, 2, ',', '.') }} €
-                        </span>
-                    </p>
-                    <p>
-                        <strong>Υπόλοιπο (απλήρωτο):</strong><br>
-                        <span class="badge {{ $outstandingTotal > 0 ? 'bg-danger' : 'bg-secondary' }} fs-6">
-                            {{ number_format($outstandingTotal, 2, ',', '.') }} €
-                        </span>
-                    </p>
+                    </div>
+
+                    {{-- Αναλυτικά οι πληρωμές της ημέρας --}}
+                    @foreach($dayPayments as $payment)
+                        <div class="text-muted" style="font-size: 0.75rem;">
+                            {{ number_format($payment->amount, 2, ',', '.') }} €
+
+                            ·
+                            @if($payment->method === 'cash')
+                                Μετρητά
+                            @elseif($payment->method === 'card')
+                                Κάρτα
+                            @else
+                                Άλλο
+                            @endif
+
+                            ·
+                            @if($payment->tax === 'Y')
+                                Με απόδειξη
+                            @else
+                                Χωρίς απόδειξη
+                            @endif
+
+                            @if($payment->is_full)
+                                · Πλήρης
+                            @else
+                                · Μερική
+                            @endif
+                        </div>
+                    @endforeach
                 </div>
-            </div>
+
+                <hr class="my-1">
+            @empty
+                <span class="text-muted">Δεν έχουν γίνει πληρωμές για αυτόν τον πελάτη.</span>
+            @endforelse
+        </div>
+    </div>
+</div>
+
+
 
             <!-- ⭐ Edit Button Bottom Right -->
             <div class="d-flex justify-content-end mt-3">
