@@ -63,6 +63,22 @@
                            value="{{ old('start_time') }}" required>
                 </div>
                 <input type="hidden" name="redirect_to" value="{{ request('redirect') }}">
+
+                {{-- ΠΟΣΕΣ ΕΒΔΟΜΑΔΕΣ (ΕΠΑΝΑΛΗΨΗ) --}}
+                <div class="mb-3">
+                    <label class="form-label">Επανάληψη ανά εβδομάδα</label>
+                    <select name="weeks" id="weeks_select" class="form-select">
+                        @for ($i = 1; $i <= 52; $i++)
+                            <option value="{{ $i }}" @selected(old('weeks', 1) == $i)>
+                                {{ $i }} εβδομάδα{{ $i > 1 ? 'ς' : '' }}
+                            </option>
+                        @endfor
+                    </select>
+                    <small class="text-muted">
+                        Πόσες εβδομάδες να δημιουργηθεί το ίδιο ραντεβού (ανά 7 ημέρες). Προεπιλογή: 1 εβδομάδα (μόνο αυτό το ραντεβού).
+                    </small>
+                </div>
+
                 {{-- ΥΠΗΡΕΣΙΑ (status) --}}
                 <div class="mb-3">
                     <label class="form-label">Υπηρεσία</label>

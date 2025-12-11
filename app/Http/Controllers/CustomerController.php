@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
-use App\Models\Payment;  
+use App\Models\Payment;
 use App\Models\Customer;
+use App\Models\Appointment;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
-
 use Illuminate\Http\Request;
 
 class CustomerController extends Controller
@@ -30,10 +30,8 @@ class CustomerController extends Controller
             ->paginate(25)
             ->withQueryString();   // <-- keeps search when switching page
 
-
         return view('customers.index', compact('customers', 'search'));
     }
-
 
     public function create()
     {
@@ -73,8 +71,6 @@ class CustomerController extends Controller
             ->with('success', 'Ο πελάτης δημιουργήθηκε επιτυχώς.');
     }
 
-
-
     public function edit(Customer $customer)
     {
         $companies = Company::all();
@@ -101,8 +97,6 @@ class CustomerController extends Controller
             ->with('success', 'Ο πελάτης ενημερώθηκε επιτυχώς.');
     }
 
-
-    
     public function show(Request $request, Customer $customer)
     {
         $customer->load([
@@ -247,8 +241,6 @@ class CustomerController extends Controller
         ));
     }
 
-
-
     public function payAll(Request $request, Customer $customer)
     {
         // IDs των επιλεγμένων ραντεβών
@@ -304,9 +296,32 @@ class CustomerController extends Controller
         return back()->with('success', 'Οι πληρωμές για τα επιλεγμένα ραντεβού ενημερώθηκαν επιτυχώς.');
     }
 
+    public function deleteAppointments(Request $request, Customer $customer)
+    {
+        $appointmentIds = $request->input('appointments', []);
 
+        if (empty($appointmentIds)) {
+            return back()->with('error', 'Δεν επιλέχθηκαν ραντεβού για διαγραφή.');
+        }
 
+        // Μόνο ραντεβού αυτού του πελάτη
+        $appointments = Appointment::whereIn('id', $appointmentIds)
+            ->where('customer_id', $customer->id)
+            ->get();
 
+        if ($appointments->isEmpty()) {
+            return back()->with('error', 'Δεν βρέθηκαν έγκυρα ραντεβού για διαγραφή.');
+        }
+
+        foreach ($appointments as $appointment) {
+            // Διαγράφουμε πρώτα τις πληρωμές
+            $appointment->payments()->delete();
+            // Μετά το ραντεβού
+            $appointment->delete();
+        }
+
+        return back()->with('success', 'Τα επιλεγμένα ραντεβού διαγράφηκαν επιτυχώς.');
+    }
 
     public function destroy(Customer $customer)
     {

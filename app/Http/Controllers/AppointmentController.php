@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
-
+use Carbon\Carbon;
 
 class AppointmentController extends Controller
 {
@@ -138,7 +138,6 @@ class AppointmentController extends Controller
         ));
     }
 
-
     public function getLastForCustomer(Request $request)
     {
         $customerId = $request->query('customer_id');
@@ -194,6 +193,8 @@ class AppointmentController extends Controller
                 'payment_amount'        => 'nullable|numeric|min:0',
                 // ΝΕΟ πεδίο: ειδικό ποσό επαγγελματία για αυτό το ραντεβού (override)
                 'professional_amount'   => 'nullable|numeric|min:0',
+                // ΝΕΟ πεδίο: πόσες εβδομάδες να δημιουργηθεί (1–52)
+                'weeks'                 => 'nullable|integer|min:1|max:52',
             ],
             [
                 'customer_id.required'     => 'Ο πελάτης είναι υποχρεωτικός.',
@@ -202,6 +203,10 @@ class AppointmentController extends Controller
                 'start_time.required'      => 'Η ημερομηνία/ώρα είναι υποχρεωτική.',
             ]
         );
+
+        // Πόσες εβδομάδες επανάληψη; default 1
+        $weeks = (int)($data['weeks'] ?? 1);
+        unset($data['weeks']); // δεν υπάρχει στο table
 
         $professional = Professional::findOrFail($data['professional_id']);
 
@@ -231,33 +236,54 @@ class AppointmentController extends Controller
         $data['company_amount']      = $companyAmount;
         $data['created_by']          = Auth::id();
 
-        $appointment = Appointment::create($data);
+        // Διαχείριση ημερομηνιών για επαναλαμβανόμενα ραντεβού
+        $startTime = Carbon::parse($data['start_time']);
+        $endTime   = isset($data['end_time']) ? Carbon::parse($data['end_time']) : null;
 
-        // Αν έχει τσεκαριστεί ότι πληρώθηκε, δημιουργούμε και μια πληρωμή
-        if ($request->boolean('mark_as_paid')) {
-            $paymentAmount = $data['payment_amount'] ?? $total;
+        $createdAppointments = [];
 
-            if ($paymentAmount > 0) {
-                Payment::create([
-                    'appointment_id' => $appointment->id,
-                    'customer_id'    => $appointment->customer_id,
-                    'amount'         => $paymentAmount,
-                    'is_full'        => $paymentAmount >= $total,
-                    'paid_at'        => now(),
-                    'method'         => null,
-                    'notes'          => 'Καταχώρηση από τη φόρμα δημιουργίας ραντεβού.',
-                ]);
+        for ($i = 0; $i < $weeks; $i++) {
+            $currentData = $data;
+
+            $currentData['start_time'] = $startTime->copy()->addWeeks($i);
+
+            if ($endTime) {
+                $currentData['end_time'] = $endTime->copy()->addWeeks($i);
+            }
+
+            $appointment = Appointment::create($currentData);
+            $createdAppointments[] = $appointment;
+
+            // Πληρωμή μόνο για το πρώτο ραντεβού
+            if ($i === 0 && $request->boolean('mark_as_paid')) {
+                $paymentAmount = $data['payment_amount'] ?? $total;
+
+                if ($paymentAmount > 0) {
+                    Payment::create([
+                        'appointment_id' => $appointment->id,
+                        'customer_id'    => $appointment->customer_id,
+                        'amount'         => $paymentAmount,
+                        'is_full'        => $paymentAmount >= $total,
+                        'paid_at'        => now(),
+                        'method'         => null,
+                        'notes'          => 'Καταχώρηση από τη φόρμα δημιουργίας ραντεβού.',
+                    ]);
+                }
             }
         }
 
-          // ---- Χειρισμός redirect ----
+        $message = count($createdAppointments) === 1
+            ? 'Το ραντεβού δημιουργήθηκε επιτυχώς!'
+            : 'Δημιουργήθηκαν ' . count($createdAppointments) . ' εβδομαδιαία ραντεβού επιτυχώς!';
+
+        // ---- Χειρισμός redirect ----
         if ($request->filled('redirect_to')) {
             return redirect($request->input('redirect_to'))
-                ->with('success', 'Το ραντεβού δημιουργήθηκε επιτυχώς!');
+                ->with('success', $message);
         }
 
         return redirect()->route('appointments.index')
-            ->with('success', 'Το ραντεβού δημιουργήθηκε επιτυχώς!');
+            ->with('success', $message);
     }
 
     public function show(Appointment $appointment)
@@ -272,7 +298,7 @@ class AppointmentController extends Controller
         $appointment->load(['customer', 'professional', 'company']);
 
         $customers     = Customer::orderBy('last_name')->get();
-         $professionals = Professional::whereIn('role', ['owner', 'therapist'])
+        $professionals = Professional::whereIn('role', ['owner', 'therapist'])
             ->orderBy('last_name')
             ->get();
         $companies     = Company::all();
@@ -357,5 +383,4 @@ class AppointmentController extends Controller
             ->route('appointments.index')
             ->with('success', 'Το ραντεβού διαγράφηκε επιτυχώς.');
     }
-
 }

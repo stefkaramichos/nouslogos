@@ -51,6 +51,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/customers/{customer}/pay-all', [CustomerController::class, 'payAll'])
     ->name('customers.payAll');
 
+    Route::delete('/customers/{customer}/appointments/delete-selected', [CustomerController::class, 'deleteAppointments'])
+    ->name('customers.deleteAppointments');
+
     Route::get('/api/customers/last-appointment', [AppointmentController::class, 'getLastForCustomer'])
     ->name('customers.lastAppointment');
 

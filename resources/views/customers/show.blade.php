@@ -24,7 +24,7 @@
                 <div class="col-md-4">
                     <p><strong>ΑΦΜ:</strong> {{ $customer->vat_number ?? '-' }}</p>
                     <p><strong>ΔΟΥ:</strong> {{ $customer->tax_office ?? '-' }}</p>
-                    <p><strong>Πληροφορίες:</strong> {{ $customer->informations ? nl2br(e($customer->informations)) : '-' }}</p>
+                    <p><strong>Πληροφορίες:</strong> {!! $customer->informations ? nl2br(e($customer->informations)) : '-' !!}</p>
                 </div>
                 <div class="col-md-4">
                     <p>
@@ -65,10 +65,9 @@
 
             {{-- ΝΕΟ κουμπί: Προσθήκη ραντεβού για αυτόν τον πελάτη --}}
             <a href="{{ route('appointments.create', ['customer_id' => $customer->id, 'redirect' => request()->fullUrl()]) }}"
-            class="btn btn-primary mb-3">
+               class="btn btn-primary mb-3">
                 + Προσθήκη Ραντεβού
             </a>
-
         </div>
 
         <div class="card-body">
@@ -136,14 +135,16 @@
                             $paid    = $payment->amount ?? 0;
                         @endphp
                         <tr>
-                            {{-- Επιλογή για μαζική πληρωμή --}}
+                            {{-- Επιλογή για μαζική πληρωμή / διαγραφή --}}
                             <td class="text-center">
                                 @if($total > 0)
                                     <input type="checkbox"
                                            class="appointment-checkbox"
                                            value="{{ $appointment->id }}">
                                 @else
-                                    <small class="text-muted">-</small>
+                                    <input type="checkbox"
+                                           class="appointment-checkbox"
+                                           value="{{ $appointment->id }}">
                                 @endif
                             </td>
 
@@ -152,10 +153,10 @@
 
                             <td>
                                 @if($appointment->professional)
-                                <a href="{{ route('professionals.show', $appointment->professional) }}">
-                                    {{ $appointment->professional->last_name }} {{ $appointment->professional->first_name }}
-                                </a>
-                                    @else
+                                    <a href="{{ route('professionals.show', $appointment->professional) }}">
+                                        {{ $appointment->professional->last_name }} {{ $appointment->professional->first_name }}
+                                    </a>
+                                @else
                                     <span class="text-muted">-</span>
                                 @endif
                             </td>
@@ -222,7 +223,7 @@
                                     <i class="bi bi-credit-card"></i>
                                 </a>
 
-                                {{-- Διαγραφή Ραντεβού --}}
+                                {{-- Διαγραφή Ραντεβού (μονή) --}}
                                 <form action="{{ route('appointments.destroy', $appointment) }}"
                                       method="POST"
                                       class="d-inline"
@@ -247,16 +248,11 @@
                     </tbody>
                 </table>
             </div>
-              {{-- Σελιδοποίηση ραντεβών --}}
+
+            {{-- Σελιδοποίηση ραντεβών --}}
             <div class="d-flex justify-content-center mb-3">
                 {{ $appointments->links() }}
             </div>
-
-            {{-- Φόρμα για μαζική πληρωμή επιλεγμένων ραντεβών --}}
-            <form id="payAllForm"
-                  method="POST"
-                  action="{{ route('customers.payAll', $customer) }}"
-                  onsubmit="return preparePayAllForm();">
 
             {{-- Φόρμα για μαζική πληρωμή επιλεγμένων ραντεβών --}}
             <form id="payAllForm"
@@ -291,6 +287,26 @@
                             💶 Πληρωμή επιλεγμένων ραντεβού (πλήρης εξόφληση)
                         </button>
                     </div>
+                </div>
+            </form>
+
+            {{-- Φόρμα για μαζική διαγραφή επιλεγμένων ραντεβών --}}
+            <form id="deleteAllForm"
+                  method="POST"
+                  action="{{ route('customers.deleteAppointments', $customer) }}"
+                  onsubmit="return prepareDeleteAllForm();"
+                  class="mt-3">
+                @csrf
+                @method('DELETE')
+
+                <div id="appointmentsDeleteHiddenContainer"></div>
+
+                <div class="d-flex justify-content-end">
+                    <button type="submit"
+                            class="btn btn-outline-danger"
+                            onclick="return confirm('Σίγουρα θέλετε να διαγράψετε τα επιλεγμένα ραντεβού; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.');">
+                        🗑 Διαγραφή επιλεγμένων ραντεβού
+                    </button>
                 </div>
             </form>
 
@@ -331,22 +347,49 @@
             }
         });
 
+        function collectSelectedAppointments() {
+            return Array.from(document.querySelectorAll('.appointment-checkbox:checked'))
+                .map(cb => cb.value);
+        }
+
         function preparePayAllForm() {
             const container = document.getElementById('appointmentsHiddenContainer');
-            const checkboxes = document.querySelectorAll('.appointment-checkbox:checked');
+            const ids = collectSelectedAppointments();
 
-            if (!checkboxes.length) {
+            if (!ids.length) {
                 alert('Παρακαλώ επιλέξτε τουλάχιστον ένα ραντεβού.');
                 return false;
             }
 
             container.innerHTML = '';
 
-            checkboxes.forEach(cb => {
+            ids.forEach(id => {
                 const hidden = document.createElement('input');
                 hidden.type  = 'hidden';
                 hidden.name  = 'appointments[]';
-                hidden.value = cb.value;
+                hidden.value = id;
+                container.appendChild(hidden);
+            });
+
+            return true;
+        }
+
+        function prepareDeleteAllForm() {
+            const container = document.getElementById('appointmentsDeleteHiddenContainer');
+            const ids = collectSelectedAppointments();
+
+            if (!ids.length) {
+                alert('Παρακαλώ επιλέξτε τουλάχιστον ένα ραντεβού για διαγραφή.');
+                return false;
+            }
+
+            container.innerHTML = '';
+
+            ids.forEach(id => {
+                const hidden = document.createElement('input');
+                hidden.type  = 'hidden';
+                hidden.name  = 'appointments[]';
+                hidden.value = id;
                 container.appendChild(hidden);
             });
 
