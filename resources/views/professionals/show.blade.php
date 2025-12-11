@@ -135,7 +135,6 @@
                     <thead>
                     <tr>
                         <th>Θερ.</th> {{-- ΝΕΑ ΣΤΗΛΗ --}}
-                        <th>#</th>
                         <th>Ημερομηνία & Ώρα</th>
                         <th>Πελάτης</th>
                         <th>Εταιρεία</th>
@@ -178,8 +177,7 @@
                                     <span class="text-muted">-</span>
                                 @endif
                             </td>
-                            <td>{{ $appointment->id }}</td>
-
+                           
                             <td>{{ $appointment->start_time?->format('d/m/Y H:i') }}</td>
 
                             <td>

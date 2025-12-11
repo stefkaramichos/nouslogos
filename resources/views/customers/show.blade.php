@@ -117,7 +117,7 @@
                         <th class="text-center">
                             <input type="checkbox" id="select_all">
                         </th>
-                        <th>#</th>
+                        <th>Created</th>
                         <th>Ημ/νία & Ώρα</th>
                         <th>Επαγγελματίας</th>
                         <th>Εταιρεία</th>
@@ -148,7 +148,16 @@
                                 @endif
                             </td>
 
-                            <td>{{ $appointment->id }}</td>
+                            <td>
+                                @if($appointment->creator)
+                                        <small class="text-muted">
+                                            {{ $appointment->creator->first_name }}
+                                        </small>
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
+                            </td>
+
                             <td>{{ $appointment->start_time?->format('d/m/Y H:i') }}</td>
 
                             <td>

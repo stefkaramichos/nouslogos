@@ -104,6 +104,7 @@ class CustomerController extends Controller
             'appointments.professional',
             'appointments.company',
             'appointments.payment',
+            'appointments.creator'
         ]);
 
         // Παίρνουμε τα φίλτρα από το request
