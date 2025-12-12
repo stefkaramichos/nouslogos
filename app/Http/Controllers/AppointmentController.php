@@ -369,17 +369,20 @@ class AppointmentController extends Controller
 
     public function destroy(Request $request, Appointment $appointment)
     {
-        $appointment->delete();
+        $appointment->delete(); // Soft delete
 
         $redirectTo = $request->input('redirect_to');
 
+        // If we have a stored redirect URL → go back there
         if ($redirectTo) {
             return redirect($redirectTo)
                 ->with('success', 'Το ραντεβού διαγράφηκε επιτυχώς.');
         }
 
+        // Fallback
         return redirect()
             ->route('appointments.index')
             ->with('success', 'Το ραντεβού διαγράφηκε επιτυχώς.');
     }
+
 }

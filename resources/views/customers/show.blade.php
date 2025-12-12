@@ -323,17 +323,21 @@
 
                                 {{-- Διαγραφή Ραντεβού (μονή) --}}
                                 <form action="{{ route('appointments.destroy', $appointment) }}"
-                                      method="POST"
-                                      class="d-inline"
-                                      onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτό το ραντεβού;');">
+                                    method="POST"
+                                    class="d-inline"
+                                    onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτό το ραντεβού;');">
+
                                     @csrf
                                     @method('DELETE')
-                                    <input type="hidden" name="redirect_to" value="{{ request()->fullUrl() }}">
-                                    <button class="btn btn-sm btn-danger"
-                                            title="Διαγραφή ραντεβού">
+
+                                    {{-- Save current page URL so controller can return here --}}
+                                    <input type="hidden" name="redirect_to" value="{{ url()->full() }}">
+
+                                    <button class="btn btn-sm btn-danger" title="Διαγραφή ραντεβού">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
+
                             </td>
                         </tr>
                     @empty
