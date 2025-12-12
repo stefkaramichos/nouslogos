@@ -89,8 +89,8 @@ Route::middleware('auth')->group(function () {
             Route::delete('/my-appointments/{therapistAppointment}', [TherapistAppointmentController::class, 'destroy'])
                 ->name('therapist_appointments.destroy');
          
-
-
+            Route::post('/appointments/{appointment}/update-price', [AppointmentController::class, 'updatePrice'])
+                 ->name('appointments.updatePrice');
 });
 
 Route::get('/hash-password', [\App\Http\Controllers\HashController::class, 'hashPassword']);

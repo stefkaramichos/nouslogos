@@ -303,7 +303,6 @@ class CustomerController extends Controller
     }
 
 
-
     public function payAll(Request $request, Customer $customer)
     {
         // IDs των επιλεγμένων ραντεβών

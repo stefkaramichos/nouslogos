@@ -275,7 +275,12 @@
                                 </span>
                             </td>
 
-                            <td>{{ number_format($total, 2, ',', '.') }}</td>
+                            <td class="editable-price"
+                                data-id="{{ $appointment->id }}"
+                                style="cursor:pointer;">
+                                {{ number_format($total, 2, ',', '.') }}
+                            </td>
+
 
                             {{-- Πληρωμή --}}
                             <td>
@@ -505,6 +510,105 @@
                 cb.addEventListener('change', updateDeleteButtonVisibility);
             });
         });
+
+
+
+       document.addEventListener('DOMContentLoaded', function () {
+    const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+    const csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
+
+    if (!csrfToken) {
+        console.warn('CSRF token meta tag is missing. Inline price editing will not work.');
+        return;
+    }
+
+    let activeInput = null;
+
+    document.querySelectorAll('.editable-price').forEach(td => {
+        td.addEventListener('dblclick', function () {
+            if (activeInput) return; // μόνο ένα ενεργό edit
+
+            const tdElem = this;
+            const originalDisplay = tdElem.innerText.trim(); // π.χ. "35,00 €" ή "35,00"
+            const numericRaw = originalDisplay.replace(/[^\d,.-]/g, '') // κρατάμε μόνο αριθμούς/κόμμα/τελεία/-
+                                        .replace('.', '')
+                                        .replace(',', '.'); // γυρνάμε σε 35.00
+            const appointmentId = tdElem.dataset.id;
+
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.step = '0.01';
+            input.min = '0';
+            input.className = 'form-control form-control-sm';
+            input.style.width = '100px';
+            input.value = numericRaw ? parseFloat(numericRaw) : 0;
+
+            tdElem.innerHTML = '';
+            tdElem.appendChild(input);
+            input.focus();
+            activeInput = input;
+
+            const restoreOriginal = () => {
+                tdElem.innerText = originalDisplay;
+                activeInput = null;
+            };
+
+            const saveValue = () => {
+                const newValue = input.value.trim();
+
+                if (newValue === '') {
+                    restoreOriginal();
+                    return;
+                }
+
+                tdElem.innerHTML = '<span class="text-muted">Αποθήκευση…</span>';
+
+                fetch("{{ url('/appointments') }}/" + appointmentId + "/update-price", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRF-TOKEN": csrfToken,
+                        "Accept": "application/json",
+                    },
+                    body: JSON.stringify({ total_price: newValue })
+                })
+                    .then(res => {
+                        if (!res.ok) {
+                            throw new Error('HTTP error ' + res.status);
+                        }
+                        return res.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            tdElem.innerText = data.new_price + ' €';
+                        } else {
+                            alert('Σφάλμα αποθήκευσης.');
+                            restoreOriginal();
+                        }
+                        activeInput = null;
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert('Σφάλμα σύνδεσης ή CSRF.');
+                        restoreOriginal();
+                    });
+            };
+
+            input.addEventListener('blur', saveValue);
+
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    input.blur();
+                }
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    restoreOriginal();
+                }
+            });
+        });
+    });
+});
 
     </script>
 @endsection

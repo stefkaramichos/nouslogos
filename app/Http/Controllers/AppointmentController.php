@@ -367,6 +367,22 @@ class AppointmentController extends Controller
             ->with('success', 'Το ραντεβού ενημερώθηκε επιτυχώς.');
     }
 
+    public function updatePrice(Request $request, Appointment $appointment)
+    {
+        $request->validate([
+            'total_price' => 'required|numeric|min:0'
+        ]);
+
+        $appointment->update([
+            'total_price' => $request->total_price
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'new_price' => number_format($appointment->total_price, 2, ',', '.')
+        ]);
+    }
+
     public function destroy(Request $request, Appointment $appointment)
     {
         $appointment->delete(); // Soft delete
