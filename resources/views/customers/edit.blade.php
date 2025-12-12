@@ -12,6 +12,8 @@
                 @csrf
                 @method('PUT')
 
+                <input type="hidden" name="redirect_to" value="{{ $redirect }}">
+                
                 <div class="mb-3">
                     <label class="form-label">Όνομα</label>
                     <input
