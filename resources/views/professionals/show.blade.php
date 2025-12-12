@@ -131,6 +131,8 @@
             </form>
 
             <div class="table-responsive">
+                @include('../includes/selected_dates')
+
                 <table class="table table-striped mb-0 align-middle">
                     <thead>
                     <tr>
@@ -265,11 +267,11 @@
                                 </a>
 
                                 <!-- Edit Payment -->
-                                <a href="{{ route('appointments.payment.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
+                                {{-- <a href="{{ route('appointments.payment.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
                                 class="btn btn-sm btn-outline-primary"
                                 title="Επεξεργασία πληρωμής">
                                     <i class="bi bi-credit-card"></i>
-                                </a>
+                                </a> --}}
 
                                 <!-- Delete -->
                                 <form action="{{ route('appointments.destroy', $appointment) }}"

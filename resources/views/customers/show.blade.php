@@ -177,6 +177,29 @@
 
             {{-- Πίνακας ραντεβών --}}
             <div class="table-responsive mb-3">
+                @include('../includes/selected_dates')
+                {{-- Φόρμα για μαζική διαγραφή επιλεγμένων ραντεβών --}}
+                <form id="deleteAllForm"
+                    method="POST"
+                    action="{{ route('customers.deleteAppointments', $customer) }}"
+                    onsubmit="return prepareDeleteAllForm();"
+                    class="mt-3">
+                    @csrf
+                    @method('DELETE')
+
+                    <div id="appointmentsDeleteHiddenContainer"></div>
+
+                   <div class="d-flex justify-content-end">
+                        <button type="submit"
+                                id="delete-selected-btn"
+                                class="btn btn-danger d-none shadow-sm"
+                                onclick="return confirm('Σίγουρα θέλετε να διαγράψετε τα επιλεγμένα ραντεβού; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.');"
+                                style="font-size: 0.9rem;">
+                            🗑 Διαγραφή επιλεγμένων
+                        </button>
+                    </div>
+
+                </form>
                 <table class="table table-striped mb-0 align-middle">
                     <thead>
                     <tr>
@@ -292,11 +315,11 @@
                                 </a>
 
                                 {{-- Επεξεργασία Πληρωμής --}}
-                                <a href="{{ route('appointments.payment.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
+                                {{-- <a href="{{ route('appointments.payment.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
                                    class="btn btn-sm btn-outline-primary mb-1"
                                    title="Επεξεργασία πληρωμής">
                                     <i class="bi bi-credit-card"></i>
-                                </a>
+                                </a> --}}
 
                                 {{-- Διαγραφή Ραντεβού (μονή) --}}
                                 <form action="{{ route('appointments.destroy', $appointment) }}"
@@ -364,27 +387,6 @@
                     </div>
                 </div>
             </form>
-
-            {{-- Φόρμα για μαζική διαγραφή επιλεγμένων ραντεβών --}}
-            <form id="deleteAllForm"
-                  method="POST"
-                  action="{{ route('customers.deleteAppointments', $customer) }}"
-                  onsubmit="return prepareDeleteAllForm();"
-                  class="mt-3">
-                @csrf
-                @method('DELETE')
-
-                <div id="appointmentsDeleteHiddenContainer"></div>
-
-                <div class="d-flex justify-content-end">
-                    <button type="submit"
-                            class="btn btn-outline-danger"
-                            onclick="return confirm('Σίγουρα θέλετε να διαγράψετε τα επιλεγμένα ραντεβού; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.');">
-                        🗑 Διαγραφή επιλεγμένων ραντεβού
-                    </button>
-                </div>
-            </form>
-
         </div>
     </div>
 
@@ -470,5 +472,32 @@
 
             return true;
         }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const selectAll       = document.getElementById('select_all');
+            const checkboxes      = document.querySelectorAll('.appointment-checkbox');
+            const deleteBtn       = document.getElementById('delete-selected-btn');
+
+            function updateDeleteButtonVisibility() {
+                const anySelected = Array.from(checkboxes).some(cb => cb.checked);
+                if (anySelected) {
+                    deleteBtn.classList.remove('d-none');
+                } else {
+                    deleteBtn.classList.add('d-none');
+                }
+            }
+
+            if (selectAll) {
+                selectAll.addEventListener('change', function () {
+                    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+                    updateDeleteButtonVisibility();
+                });
+            }
+
+            checkboxes.forEach(cb => {
+                cb.addEventListener('change', updateDeleteButtonVisibility);
+            });
+        });
+
     </script>
 @endsection
