@@ -99,111 +99,199 @@ class CustomerController extends Controller
     }
 
     public function show(Request $request, Customer $customer)
-    {
-        $customer->load([
-            'company',
-            'appointments.professional',
-            'appointments.company',
-            'appointments.payment',
-            'appointments.creator'
-        ]);
+{
+    // Φορτώνουμε τις βασικές σχέσεις του πελάτη
+    $customer->load([
+        'company',
+        'appointments.professional',
+        'appointments.company',
+        'appointments.payment',
+        'appointments.creator'
+    ]);
 
-        // 🔹 Όλες οι πληρωμές του πελάτη (τελευταίες πρώτα)
-        $payments = Payment::where('customer_id', $customer->id)
-            ->orderByDesc('paid_at')
-            ->orderByDesc('id')
-            ->get();
+    /**
+     * 🔹 Ιστορικό πληρωμών (ομαδοποιημένο ανά ημερομηνία)
+     */
+    $payments = Payment::where('customer_id', $customer->id)
+        ->orderByDesc('paid_at')
+        ->orderByDesc('id')
+        ->get();
 
-        // 🔹 Ομαδοποίηση ανά ημερομηνία (paid_at date)
-        $paymentsByDate = $payments->groupBy(function ($payment) {
-            if (!$payment->paid_at) {
-                return 'Χωρίς ημερομηνία';
-            }
-
-            return Carbon::parse($payment->paid_at)->toDateString(); // Y-m-d
-        });
-
-        // Παίρνουμε τα φίλτρα από το request
-        $from          = $request->input('from');
-        $to            = $request->input('to');
-        $status        = $request->input('status');
-        $paymentStatus = $request->input('payment_status');
-        $paymentMethod = $request->input('payment_method');
-
-        if (!$request->hasAny(['from', 'to', 'status', 'payment_status', 'payment_method'])) {
-            $from = now()->startOfMonth()->toDateString();
-            $to   = now()->endOfMonth()->toDateString();
+    $paymentsByDate = $payments->groupBy(function ($payment) {
+        if (!$payment->paid_at) {
+            return 'Χωρίς ημερομηνία';
         }
 
-        $appointmentsCollection = $customer->appointments
-            ->sortByDesc('start_time')
-            ->values();
+        return Carbon::parse($payment->paid_at)->toDateString(); // Y-m-d
+    });
 
-        $filteredAppointments = $appointmentsCollection;
+    /**
+     * 🔹 Παίρνουμε τα φίλτρα από το request
+     */
+    $from          = $request->input('from');
+    $to            = $request->input('to');
+    $status        = $request->input('status');           // (προαιρετικά, αν το χρησιμοποιήσεις αργότερα)
+    $paymentStatus = $request->input('payment_status');
+    $paymentMethod = $request->input('payment_method');
 
-        $appointmentsCount = $filteredAppointments->count();
-
-        $totalAmount = $filteredAppointments->sum(function ($a) {
-            return $a->total_price ?? 0;
-        });
-
-        $paidTotal = $filteredAppointments->sum(function ($a) {
-            return $a->payment->amount ?? 0;
-        });
-
-        $outstandingTotal = max($totalAmount - $paidTotal, 0);
-
-        $cashTotal = $filteredAppointments->sum(function ($a) {
-            return ($a->payment && $a->payment->method === 'cash')
-                ? $a->payment->amount
-                : 0;
-        });
-
-        $cardTotal = $filteredAppointments->sum(function ($a) {
-            return ($a->payment && $a->payment->method === 'card')
-                ? $a->payment->amount
-                : 0;
-        });
-
-        $perPage = 25;
-        $currentPage = Paginator::resolveCurrentPage() ?: 1;
-
-        $currentItems = $filteredAppointments
-            ->values()
-            ->forPage($currentPage, $perPage);
-
-        $appointments = new LengthAwarePaginator(
-            $currentItems,
-            $filteredAppointments->count(),
-            $perPage,
-            $currentPage,
-            [
-                'path'  => $request->url(),
-                'query' => $request->query(),
-            ]
-        );
-
-        $filters = [
-            'from'           => $from,
-            'to'             => $to,
-            'status'         => $status ?? 'all',
-            'payment_status' => $paymentStatus ?? 'all',
-            'payment_method' => $paymentMethod ?? 'all',
-        ];
-
-        return view('customers.show', compact(
-            'customer',
-            'appointments',
-            'appointmentsCount',
-            'totalAmount',
-            'paidTotal',
-            'outstandingTotal',
-            'cashTotal',
-            'cardTotal',
-            'filters',
-            'paymentsByDate' // 👈 ΠΕΡΝΑΜΕ ΚΑΙ ΑΥΤΟ
-        ));
+    // Αν δεν έχει σταλεί ΚΑΝΕΝΑ φίλτρο, βάζουμε default τρέχον μήνα
+    if (!$request->hasAny(['from', 'to', 'status', 'payment_status', 'payment_method'])) {
+        $from = now()->startOfMonth()->toDateString();
+        $to   = now()->endOfMonth()->toDateString();
     }
+
+    /**
+     * 🔹 Ξεκινάμε από όλα τα ραντεβού του πελάτη (όχι διαγραμμένα)
+     * Η σχέση appointments ήδη φιλτράρει soft-deleted λόγω SoftDeletes.
+     */
+    $appointmentsCollection = $customer->appointments
+        ->sortByDesc('start_time')
+        ->values();
+
+    $filteredAppointments = $appointmentsCollection;
+
+    /**
+     * 🔹 Φίλτρο: Ημερομηνία από
+     */
+    if ($from) {
+        $filteredAppointments = $filteredAppointments->filter(function ($a) use ($from) {
+            if (!$a->start_time) {
+                return false;
+            }
+            return $a->start_time->toDateString() >= $from;
+        });
+    }
+
+    /**
+     * 🔹 Φίλτρο: Ημερομηνία έως
+     */
+    if ($to) {
+        $filteredAppointments = $filteredAppointments->filter(function ($a) use ($to) {
+            if (!$a->start_time) {
+                return false;
+            }
+            return $a->start_time->toDateString() <= $to;
+        });
+    }
+
+    /**
+     * 🔹 Φίλτρο: Κατάσταση πληρωμής (unpaid / partial / full)
+     */
+    if ($paymentStatus && $paymentStatus !== 'all') {
+        $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentStatus) {
+            $payment = $a->payment;
+            $total   = $a->total_price ?? 0;
+            $paid    = $payment->amount ?? 0;
+
+            switch ($paymentStatus) {
+                case 'unpaid':
+                    return $paid <= 0;
+                case 'partial':
+                    return $paid > 0 && $paid < $total;
+                case 'full':
+                    return $total > 0 && $paid >= $total;
+                default:
+                    return true;
+            }
+        });
+    }
+
+    /**
+     * 🔹 Φίλτρο: Τρόπος πληρωμής (cash / card)
+     */
+    if ($paymentMethod && $paymentMethod !== 'all') {
+        $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentMethod) {
+            if (!$a->payment) {
+                return false;
+            }
+            return $a->payment->method === $paymentMethod;
+        });
+    }
+
+    // Αν θέλεις στο μέλλον να φιλτράρεις και με βάση appointment->status:
+    /*
+    if ($status && $status !== 'all') {
+        $filteredAppointments = $filteredAppointments->filter(function ($a) use ($status) {
+            return $a->status === $status;
+        });
+    }
+    */
+
+    // Κάνουμε reset τα keys της συλλογής
+    $filteredAppointments = $filteredAppointments->values();
+
+    /**
+     * 🔹 Στατιστικά με βάση ΤΑ ΦΙΛΤΡΑΡΙΣΜΕΝΑ ραντεβού
+     */
+    $appointmentsCount = $filteredAppointments->count();
+
+    $totalAmount = $filteredAppointments->sum(function ($a) {
+        return $a->total_price ?? 0;
+    });
+
+    $paidTotal = $filteredAppointments->sum(function ($a) {
+        return $a->payment->amount ?? 0;
+    });
+
+    $outstandingTotal = max($totalAmount - $paidTotal, 0);
+
+    $cashTotal = $filteredAppointments->sum(function ($a) {
+        return ($a->payment && $a->payment->method === 'cash')
+            ? $a->payment->amount
+            : 0;
+    });
+
+    $cardTotal = $filteredAppointments->sum(function ($a) {
+        return ($a->payment && $a->payment->method === 'card')
+            ? $a->payment->amount
+            : 0;
+    });
+
+    /**
+     * 🔹 Manual pagination πάνω στη filtered συλλογή
+     */
+    $perPage     = 25;
+    $currentPage = Paginator::resolveCurrentPage() ?: 1;
+
+    $currentItems = $filteredAppointments
+        ->forPage($currentPage, $perPage);
+
+    $appointments = new LengthAwarePaginator(
+        $currentItems,
+        $filteredAppointments->count(),
+        $perPage,
+        $currentPage,
+        [
+            'path'  => $request->url(),
+            'query' => $request->query(), // κρατάμε τα φίλτρα στο pagination links
+        ]
+    );
+
+    /**
+     * 🔹 Φίλτρα που περνάμε στο Blade
+     */
+    $filters = [
+        'from'           => $from,
+        'to'             => $to,
+        'status'         => $status ?? 'all',
+        'payment_status' => $paymentStatus ?? 'all',
+        'payment_method' => $paymentMethod ?? 'all',
+    ];
+
+    return view('customers.show', compact(
+        'customer',
+        'appointments',
+        'appointmentsCount',
+        'totalAmount',
+        'paidTotal',
+        'outstandingTotal',
+        'cashTotal',
+        'cardTotal',
+        'filters',
+        'paymentsByDate'
+    ));
+}
+
 
 
     public function payAll(Request $request, Customer $customer)
