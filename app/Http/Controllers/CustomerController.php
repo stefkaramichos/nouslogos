@@ -279,14 +279,12 @@ class CustomerController extends Controller
         }
 
         foreach ($appointments as $appointment) {
-            // Διαγράφουμε πρώτα τις πληρωμές
-            $appointment->payments()->delete();
-            // Μετά το ραντεβού
-            $appointment->delete();
+            $appointment->delete(); // 👈 soft delete
         }
 
         return back()->with('success', 'Τα επιλεγμένα ραντεβού διαγράφηκαν επιτυχώς.');
     }
+
 
     public function destroy(Customer $customer)
     {

@@ -369,7 +369,6 @@ class AppointmentController extends Controller
 
     public function destroy(Request $request, Appointment $appointment)
     {
-        $appointment->payments()->delete();
         $appointment->delete();
 
         $redirectTo = $request->input('redirect_to');
