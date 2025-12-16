@@ -71,6 +71,7 @@ Route::middleware('auth')->group(function () {
  
     Route::get('/settlements', [SettlementController::class, 'index'])
             ->name('settlements.index');
+    Route::post('/settlements/settle', [SettlementController::class, 'store'])->name('settlements.store');
 
     Route::resource('expenses', ExpenseController::class)
     ->middleware(['auth', 'role:owner,grammatia']);

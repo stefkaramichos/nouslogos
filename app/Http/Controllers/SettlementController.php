@@ -5,231 +5,108 @@ namespace App\Http\Controllers;
 use App\Models\Payment;
 use App\Models\Expense;
 use App\Models\Professional;
+use App\Models\Settlement;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
 class SettlementController extends Controller
 {
+    // Συνεταίροι (ids professionals)
+    private array $partnerProfessionals = [
+        'partner1' => 1, // Γιάννης
+        'partner2' => 2, // Ελένη
+    ];
+
     public function index(Request $request)
     {
         $user = Auth::user();
 
-        // Μόνο owner
         if (!$user || $user->role !== 'owner') {
             abort(403, 'Δεν έχετε πρόσβαση σε αυτή τη σελίδα.');
         }
 
-        // mapping professionals -> συνεταίροι
-        $partnerProfessionals = [
-            'partner1' => 1, // Γιάννης
-            'partner2' => 2, // Ελένη
-        ];
+        // ===== ΦΙΛΤΡΟ ΜΗΝΩΝ (YYYY-MM) =====
+        $fromMonth = $request->input('from_month');
+        $toMonth   = $request->input('to_month');
 
-        // ===== ΦΙΛΤΡΟ ΗΜΕΡΟΜΗΝΙΩΝ =====
-        $from = $request->input('from');
-        $to   = $request->input('to');
-
-        if (!$from && !$to) {
-            $from = Carbon::now()->startOfMonth()->toDateString();
-            $to   = Carbon::now()->endOfMonth()->toDateString();
+        if (!$fromMonth && !$toMonth) {
+            $fromMonth = Carbon::now()->format('Y-m');
+            $toMonth   = $fromMonth;
         }
+        if ($fromMonth && !$toMonth) $toMonth = $fromMonth;
+        if (!$fromMonth && $toMonth) $fromMonth = $toMonth;
 
-        if ($from && !$to) {
-            $to = $from;
-        }
+        $rangeStart = Carbon::createFromFormat('Y-m', $fromMonth)->startOfMonth()->startOfDay();
+        $rangeEndExclusive = Carbon::createFromFormat('Y-m', $toMonth)->startOfMonth()->addMonth()->startOfDay();
 
-        // ===== ΦΕΡΝΟΥΜΕ ΠΛΗΡΩΜΕΣ =====
-        $payments = Payment::with(['appointment.professional', 'customer'])
-            ->when($from, function ($q) use ($from) {
-                $q->whereHas('appointment', function ($qq) use ($from) {
-                    $qq->whereDate('start_time', '>=', $from);
-                });
-            })
-            ->when($to, function ($q) use ($to) {
-                $q->whereHas('appointment', function ($qq) use ($to) {
-                    $qq->whereDate('start_time', '<=', $to);
-                });
-            })
+        // ✅ ΠΑΝΤΑ live υπολογισμός (να πιάνει και αλλαγές μετά την εκκαθάριση)
+        $calc = $this->calculateForRange($rangeStart, $rangeEndExclusive);
+
+        // Live totals
+        $totalAmount      = $calc['totalAmount'];
+        $cashToBank       = $calc['cashToBank'];
+        $partner1Total    = $calc['partner1Total'];
+        $partner2Total    = $calc['partner2Total'];
+
+        // Live υπόλοιπα
+        $companyBankTotal = $calc['companyBankTotal'];
+        $cardTotal        = $calc['cardTotal'];
+        $cashNoTax        = $calc['cashNoTax'];
+        $cashWithTax      = $calc['cashWithTax'];
+        $sharedPool       = $calc['sharedPool'];
+        $partner1Personal = $calc['partner1Personal'];
+        $partner2Personal = $calc['partner2Personal'];
+        $chartDistribution= $calc['chartDistribution'];
+        $dailyChart       = $calc['dailyChart'];
+        $payments         = $calc['payments'];
+
+        // ===== Αποθηκευμένες εκκαθαρίσεις (μόνο για εμφάνιση/σύγκριση UI) =====
+        $companyId = $user->company_id ?? 1;
+
+        $settlements = Settlement::where('company_id', $companyId)
+            ->where('month', '>=', $rangeStart->toDateString())
+            ->where('month', '<',  $rangeEndExclusive->toDateString())
+            ->orderBy('month')
             ->get();
 
-        // ===== ΣΥΝΟΛΙΚΑ ΠΟΣΑ ΕΙΣΠΡΑΞΕΩΝ =====
-        $totalAmount = 0;
-
-        // Μετρητά / κάρτα / απόδειξη
-        $cashToBank   = 0; // μετρητά ΜΕ απόδειξη που πάνε στην τράπεζα (εταιρικό μέρος όταν είναι συνεταίρος)
-        $cashNoTax    = 0; // μετρητά χωρίς απόδειξη (σύνολο)
-        $cashWithTax  = 0; // μετρητά με απόδειξη (σύνολο)
-        $cardTotal    = 0; // σύνολο πληρωμών με κάρτα (bruto)
-
-        // Προσωπικά ποσά συνεταίρων
-        $partner1Personal = 0; // Γιάννης
-        $partner2Personal = 0; // Ελένη
-
-        // Κοινό "μαύρο" ταμείο από μετρητά χωρίς απόδειξη (RAW)
-        $sharedPoolRaw = 0;
-
-        // Σύνολο 10€ επαγγελματία από ΚΑΡΤΑ (συνεταίροι) – θα αφαιρεθεί από το κοινό ταμείο
-        $partnerCardPersonal = 0;
-
-        // Δεδομένα για ημερήσιο chart
-        $daily = []; // ['Y-m-d' => ['giannis' => ..., 'eleni' => ...]]
-
-        foreach ($payments as $payment) {
-            $appointment = $payment->appointment;
-            if (!$appointment) {
-                continue;
-            }
-
-            $dateKey = $appointment->start_time
-                ? $appointment->start_time->toDateString()
-                : ($payment->paid_at ? Carbon::parse($payment->paid_at)->toDateString() : null);
-
-            if ($dateKey && !isset($daily[$dateKey])) {
-                $daily[$dateKey] = [
-                    'giannis' => 0,
-                    'eleni'   => 0,
-                ];
-            }
-
-            $amount          = (float) $payment->amount;
-            $method          = $payment->method;             // cash / card / null
-            $tax             = $payment->tax ?? 'N';         // 'Y' ή 'N'
-            $professionalAmt = (float) ($appointment->professional_amount ?? 0);
-            $professionalId  = $appointment->professional_id;
-
-            $totalAmount += $amount;
-
-            $isPartnerProfessional = in_array($professionalId, $partnerProfessionals, true);
-
-            // ===== ΠΡΟΣΩΠΙΚΟ ΠΟΣΟ ΣΥΝΕΤΑΙΡΩΝ (πάντα τα 10€ του επαγγελματία) =====
-            if ($isPartnerProfessional && $professionalAmt > 0) {
-                if ($professionalId === $partnerProfessionals['partner1']) {
-                    $partner1Personal += $professionalAmt;
-                    if ($dateKey) {
-                        $daily[$dateKey]['giannis'] += $professionalAmt;
-                    }
-                } elseif ($professionalId === $partnerProfessionals['partner2']) {
-                    $partner2Personal += $professionalAmt;
-                    if ($dateKey) {
-                        $daily[$dateKey]['eleni'] += $professionalAmt;
-                    }
-                }
-            }
-
-            // ===== CASH =====
-            if ($method === 'cash') {
-
-                // --- Με απόδειξη ---
-                if ($tax === 'Y') {
-                    $cashWithTax += $amount;
-
-                    if ($isPartnerProfessional && $professionalAmt > 0) {
-                        // Στην τράπεζα πάει μόνο το εταιρικό κομμάτι (π.χ. 35 - 10 = 25)
-                        $cashToBank += max($amount - $professionalAmt, 0);
-                    } else {
-                        // Τρίτος επαγγελματίας → όλο στην εταιρεία
-                        $cashToBank += $amount;
-                    }
-
-                    continue;
-                }
-
-                // --- Χωρίς απόδειξη ---
-                $cashNoTax += $amount;
-
-                if ($isPartnerProfessional) {
-                    // στο RAW κοινό ταμείο μπαίνει ΜΟΝΟ το εταιρικό κομμάτι (amount - professionalAmt)
-                    $sharedPoolRaw += max($amount - $professionalAmt, 0);
-                } else {
-                    // τρίτος επαγγελματίας: όλο στο RAW κοινό ταμείο
-                    $sharedPoolRaw += $amount;
-                }
-
-                continue;
-            }
-
-            // ===== CARD =====
-            if ($method === 'card') {
-                $cardTotal += $amount; // bruto (ό,τι περνάει από POS)
-
-                if ($isPartnerProfessional && $professionalAmt > 0) {
-                    // Τα 10€ του συνεταίρου από κάρτα θα πληρωθούν από το μαύρο κοινό ταμείο
-                    $partnerCardPersonal += $professionalAmt;
-                }
-
-                continue;
-            }
-
-            // ===== ΆΛΛΗ/ΑΓΝΩΣΤΗ ΜΕΘΟΔΟΣ -> σαν μετρητά με απόδειξη, όλο στην εταιρεία =====
-            $cashWithTax += $amount;
-            $cashToBank  += $amount;
-        }
-
-        // ===== ΤΕΛΙΚΟΣ ΚΟΙΝΟΣ ΚΟΥΜΠΑΡΑΣ =====
-        // Από το RAW κοινό ταμείο αφαιρούμε τα 10άρια των συνεταίρων από ΚΑΡΤΕΣ
-        $sharedPool = max($sharedPoolRaw - $partnerCardPersonal, 0);
-
-        // ===== ΤΕΛΙΚΑ ΠΟΣΑ ΣΥΝΕΤΑΙΡΩΝ =====
-        $partner1Total = $partner1Personal + ($sharedPool / 2);
-        $partner2Total = $partner2Personal + ($sharedPool / 2);
-
-        // Ποσό επιχείρησης στην Τράπεζα (ό,τι περνάει από τράπεζα)
-        $companyBankTotal = $cashToBank + $cardTotal;
-
-        // για πληροφόρηση (αν το χρειαστείς)
-        $bankFromCard = $cardTotal;
-
-        // 🔹 Δεδομένα για Chart.js (κατανομή)
-        $chartDistribution = [
-            'labels' => [
-                'Μετρητά προς κατάθεση',
-                'Γιάννης #1',
-                'Ελένη #2',
-            ],
-            'data'   => [
-                round($cashToBank, 2),
-                round($partner1Total, 2),
-                round($partner2Total, 2),
-            ],
+        // totals από saved settlements (για compare μόνο)
+        $savedTotals = [
+            'cashToBank'    => round((float) $settlements->sum('cash_to_bank'), 2),
+            'partner1Total' => round((float) $settlements->sum('partner1_total'), 2),
+            'partner2Total' => round((float) $settlements->sum('partner2_total'), 2),
         ];
 
-        // 🔹 Ημερήσιο chart (μόνο τα προσωπικά 10€)
-        ksort($daily);
-
-        $dailyChart = [
-            'labels'  => array_keys($daily),
-            'giannis' => array_map(fn($d) => round($d['giannis'], 2), $daily),
-            'eleni'   => array_map(fn($d) => round($d['eleni'], 2), $daily),
+        $liveTotals = [
+            'cashToBank'    => round((float) $cashToBank, 2),
+            'partner1Total' => round((float) $partner1Total, 2),
+            'partner2Total' => round((float) $partner2Total, 2),
         ];
 
-        // ================= ΕΞΟΔΑ & ΜΙΣΘΟΙ =================
+        // tolerance για floating
+        $eps = 0.01;
 
-        $expensesQuery = Expense::query();
+        // ✅ Αν ΔΕΝ υπάρχουν settlements για το range => not settled
+        $isSettled = $settlements->count() > 0
+            && abs($liveTotals['cashToBank'] - $savedTotals['cashToBank']) < $eps
+            && abs($liveTotals['partner1Total'] - $savedTotals['partner1Total']) < $eps
+            && abs($liveTotals['partner2Total'] - $savedTotals['partner2Total']) < $eps;
 
-        if ($from) {
-            $expensesQuery->whereDate('created_at', '>=', $from);
-        }
-        if ($to) {
-            $expensesQuery->whereDate('created_at', '<=', $to);
-        }
+        // ===== ΕΞΟΔΑ (live) =====
+        $expensesList = Expense::where('created_at', '>=', $rangeStart)
+            ->where('created_at', '<', $rangeEndExclusive)
+            ->orderBy('created_at', 'desc')
+            ->get();
 
-        $expensesList  = $expensesQuery->orderBy('created_at', 'desc')->get();
         $expensesTotal = (float) $expensesList->sum('amount');
 
-        // Πόσες μέρες καλύπτει το διάστημα (inclusive)
-        $startDate = Carbon::parse($from);
-        $endDate   = Carbon::parse($to);
+        // ===== ΜΗΝΕΣ στο διάστημα (inclusive) =====
+        $startIndex = $rangeStart->year * 12 + $rangeStart->month;
+        $endDateInclusive = $rangeEndExclusive->copy()->subDay();
+        $endIndex = $endDateInclusive->year * 12 + $endDateInclusive->month;
+        $monthsCount = max(($endIndex - $startIndex + 1), 1);
 
-        $daysDiff = $startDate->diffInDays($endDate) + 1;
-
-        // Από 0–31 ημέρες => 1 μισθός, 32–62 => 2, κ.ο.κ.
-        $monthsCount = (int) ceil($daysDiff / 31);
-        if ($monthsCount < 1) {
-            $monthsCount = 1;
-        }
-
-        // Υπάλληλοι με μισθό
+        // ===== ΜΙΣΘΟΙ =====
         $employees = Professional::whereNotNull('salary')
             ->where('salary', '>', 0)
             ->orderBy('last_name')
@@ -252,26 +129,22 @@ class SettlementController extends Controller
             $employeesTotalSalary += $period;
         }
 
-        // Σύνολο εξόδων = έξοδα + μισθοί όλων των υπαλλήλων
         $totalOutflow = $expensesTotal + $employeesTotalSalary;
-
-        // Net εταιρείας στην τράπεζα μετά τα έξοδα
         $companyNetAfterExpenses = $companyBankTotal - $totalOutflow;
 
         $filters = [
-            'from' => $from,
-            'to'   => $to,
+            'from_month' => $fromMonth,
+            'to_month'   => $toMonth,
         ];
 
         return view('settlements.index', compact(
             'filters',
             'totalAmount',
-            'cashToBank',          // Μετρητά προς κατάθεση (τώρα 25€ στο σενάριο cash N + cash Y)
-            'cardTotal',           // Πληρωμές με κάρτα (bruto)
-            'companyBankTotal',    // Ποσό επιχείρησης στην τράπεζα
+            'cashToBank',
+            'cardTotal',
+            'companyBankTotal',
             'cashNoTax',
             'cashWithTax',
-            'bankFromCard',
             'sharedPool',
             'partner1Personal',
             'partner2Personal',
@@ -286,7 +159,210 @@ class SettlementController extends Controller
             'employeesSalaryRows',
             'employeesTotalSalary',
             'totalOutflow',
-            'companyNetAfterExpenses'
+            'companyNetAfterExpenses',
+            'settlements',
+            'savedTotals',
+            'liveTotals',
+            'isSettled'
         ));
+    }
+
+    /**
+     * POST: Πατάς "Εκκαθάριση" -> αποθηκεύει (ή ενημερώνει) settlement για ΚΑΘΕ μήνα του range.
+     */
+    public function store(Request $request)
+    {
+        $professional = Auth::user();
+
+        if (!$professional) {
+            abort(401, 'Δεν είστε συνδεδεμένος.');
+        }
+
+        if (!in_array($professional->role, ['owner'], true)) {
+            abort(403, 'Δεν έχετε πρόσβαση σε αυτή τη λειτουργία.');
+        }
+
+        $fromMonth = $request->input('from_month');
+        $toMonth   = $request->input('to_month');
+
+        if (!$fromMonth && !$toMonth) {
+            $fromMonth = Carbon::now()->format('Y-m');
+            $toMonth   = $fromMonth;
+        }
+        if ($fromMonth && !$toMonth) $toMonth = $fromMonth;
+        if (!$fromMonth && $toMonth) $fromMonth = $toMonth;
+
+        try {
+            $start = Carbon::createFromFormat('Y-m', $fromMonth)->startOfMonth()->startOfDay();
+            $endExclusive = Carbon::createFromFormat('Y-m', $toMonth)->startOfMonth()->addMonth()->startOfDay();
+        } catch (\Throwable $e) {
+            return back()->withErrors(['from_month' => 'Μη έγκυρος μήνας επιλογής.']);
+        }
+
+        $companyId = $professional->company_id;
+
+        $cursor = $start->copy();
+
+        while ($cursor->lt($endExclusive)) {
+            $monthStart = $cursor->copy()->startOfMonth()->startOfDay();
+            $monthEndExclusive = $monthStart->copy()->addMonth();
+
+            $monthCalc = $this->calculateForRange($monthStart, $monthEndExclusive);
+
+            Settlement::updateOrCreate(
+                [
+                    'company_id' => $companyId,
+                    'month'      => $monthStart->toDateString(),
+                ],
+                [
+                    'total_amount'   => $monthCalc['totalAmount'],
+                    'cash_to_bank'   => $monthCalc['cashToBank'],
+                    'partner1_total' => $monthCalc['partner1Total'],
+                    'partner2_total' => $monthCalc['partner2Total'],
+                    'created_by'     => $professional->id, // professional id
+                ]
+            );
+
+            $cursor = $monthEndExclusive;
+        }
+
+        return redirect()
+            ->route('settlements.index', [
+                'from_month' => $fromMonth,
+                'to_month'   => $toMonth,
+            ])
+            ->with('success', 'Η εκκαθάριση αποθηκεύτηκε επιτυχώς.');
+    }
+
+    /**
+     * Υπολογισμός για όλο το range: [start, endExclusive)
+     */
+    private function calculateForRange(Carbon $rangeStart, Carbon $rangeEndExclusive): array
+    {
+        $payments = Payment::with(['appointment.professional', 'customer'])
+            ->whereHas('appointment', function ($q) use ($rangeStart, $rangeEndExclusive) {
+                $q->where('start_time', '>=', $rangeStart)
+                  ->where('start_time', '<',  $rangeEndExclusive)
+                  ->whereNull('deleted_at');
+            })
+            ->get();
+
+        $totalAmount = 0;
+
+        $cashToBank   = 0;
+        $cashNoTax    = 0;
+        $cashWithTax  = 0;
+        $cardTotal    = 0;
+
+        $partner1Personal = 0;
+        $partner2Personal = 0;
+
+        $sharedPoolRaw = 0;
+        $partnerCardPersonal = 0;
+
+        $daily = [];
+
+        foreach ($payments as $payment) {
+            $appointment = $payment->appointment;
+            if (!$appointment) continue;
+
+            $dateKey = $appointment->start_time->toDateString();
+
+            if (!isset($daily[$dateKey])) {
+                $daily[$dateKey] = ['giannis' => 0, 'eleni' => 0];
+            }
+
+            $amount          = (float) $payment->amount;
+            $method          = $payment->method;
+            $tax             = $payment->tax ?? 'N';
+            $professionalAmt = (float) ($appointment->professional_amount ?? 0);
+            $professionalId  = $appointment->professional_id;
+
+            $totalAmount += $amount;
+
+            $isPartner = in_array($professionalId, $this->partnerProfessionals, true);
+
+            if ($isPartner && $professionalAmt > 0) {
+                if ($professionalId === $this->partnerProfessionals['partner1']) {
+                    $partner1Personal += $professionalAmt;
+                    $daily[$dateKey]['giannis'] += $professionalAmt;
+                }
+                if ($professionalId === $this->partnerProfessionals['partner2']) {
+                    $partner2Personal += $professionalAmt;
+                    $daily[$dateKey]['eleni'] += $professionalAmt;
+                }
+            }
+
+            if ($method === 'cash') {
+                if ($tax === 'Y') {
+                    $cashWithTax += $amount;
+
+                    if ($isPartner) {
+                        $cashToBank += max($amount - $professionalAmt, 0);
+                    } else {
+                        $cashToBank += $amount;
+                    }
+                    continue;
+                }
+
+                $cashNoTax += $amount;
+
+                if ($isPartner) {
+                    $sharedPoolRaw += max($amount - $professionalAmt, 0);
+                } else {
+                    $sharedPoolRaw += $amount;
+                }
+                continue;
+            }
+
+            if ($method === 'card') {
+                $cardTotal += $amount;
+
+                if ($isPartner && $professionalAmt > 0) {
+                    $partnerCardPersonal += $professionalAmt;
+                }
+                continue;
+            }
+
+            $cashWithTax += $amount;
+            $cashToBank  += $amount;
+        }
+
+        $sharedPool = max($sharedPoolRaw - $partnerCardPersonal, 0);
+
+        $partner1Total = $partner1Personal + ($sharedPool / 2);
+        $partner2Total = $partner2Personal + ($sharedPool / 2);
+
+        $companyBankTotal = $cashToBank + $cardTotal;
+
+        ksort($daily);
+
+        $chartDistribution = [
+            'labels' => ['Μετρητά προς κατάθεση', 'Γιάννης #1', 'Ελένη #2'],
+            'data'   => [round($cashToBank, 2), round($partner1Total, 2), round($partner2Total, 2)],
+        ];
+
+        $dailyChart = [
+            'labels'  => array_keys($daily),
+            'giannis' => array_map(fn($d) => round($d['giannis'], 2), $daily),
+            'eleni'   => array_map(fn($d) => round($d['eleni'], 2), $daily),
+        ];
+
+        return [
+            'payments'         => $payments,
+            'totalAmount'      => round($totalAmount, 2),
+            'cashToBank'       => round($cashToBank, 2),
+            'cardTotal'        => round($cardTotal, 2),
+            'companyBankTotal' => round($companyBankTotal, 2),
+            'cashNoTax'        => round($cashNoTax, 2),
+            'cashWithTax'      => round($cashWithTax, 2),
+            'sharedPool'       => round($sharedPool, 2),
+            'partner1Personal' => round($partner1Personal, 2),
+            'partner2Personal' => round($partner2Personal, 2),
+            'partner1Total'    => round($partner1Total, 2),
+            'partner2Total'    => round($partner2Total, 2),
+            'chartDistribution'=> $chartDistribution,
+            'dailyChart'       => $dailyChart,
+        ];
     }
 }
