@@ -33,5 +33,9 @@ class Customer extends Model
     {
         return $this->hasMany(Payment::class);
     }
+    public function files()
+    {
+        return $this->hasMany(\App\Models\CustomerFile::class);
+    }
 
 }

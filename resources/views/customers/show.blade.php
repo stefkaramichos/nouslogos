@@ -113,6 +113,118 @@
             </div>
 
 
+            {{-- ===================== ΑΡΧΕΙΑ ΠΕΛΑΤΗ ===================== --}}
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="border rounded p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Αρχεία Πελάτη</h6>
+
+                            {{-- Κουμπί ανοίγει file picker (το input είναι hidden) --}}
+                            <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('customerFileInput').click();">
+                                + Προσθήκη / Ανέβασμα αρχείου
+                            </button>
+                        </div>
+
+                        {{-- Upload form --}}
+                        <form method="POST"
+                            action="{{ route('customers.files.store', $customer) }}"
+                            enctype="multipart/form-data"
+                            class="row g-2 align-items-end">
+                            @csrf
+
+                            <div class="col-md-4">
+                                <input id="customerFileInput" type="file" name="file" class="form-control d-none"
+                                    onchange="document.getElementById('customerFileName').value = this.files?.[0]?.name ?? '';">
+                                <input id="customerFileName" type="text" class="form-control" placeholder="Δεν επιλέχθηκε αρχείο" readonly>
+                                @error('file')
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted mb-1">Σημείωση (προαιρετικό)</label>
+                                <input type="text" name="notes" class="form-control" maxlength="1000" placeholder="π.χ. γνωμάτευση, παραστατικό...">
+                                @error('notes')
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            <div class="col-md-2 text-end">
+                                <button type="submit" class="btn btn-success w-100">
+                                    Ανέβασμα
+                                </button>
+                            </div>
+                        </form>
+
+                        <hr class="my-3">
+
+                        {{-- Files list --}}
+                        @php
+                            $files = $customer->files?->sortByDesc('id') ?? collect();
+                        @endphp
+
+                        @if($files->count() === 0)
+                            <div class="text-muted">Δεν υπάρχουν αρχεία για αυτόν τον πελάτη.</div>
+                        @else
+                            <div class="table-responsive" style="max-height: 110px;overflow-y:auto;">
+                                <table class="table table-sm table-striped align-middle mb-0">
+                                    <thead>
+                                    <tr>
+                                        <th>Αρχείο</th>
+                                        <th>Μέγεθος</th>
+                                        <th>Ημ/νία</th>
+                                        <th>Ανέβηκε από</th>
+                                        <th>Σημείωση</th>
+                                        <th class="text-end">Ενέργειες</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    @foreach($files as $f)
+                                        <tr>
+                                            <td>
+                                                <strong>{{ $f->original_name }}</strong>
+                                                @if($f->mime_type)
+                                                    <div class="text-muted small">{{ $f->mime_type }}</div>
+                                                @endif
+                                            </td>
+                                            <td>{{ number_format(($f->size ?? 0) / 1024, 1, ',', '.') }} KB</td>
+                                            <td>{{ $f->created_at?->format('d/m/Y H:i') ?? '-' }}</td>
+                                            <td>
+                                                @if($f->uploader)
+                                                    {{ $f->uploader->last_name }} {{ $f->uploader->first_name }}
+                                                @else
+                                                    <span class="text-muted">-</span>
+                                                @endif
+                                            </td>
+                                            <td>{{ $f->notes ?? '-' }}</td>
+                                            <td class="text-end">
+                                                <a class="btn btn-sm btn-outline-primary"
+                                                href="{{ route('customers.files.download', ['customer' => $customer->id, 'file' => $f->id]) }}">
+                                                    Download
+                                                </a>
+
+                                                <form method="POST"
+                                                    action="{{ route('customers.files.destroy', ['customer' => $customer->id, 'file' => $f->id]) }}"
+                                                    class="d-inline"
+                                                    onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτό το αρχείο;');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button class="btn btn-sm btn-danger">Διαγραφή</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+
+                    </div>
+                </div>
+            </div>
+            {{-- ===================== /ΑΡΧΕΙΑ ΠΕΛΑΤΗ ===================== --}}
+
 
             <!-- ⭐ Edit Button Bottom Right -->
             <div class="d-flex justify-content-end mt-3">

@@ -10,6 +10,10 @@ use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Http\Request;
+use App\Models\CustomerFile;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class CustomerController extends Controller
 {
@@ -33,6 +37,74 @@ class CustomerController extends Controller
 
         return view('customers.index', compact('customers', 'search'));
     }
+
+    public function uploadFile(Request $request, Customer $customer)
+    {
+        $request->validate([
+            'file'  => 'required|file|max:10240', // 10MB
+            'notes' => 'nullable|string|max:1000',
+        ], [
+            'file.required' => 'Πρέπει να επιλέξετε αρχείο.',
+            'file.file'     => 'Μη έγκυρο αρχείο.',
+            'file.max'      => 'Το αρχείο δεν μπορεί να ξεπερνά τα 10MB.',
+        ]);
+
+        $uploaded = $request->file('file');
+
+        $originalName = $uploaded->getClientOriginalName();
+        $mime = $uploaded->getClientMimeType();
+        $size = $uploaded->getSize();
+
+        // αποθήκευση στο storage/app/customer-files/{customer_id}/
+        $storedName = Str::random(12) . '_' . time() . '_' . preg_replace('/\s+/', '_', $originalName);
+        $dir = "customer-files/{$customer->id}";
+        $path = $uploaded->storeAs($dir, $storedName); // default disk = local
+
+        CustomerFile::create([
+            'customer_id'    => $customer->id,
+            'uploaded_by'    => Auth::user()?->id, // professional id
+            'original_name'  => $originalName,
+            'stored_name'    => $storedName,
+            'path'           => $path,
+            'mime_type'      => $mime,
+            'size'           => $size,
+            'notes'          => $request->input('notes'),
+        ]);
+
+        return back()->with('success', 'Το αρχείο ανέβηκε επιτυχώς.');
+    }
+
+    public function downloadFile(Customer $customer, CustomerFile $file)
+    {
+        // ασφάλεια: να ανήκει στον πελάτη
+        if ((int)$file->customer_id !== (int)$customer->id) {
+            abort(404);
+        }
+
+        if (!Storage::exists($file->path)) {
+            return back()->with('error', 'Το αρχείο δεν βρέθηκε στο storage.');
+        }
+
+        return Storage::download($file->path, $file->original_name);
+    }
+
+    public function deleteFile(Request $request, Customer $customer, CustomerFile $file)
+    {
+        // ασφάλεια: να ανήκει στον πελάτη
+        if ((int)$file->customer_id !== (int)$customer->id) {
+            abort(404);
+        }
+
+        // σβήνουμε πρώτα το φυσικό αρχείο
+        if ($file->path && Storage::exists($file->path)) {
+            Storage::delete($file->path);
+        }
+
+        $file->delete();
+
+        return back()->with('success', 'Το αρχείο διαγράφηκε επιτυχώς.');
+    }
+
 
     public function create()
     {
@@ -116,7 +188,8 @@ class CustomerController extends Controller
             'appointments.professional',
             'appointments.company',
             'appointments.payment',
-            'appointments.creator'
+            'appointments.creator',
+            'files.uploader'
         ]);
 
         /**

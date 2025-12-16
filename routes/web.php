@@ -109,7 +109,15 @@ Route::middleware('auth')->group(function () {
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
 
     Route::resource('notifications', NotificationController::class)->except(['show']);
-            
+ 
+    Route::post('/customers/{customer}/files', [CustomerController::class, 'uploadFile'])
+        ->name('customers.files.store');
+
+    Route::get('/customers/{customer}/files/{file}/download', [CustomerController::class, 'downloadFile'])
+        ->name('customers.files.download');
+
+    Route::delete('/customers/{customer}/files/{file}', [CustomerController::class, 'deleteFile'])
+        ->name('customers.files.destroy');
             
 });
 
