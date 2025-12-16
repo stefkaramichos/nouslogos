@@ -12,6 +12,7 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\TherapistAppointmentController;
 use App\Http\Controllers\SettlementController;
 use App\Http\Controllers\AppointmentTrashController;
+use App\Http\Controllers\NotificationController;
 
 // 🔹 Login routes (χωρίς auth)
 Route::get('/login', [AuthController::class, 'showLoginForm'])
@@ -103,7 +104,10 @@ Route::middleware('auth')->group(function () {
                  ->name('appointments.updatePrice');
 
 
-          
+    Route::get('/notifications/due', [NotificationController::class, 'due'])->name('notifications.due');
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+
+    Route::resource('notifications', NotificationController::class)->except(['show']);
             
             
 });

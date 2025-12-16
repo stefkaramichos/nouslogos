@@ -102,24 +102,23 @@
 
         {{-- BOTTOM ACTIONS (MOBILE) --}}
         <div class="mt-3 border-top pt-3">
-
             {{-- Owner: Ραντεβού θεραπευτών --}}
             @if($user && $user->role === 'owner')
                 <a class="btn btn-outline-primary w-100 mb-2 @if(request()->routeIs('therapist_appointments.*')) active @endif"
                    href="{{ route('therapist_appointments.index') }}">
                     🗓 Ραντεβού θεραπευτών
                 </a>
-                {{-- ✅ γραμμή κάτω από το Ραντεβού θεραπευτών --}}
                 <hr class="my-2">
             @endif
 
-            {{-- ✅ Logout + Recycle: icons only --}}
             <div class="d-flex justify-content-center gap-3 icon-actions">
                 @if($user && in_array($user->role, ['owner', 'grammatia']))
-                    <a href="{{ route('appointments.recycle') }}"
-                       class="btn btn-outline-secondary"
-                       title="Recycle Ραντεβού">
+                    <a href="{{ route('appointments.recycle') }}" class="btn btn-outline-secondary" title="Recycle Ραντεβού">
                         <i class="bi bi-arrow-counterclockwise"></i>
+                    </a>
+
+                    <a href="{{ route('notifications.index') }}" class="btn btn-outline-primary" title="Ειδοποιήσεις">
+                        <i class="bi bi-bell"></i>
                     </a>
                 @endif
 
@@ -130,7 +129,6 @@
                     </button>
                 </form>
             </div>
-
         </div>
     </div>
 </div>
@@ -138,7 +136,7 @@
 <div class="container-fluid">
     <div class="row">
 
-        {{-- DESKTOP SIDEBAR (visible only on >= md) --}}
+        {{-- DESKTOP SIDEBAR --}}
         <nav class="col-md-2 col-lg-2 d-none d-md-block bg-light sidebar py-3">
             <div class="position-sticky d-flex flex-column justify-content-between h-100">
                 <div>
@@ -153,34 +151,24 @@
                         @if($user && $user->role !== 'therapist')
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('customers.*')) active @endif"
-                                   href="{{ route('customers.index') }}">
-                                    👤 Πελάτες
-                                </a>
+                                   href="{{ route('customers.index') }}">👤 Πελάτες</a>
                             </li>
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('professionals.*')) active @endif"
-                                   href="{{ route('professionals.index') }}">
-                                    💼 Επαγγελματίες
-                                </a>
+                                   href="{{ route('professionals.index') }}">💼 Επαγγελματίες</a>
                             </li>
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('appointments.*')) active @endif"
-                                   href="{{ route('appointments.index') }}">
-                                    📅 Ραντεβού
-                                </a>
+                                   href="{{ route('appointments.index') }}">📅 Ραντεβού</a>
                             </li>
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('expenses.*')) active @endif"
-                                   href="{{ route('expenses.index') }}">
-                                    💸 Έξοδα
-                                </a>
+                                   href="{{ route('expenses.index') }}">💸 Έξοδα</a>
                             </li>
                             @if(Auth::check() && Auth::user()->role === 'owner')
                                 <li class="nav-item mb-1">
                                     <a class="nav-link @if(request()->routeIs('settlements.*')) active @endif"
-                                       href="{{ route('settlements.index') }}">
-                                        📑 Εκκαθάριση
-                                    </a>
+                                       href="{{ route('settlements.index') }}">📑 Εκκαθάριση</a>
                                 </li>
                             @endif
                         @endif
@@ -188,34 +176,30 @@
                         @if($user && $user->role === 'therapist')
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('therapist_appointments.*')) active @endif"
-                                   href="{{ route('therapist_appointments.index') }}">
-                                    🗓 Ραντεβού θεραπευτών
-                                </a>
+                                   href="{{ route('therapist_appointments.index') }}">🗓 Ραντεβού θεραπευτών</a>
                             </li>
                         @endif
                     </ul>
                 </div>
 
                 {{-- BOTTOM ACTIONS (DESKTOP) --}}
-                <div class="px-2 mt-3 pt-3">
-
-                    {{-- Owner: Ραντεβού θεραπευτών --}}
+                <div class="px-2 mt-3 pt-3 border-top">
                     @if($user && $user->role === 'owner')
                         <a class="btn btn-outline-primary w-100 mb-2 @if(request()->routeIs('therapist_appointments.*')) active @endif"
                            href="{{ route('therapist_appointments.index') }}">
                             🗓 Ραντεβού θεραπευτών
                         </a>
-                        {{-- ✅ γραμμή κάτω από το Ραντεβού θεραπευτών --}}
                         <hr class="my-2">
                     @endif
 
-                    {{-- ✅ Logout + Recycle: icons only --}}
                     <div class="d-flex justify-content-center gap-3 icon-actions">
                         @if($user && in_array($user->role, ['owner', 'grammatia']))
-                            <a href="{{ route('appointments.recycle') }}"
-                               class="btn btn-outline-secondary"
-                               title="Recycle Ραντεβού">
+                            <a href="{{ route('appointments.recycle') }}" class="btn btn-outline-secondary" title="Recycle Ραντεβού">
                                 <i class="bi bi-arrow-counterclockwise"></i>
+                            </a>
+
+                            <a href="{{ route('notifications.index') }}" class="btn btn-outline-primary" title="Ειδοποιήσεις">
+                                <i class="bi bi-bell"></i>
                             </a>
                         @endif
 
@@ -226,26 +210,20 @@
                             </button>
                         </form>
                     </div>
-
                 </div>
             </div>
         </nav>
 
         {{-- MAIN CONTENT --}}
         <main class="col-12 col-md-10 ms-sm-auto col-lg-10 px-3 px-md-4 py-4">
-
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4">
                 <h2 class="h3 mb-0" style="color:#b21691">@yield('title', 'Επισκόπηση')</h2>
             </div>
 
-            {{-- Flash messages --}}
             @if(session('success'))
-                <div class="alert alert-success">
-                    {{ session('success') }}
-                </div>
+                <div class="alert alert-success">{{ session('success') }}</div>
             @endif
 
-            {{-- Validation errors --}}
             @if ($errors->any())
                 <div class="alert alert-danger">
                     <ul class="mb-0">
@@ -257,17 +235,133 @@
             @endif
 
             @yield('content')
-
         </main>
     </div>
 </div>
 
+{{-- ✅ Notifications Modal --}}
+@if(Auth::check())
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;">
+    <div id="notificationsToasts" class="d-grid gap-2"></div>
+</div>
+@endif
+
+
+{{-- ✅ 1) Bootstrap JS ΠΡΩΤΑ --}}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <!-- Flatpickr -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
+{{-- ✅ 2) Μετά φορτώνουμε scripts από views --}}
 @stack('scripts')
+
+{{-- ✅ 3) Και ΤΕΛΟΣ το global notifications script (χωρίς push/stack για να μην μπερδεύεσαι) --}}
+@if(Auth::check())
+<script>
+(function () {
+    let shownIds = new Set();
+
+    async function fetchDue() {
+        try {
+            const res = await fetch("{{ route('notifications.due') }}", {
+                headers: { "Accept": "application/json" }
+            });
+            if (!res.ok) return [];
+            return await res.json();
+        } catch (e) {
+            return [];
+        }
+    }
+
+    async function markRead(id) {
+        await fetch("{{ url('/notifications') }}/" + id + "/read", {
+            method: "POST",
+            headers: {
+                "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content,
+                "Accept": "application/json"
+            }
+        });
+    }
+
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, function (m) {
+            return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]);
+        });
+    }
+
+    function renderToast(n) {
+        const container = document.getElementById('notificationsToasts');
+        if (!container) return;
+
+        const toastEl = document.createElement('div');
+        toastEl.className = 'toast align-items-start';
+        toastEl.setAttribute('role', 'alert');
+        toastEl.setAttribute('aria-live', 'assertive');
+        toastEl.setAttribute('aria-atomic', 'true');
+        toastEl.setAttribute('style', 'background-color: #e9f5ff;');
+
+        const note = escapeHtml(n.note);
+        const when = escapeHtml(n.notify_at_text || n.notify_at || '');
+
+        toastEl.innerHTML = `
+            <div class="toast-header">
+                <i class="bi bi-bell-fill me-2"></i>
+                <strong class="me-auto">Ειδοποίηση</strong>
+                <small class="text-muted">${when}</small>
+                <button type="button" class="btn-close ms-2" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                <div>${note}</div>
+                <div class="mt-2 d-flex gap-2">
+                    <button class="btn btn-sm btn-primary js-ok">Μην εμφανιστεί ξανά</button>
+                </div>
+            </div>
+        `;
+
+        container.prepend(toastEl);
+
+        const toast = new bootstrap.Toast(toastEl, {
+            autohide: false // να μένει μέχρι να πατήσει ΟΚ/close
+        });
+        toast.show();
+
+        // Mark read on OK (και κλείσιμο)
+        toastEl.querySelector('.js-ok').addEventListener('click', async () => {
+            await markRead(n.id);
+            toast.hide();
+        });
+
+        // Mark read και αν το κλείσει με το X
+        toastEl.querySelector('.js-ok').addEventListener('click', async () => {
+            await markRead(n.id);
+            toast.hide();
+            toastEl.remove();
+        });
+    }
+
+    async function checkAndShow() {
+        const due = await fetchDue();
+        if (!due.length) return;
+
+        const newOnes = due.filter(n => !shownIds.has(n.id));
+        if (!newOnes.length) return;
+
+        newOnes.forEach(n => {
+            shownIds.add(n.id);
+            renderToast(n);
+        });
+    }
+
+    // run on load
+    checkAndShow();
+    // every 60 sec
+    setInterval(checkAndShow, 60000);
+})();
+</script>
+@endif
+
+
 </body>
 </html>
