@@ -101,7 +101,7 @@
         </div>
 
         {{-- BOTTOM ACTIONS (MOBILE) --}}
-        <div class="mt-3 border-top pt-3">
+        <div class="mt-3 pt-3">
             {{-- Owner: Ραντεβού θεραπευτών --}}
             @if($user && $user->role === 'owner')
                 <a class="btn btn-outline-primary w-100 mb-2 @if(request()->routeIs('therapist_appointments.*')) active @endif"
@@ -111,7 +111,7 @@
                 <hr class="my-2">
             @endif
 
-            <div class="d-flex justify-content-center gap-3 icon-actions">
+            <div class="d-flex justify-content-start gap-3 icon-actions">
                 @if($user && in_array($user->role, ['owner', 'grammatia']))
                     <a href="{{ route('appointments.recycle') }}" class="btn btn-outline-secondary" title="Recycle Ραντεβού">
                         <i class="bi bi-arrow-counterclockwise"></i>
@@ -183,7 +183,7 @@
                 </div>
 
                 {{-- BOTTOM ACTIONS (DESKTOP) --}}
-                <div class="px-2 mt-3 pt-3 border-top">
+                <div class="px-2 mt-3 pt-3">
                     @if($user && $user->role === 'owner')
                         <a class="btn btn-outline-primary w-100 mb-2 @if(request()->routeIs('therapist_appointments.*')) active @endif"
                            href="{{ route('therapist_appointments.index') }}">
@@ -192,7 +192,7 @@
                         <hr class="my-2">
                     @endif
 
-                    <div class="d-flex justify-content-center gap-3 icon-actions">
+                    <div class="d-flex justify-content-start gap-3 icon-actions">
                         @if($user && in_array($user->role, ['owner', 'grammatia']))
                             <a href="{{ route('appointments.recycle') }}" class="btn btn-outline-secondary" title="Recycle Ραντεβού">
                                 <i class="bi bi-arrow-counterclockwise"></i>
