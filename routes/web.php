@@ -11,6 +11,7 @@ use App\Models\Professional;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\TherapistAppointmentController;
 use App\Http\Controllers\SettlementController;
+use App\Http\Controllers\AppointmentTrashController;
 
 // 🔹 Login routes (χωρίς auth)
 Route::get('/login', [AuthController::class, 'showLoginForm'])
@@ -35,6 +36,15 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/professionals/company', [\App\Http\Controllers\ProfessionalController::class, 'getCompany'])
     ->name('professionals.getCompany');
+
+    Route::get('/appointments/recycle', [AppointmentTrashController::class, 'index'])
+            ->name('appointments.recycle');
+
+    Route::post('/appointments/{appointment}/restore', [AppointmentTrashController::class, 'restore'])
+            ->name('appointments.restore');
+
+    Route::delete('/appointments/{appointment}/force', [AppointmentTrashController::class, 'forceDelete'])
+            ->name('appointments.forceDelete');
 
     // Πελάτες / Επαγγελματίες / Ραντεβού
     Route::resource('customers', CustomerController::class);
@@ -91,6 +101,11 @@ Route::middleware('auth')->group(function () {
          
             Route::post('/appointments/{appointment}/update-price', [AppointmentController::class, 'updatePrice'])
                  ->name('appointments.updatePrice');
+
+
+          
+            
+            
 });
 
 Route::get('/hash-password', [\App\Http\Controllers\HashController::class, 'hashPassword']);

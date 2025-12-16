@@ -15,27 +15,18 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
     <style>
-        body {
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-        .sidebar {
-            min-height: 100vh;
-        }
-        .sidebar .nav-link.active {
-            background-color: #0d6efd;
-            color: #fff !important;
-        }
-        .sidebar .nav-link {
-            color: #333;
+        body { min-height: 100vh; overflow-x: hidden; }
+        .sidebar { min-height: 100vh; }
+        .sidebar .nav-link.active { background-color: #0d6efd; color: #fff !important; }
+        .sidebar .nav-link { color: #333; }
+
+        @media (max-width: 767.98px) {
+            .sidebar { min-height: auto; }
         }
 
-        /* On small screens let sidebar be auto height */
-        @media (max-width: 767.98px) {
-            .sidebar {
-                min-height: auto;
-            }
-        }
+        /* small icon polish */
+        .icon-actions .btn i { font-size: 1.1rem; }
+        .icon-actions .btn:hover i { transform: scale(1.1); transition: 0.15s ease; }
     </style>
 </head>
 <body>
@@ -45,9 +36,7 @@
 <nav class="navbar navbar-expand-md navbar-light bg-light d-md-none">
     <div class="container-fluid logo-img ">
         <a class="navbar-brand fw-bold" href="#">
-            <img src="{{ asset('images/logo.png') }}"
-                 alt="Booking App"
-                 height="32">
+            <img src="{{ asset('images/logo.png') }}" alt="Booking App" height="32">
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar"
                 aria-controls="mobileSidebar" aria-label="Toggle navigation">
@@ -61,6 +50,7 @@
         <h5 class="offcanvas-title fw-bold" id="mobileSidebarLabel">Πάνελ Διαχείρισης</h5>
         <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
+
     <div class="offcanvas-body d-flex flex-column justify-content-between">
         <div>
             <ul class="nav flex-column mb-3">
@@ -83,7 +73,6 @@
                             📅 Ραντεβού
                         </a>
                     </li>
-                    {{-- NEW: Έξοδα --}}
                     <li class="nav-item mb-1">
                         <a class="nav-link @if(request()->routeIs('expenses.*')) active @endif"
                            href="{{ route('expenses.index') }}">
@@ -111,26 +100,38 @@
             </ul>
         </div>
 
-        <div class="mt-3">
+        {{-- BOTTOM ACTIONS (MOBILE) --}}
+        <div class="mt-3 border-top pt-3">
 
             {{-- Owner: Ραντεβού θεραπευτών --}}
             @if($user && $user->role === 'owner')
-                <a class="btn btn-outline-primary w-100 mb-2
-                   @if(request()->routeIs('therapist_appointments.*')) active @endif"
+                <a class="btn btn-outline-primary w-100 mb-2 @if(request()->routeIs('therapist_appointments.*')) active @endif"
                    href="{{ route('therapist_appointments.index') }}">
                     🗓 Ραντεβού θεραπευτών
                 </a>
+                {{-- ✅ γραμμή κάτω από το Ραντεβού θεραπευτών --}}
+                <hr class="my-2">
             @endif
 
-            {{-- Logout --}}
-            <form action="{{ route('logout') }}" method="POST" class="d-flex align-items-center">
-                @csrf
-                <button class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center">
-                    <i class="bi bi-box-arrow-right me-2"></i> Αποσύνδεση
-                </button>
-            </form>
-        </div>
+            {{-- ✅ Logout + Recycle: icons only --}}
+            <div class="d-flex justify-content-center gap-3 icon-actions">
+                @if($user && in_array($user->role, ['owner', 'grammatia']))
+                    <a href="{{ route('appointments.recycle') }}"
+                       class="btn btn-outline-secondary"
+                       title="Recycle Ραντεβού">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </a>
+                @endif
 
+                <form action="{{ route('logout') }}" method="POST">
+                    @csrf
+                    <button class="btn btn-outline-danger" title="Αποσύνδεση">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </button>
+                </form>
+            </div>
+
+        </div>
     </div>
 </div>
 
@@ -138,17 +139,16 @@
     <div class="row">
 
         {{-- DESKTOP SIDEBAR (visible only on >= md) --}}
-        <nav class="col-md-2  col-lg-2 d-none d-md-block bg-light sidebar py-3">
+        <nav class="col-md-2 col-lg-2 d-none d-md-block bg-light sidebar py-3">
             <div class="position-sticky d-flex flex-column justify-content-between h-100">
                 <div>
                     <div class="px-3 logo-img mb-4">
                         <a class="navbar-brand fw-bold" href="#">
-                            <img src="{{ asset('images/logo.png') }}"
-                                 alt="Booking App"
-                                 height="32">
+                            <img src="{{ asset('images/logo.png') }}" alt="Booking App" height="32">
                         </a>
                     </div>
                     <hr>
+
                     <ul class="nav flex-column px-2">
                         @if($user && $user->role !== 'therapist')
                             <li class="nav-item mb-1">
@@ -169,7 +169,6 @@
                                     📅 Ραντεβού
                                 </a>
                             </li>
-                            {{-- NEW: Έξοδα --}}
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('expenses.*')) active @endif"
                                    href="{{ route('expenses.index') }}">
@@ -197,26 +196,38 @@
                     </ul>
                 </div>
 
-                <div class="px-2 mt-3">
+                {{-- BOTTOM ACTIONS (DESKTOP) --}}
+                <div class="px-2 mt-3 pt-3">
 
                     {{-- Owner: Ραντεβού θεραπευτών --}}
                     @if($user && $user->role === 'owner')
-                        <a class="btn btn-outline-primary w-100 mb-2
-                           @if(request()->routeIs('therapist_appointments.*')) active @endif"
+                        <a class="btn btn-outline-primary w-100 mb-2 @if(request()->routeIs('therapist_appointments.*')) active @endif"
                            href="{{ route('therapist_appointments.index') }}">
                             🗓 Ραντεβού θεραπευτών
                         </a>
+                        {{-- ✅ γραμμή κάτω από το Ραντεβού θεραπευτών --}}
+                        <hr class="my-2">
                     @endif
 
-                    {{-- Logout --}}
-                    <form action="{{ route('logout') }}" method="POST" class="d-flex align-items-center">
-                        @csrf
-                        <button class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center">
-                            <i class="bi bi-box-arrow-right me-2"></i> Αποσύνδεση
-                        </button>
-                    </form>
-                </div>
+                    {{-- ✅ Logout + Recycle: icons only --}}
+                    <div class="d-flex justify-content-center gap-3 icon-actions">
+                        @if($user && in_array($user->role, ['owner', 'grammatia']))
+                            <a href="{{ route('appointments.recycle') }}"
+                               class="btn btn-outline-secondary"
+                               title="Recycle Ραντεβού">
+                                <i class="bi bi-arrow-counterclockwise"></i>
+                            </a>
+                        @endif
 
+                        <form action="{{ route('logout') }}" method="POST">
+                            @csrf
+                            <button class="btn btn-outline-danger" title="Αποσύνδεση">
+                                <i class="bi bi-box-arrow-right"></i>
+                            </button>
+                        </form>
+                    </div>
+
+                </div>
             </div>
         </nav>
 
