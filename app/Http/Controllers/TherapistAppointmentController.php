@@ -58,6 +58,8 @@ class TherapistAppointmentController extends Controller
             }
         }
 
+        $user_role = $user->role;
+
         if (!empty($from)) {
             $query->whereDate('start_time', '>=', $from);
         }
@@ -91,6 +93,7 @@ class TherapistAppointmentController extends Controller
             'customerId',
             'professionals',
             'professionalId',
+            'user_role'
         ));
     }
 

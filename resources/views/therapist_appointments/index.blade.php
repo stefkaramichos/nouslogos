@@ -87,9 +87,13 @@
                         data-notes="{{ $a->notes }}">
                         <td>{{ $a->id }}</td>
                         <td>
-                            <a href="{{ route('customers.show', $a->customer) }}">
+                            @if($user_role === 'owner')
+                                <a href="{{ route('customers.show', $a->customer) }}">
+                                    {{ $a->customer->last_name }} {{ $a->customer->first_name }}
+                                </a>
+                            @else
                                 {{ $a->customer->last_name }} {{ $a->customer->first_name }}
-                            </a>
+                            @endif
                         </td>
                         <td>{{ \Carbon\Carbon::parse($a->start_time)->format('d/m/Y H:i') }}</td>
                         <td title="{{ $a->notes }}">{{ $a->notes ? Str::limit($a->notes, 30) : '-' }}</td>
@@ -128,36 +132,36 @@
 
     </div>
     <!-- Modal Λεπτομερειών Ραντεβού -->
-<div class="modal fade" id="appointmentModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Λεπτομέρειες Ραντεβού</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Κλείσιμο"></button>
-            </div>
-            <div class="modal-body">
-                <dl class="row mb-0">
-                    <dt class="col-sm-3">Κωδικός</dt>
-                    <dd class="col-sm-9" id="modalAppointmentId"></dd>
+    <div class="modal fade" id="appointmentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Λεπτομέρειες Ραντεβού</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Κλείσιμο"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Κωδικός</dt>
+                        <dd class="col-sm-9" id="modalAppointmentId"></dd>
 
-                    <dt class="col-sm-3">Πελάτης</dt>
-                    <dd class="col-sm-9" id="modalAppointmentCustomer"></dd>
+                        <dt class="col-sm-3">Πελάτης</dt>
+                        <dd class="col-sm-9" id="modalAppointmentCustomer"></dd>
 
-                    <dt class="col-sm-3">Ημερομηνία & Ώρα</dt>
-                    <dd class="col-sm-9" id="modalAppointmentDatetime"></dd>
+                        <dt class="col-sm-3">Ημερομηνία & Ώρα</dt>
+                        <dd class="col-sm-9" id="modalAppointmentDatetime"></dd>
 
-                    <dt class="col-sm-3">Σημειώσεις</dt>
-                    <dd class="col-sm-9">
-                        <p id="modalAppointmentNotes" class="mb-0" style="white-space: pre-wrap;"></p>
-                    </dd>
-                </dl>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Κλείσιμο</button>
+                        <dt class="col-sm-3">Σημειώσεις</dt>
+                        <dd class="col-sm-9">
+                            <p id="modalAppointmentNotes" class="mb-0" style="white-space: pre-wrap;"></p>
+                        </dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Κλείσιμο</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
 </div>
 @endsection
