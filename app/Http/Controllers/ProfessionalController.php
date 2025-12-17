@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Models\Customer;
 use App\Models\TherapistAppointment;
 use App\Models\Professional;
-  use Illuminate\Support\Facades\Hash;
-  use Illuminate\Support\Facades\Storage;
-  use Illuminate\Pagination\LengthAwarePaginator;
+
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 
 use Illuminate\Support\Facades\Auth;
@@ -19,7 +21,7 @@ class ProfessionalController extends Controller
     {
         $search = $request->input('search');
 
-        $professionals = Professional::with('companies')
+        $professionals = Professional::with(['companies', 'customers'])
             ->when($search, function ($query) use ($search) {
                 $query->where('first_name', 'like', "%$search%")
                     ->orWhere('last_name', 'like', "%$search%")
@@ -27,6 +29,10 @@ class ProfessionalController extends Controller
                     ->orWhere('email', 'like', "%$search%")
                     ->orWhereHas('companies', function ($q) use ($search) {
                         $q->where('name', 'like', "%$search%");
+                    })
+                    ->orWhereHas('customers', function ($q) use ($search) {
+                        $q->where('first_name', 'like', "%$search%")
+                          ->orWhere('last_name', 'like', "%$search%");
                     });
             })
             ->orderBy('last_name')
@@ -35,14 +41,13 @@ class ProfessionalController extends Controller
         return view('professionals.index', compact('professionals', 'search'));
     }
 
-
     public function create()
     {
-        $companies = Company::all();
+        $companies  = Company::all();
+        $customers  = Customer::orderBy('last_name')->orderBy('first_name')->get();
 
-        return view('professionals.create', compact('companies'));
+        return view('professionals.create', compact('companies', 'customers'));
     }
-
 
     public function store(Request $request)
     {
@@ -52,14 +57,22 @@ class ProfessionalController extends Controller
                 'last_name'      => 'nullable|string|max:100',
                 'phone'          => 'nullable|string|max:30',
                 'email'          => 'nullable|email|max:150',
+
+                'eidikotita'     => 'nullable|in:Λογοθεραπευτής,Ειδικός παιδαγωγός,Εργοθεραπευτής,Ψυχοθεραπευτής',
+
                 'companies'      => 'required|array',
                 'companies.*'    => 'exists:companies,id',
+
+                // ✅ ΝΕΟ: παιδιά για τον επαγγελματία (many-to-many)
+                'customers'      => 'nullable|array',
+                'customers.*'    => 'exists:customers,id',
+
                 'service_fee'    => 'nullable|numeric|min:0',
                 'percentage_cut' => 'nullable|numeric|min:0',
                 'salary'         => 'nullable|numeric|min:0',
+
                 'password'       => 'required|string|min:6|confirmed',
                 'profile_image'  => 'nullable|image|mimes:jpeg,png,jpg,webp,gif|max:2048',
-                'eidikotita' => 'nullable|in:Λογοθεραπευτής,Ειδικός παιδαγωγός,Εργοθεραπευτής,Ψυχοθεραπευτής',
             ],
             [
                 'password.required'  => 'Ο κωδικός είναι υποχρεωτικός.',
@@ -68,7 +81,7 @@ class ProfessionalController extends Controller
         );
 
         // Hash password
-        $data['password'] = \Hash::make($request->password);
+        $data['password'] = Hash::make($request->password);
 
         // Αποθήκευση εικόνας προφίλ, αν υπάρχει
         if ($request->hasFile('profile_image')) {
@@ -80,18 +93,24 @@ class ProfessionalController extends Controller
         $companyIds = $data['companies'];
         unset($data['companies']);
 
+        // ✅ Πάρε τα παιδιά (προαιρετικά)
+        $customerIds = $data['customers'] ?? [];
+        unset($data['customers']);
+
         $data['company_id'] = $companyIds[0];
 
         $professional = Professional::create($data);
+
+        // Sync εταιρειών
         $professional->companies()->sync($companyIds);
+
+        // ✅ Sync παιδιών (many-to-many)
+        $professional->customers()->sync($customerIds);
 
         return redirect()
             ->route('professionals.index')
             ->with('success', 'Ο επαγγελματίας δημιουργήθηκε επιτυχώς.');
     }
-
-
-
 
     public function toggleActive(Professional $professional)
     {
@@ -108,16 +127,20 @@ class ProfessionalController extends Controller
             );
     }
 
-
     public function edit(Professional $professional)
     {
         $companies = Company::all();
-        return view('professionals.edit', compact('professional', 'companies'));
+        $customers = Customer::orderBy('last_name')->orderBy('first_name')->get();
+
+        // για να είναι διαθέσιμα στο view (edit) τα τρέχοντα children
+        $professional->load('customers', 'companies');
+
+        return view('professionals.edit', compact('professional', 'companies', 'customers'));
     }
 
     public function getCompany(Request $request)
     {
-        $professional = \App\Models\Professional::find($request->professional_id);
+        $professional = Professional::find($request->professional_id);
 
         if (!$professional) {
             return response()->json(['found' => false]);
@@ -129,8 +152,6 @@ class ProfessionalController extends Controller
         ]);
     }
 
-  
-
     public function update(Request $request, Professional $professional)
     {
         // Βασικοί κανόνες για όλους
@@ -139,12 +160,20 @@ class ProfessionalController extends Controller
             'last_name'      => 'nullable|string|max:100',
             'phone'          => 'nullable|string|max:30',
             'email'          => 'nullable|email|max:150',
+
+            'eidikotita'     => 'nullable|in:Λογοθεραπευτής,Ειδικός παιδαγωγός,Εργοθεραπευτής,Ψυχοθεραπευτής',
+
             'companies'      => 'required|array',
             'companies.*'    => 'exists:companies,id',
+
+            // ✅ ΝΕΟ: παιδιά για τον επαγγελματία (many-to-many)
+            'customers'      => 'nullable|array',
+            'customers.*'    => 'exists:customers,id',
+
             'service_fee'    => 'nullable|numeric|min:0',
             'percentage_cut' => 'nullable|numeric|min:0',
             'salary'         => 'nullable|numeric|min:0',
-            'eidikotita' => 'nullable|in:Λογοθεραπευτής,Ειδικός παιδαγωγός,Εργοθεραπευτής,Ψυχοθεραπευτής',
+
             'profile_image'  => 'nullable|image|mimes:jpeg,png,jpg,webp,gif',
         ];
 
@@ -168,11 +197,18 @@ class ProfessionalController extends Controller
             $professional->password = Hash::make($data['password']);
         }
 
-
-
         // Κρατάμε τις εταιρείες ξεχωριστά
         $companyIds = $data['companies'] ?? [];
-        unset($data['password'], $data['password_confirmation'], $data['companies']);
+
+        // ✅ Κρατάμε και τα παιδιά ξεχωριστά
+        $customerIds = $data['customers'] ?? [];
+
+        unset(
+            $data['password'],
+            $data['password_confirmation'],
+            $data['companies'],
+            $data['customers']
+        );
 
         if ($request->hasFile('profile_image')) {
             // σβήσε παλιά αν υπάρχει
@@ -184,9 +220,7 @@ class ProfessionalController extends Controller
             $data['profile_image'] = $path;
         }
 
-        // Optional: ενημέρωσε και το παλιό company_id με την πρώτη εταιρεία
-        // $data['company_id'] = $companyIds[0] ?? null;
-
+        // ενημέρωσε και το legacy company_id με την πρώτη εταιρεία
         if (!empty($companyIds)) {
             $data['company_id'] = $companyIds[0];
         }
@@ -199,12 +233,13 @@ class ProfessionalController extends Controller
             $professional->companies()->sync($companyIds);
         }
 
+        // ✅ Sync παιδιών (αν δεν επιλέξεις κανένα, θα αδειάσει)
+        $professional->customers()->sync($customerIds);
+
         return redirect()
             ->route('professionals.index')
             ->with('success', 'Ο επαγγελματίας ενημερώθηκε επιτυχώς.');
     }
-
-
 
     public function destroy(Professional $professional)
     {
@@ -338,7 +373,7 @@ class ProfessionalController extends Controller
             $name = mb_strtolower($customerName);
             $therapistQuery->whereHas('customer', function ($q) use ($name) {
                 $q->whereRaw("LOWER(CONCAT(first_name,' ',last_name)) like ?", ["%{$name}%"])
-                ->orWhereRaw("LOWER(CONCAT(last_name,' ',first_name)) like ?", ["%{$name}%"]);
+                  ->orWhereRaw("LOWER(CONCAT(last_name,' ',first_name)) like ?", ["%{$name}%"]);
             });
         }
 
@@ -411,6 +446,5 @@ class ProfessionalController extends Controller
             'therapistMatches',
             'therapistMissing'
         ));
-}
-
+    }
 }

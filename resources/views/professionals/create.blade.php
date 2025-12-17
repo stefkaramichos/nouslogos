@@ -32,7 +32,6 @@
                     </select>
                 </div>
 
-
                 {{-- <div class="mb-3">
                     <label class="form-label">Τηλέφωνο</label>
                     <input type="text" name="phone" class="form-control" value="{{ old('phone') }}" >
@@ -43,7 +42,6 @@
                     <input type="file" name="profile_image" class="form-control" accept="image/*">
                     <small class="text-muted">Επιτρέπονται εικόνες (jpg, png, webp, μέχρι 2MB).</small>
                 </div> --}}
-
 
                 {{-- Μισθός --}}
                 {{-- <div class="mb-3">
@@ -72,10 +70,27 @@
                     </small>
                 </div>
 
-                {{-- <div class="mb-3">
+                {{-- ✅ ΝΕΟ: Παιδιά (Customers) --}}
+                <div class="mb-3">
+                    <label class="form-label">Παιδιά</label>
+                    <select name="customers[]" class="form-select js-select2" multiple>
+                        @foreach($customers as $customer)
+                            <option value="{{ $customer->id }}"
+                                @selected(collect(old('customers', []))->contains($customer->id))
+                            >
+                                {{ $customer->last_name }} {{ $customer->first_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <small class="text-muted">
+                        Προαιρετικό. Κρατήστε πατημένο Ctrl (Windows) ή Command (Mac) για πολλαπλή επιλογή.
+                    </small>
+                </div>
+
+                <div class="mb-3">
                     <label class="form-label">Email</label>
                     <input type="email" name="email" class="form-control" value="{{ old('email') }}" required>
-                </div> --}}
+                </div>
 
                 <div class="mb-3">
                     <label class="form-label">Κωδικός</label>
@@ -93,3 +108,15 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+  $(function () {
+    $('.js-select2').select2({
+      placeholder: 'Αναζήτηση παιδιών...',
+      allowClear: true,
+      width: '100%'
+    });
+  });
+</script>
+@endpush

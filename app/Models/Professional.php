@@ -71,4 +71,12 @@ class Professional extends Authenticatable
     {
         return $this->hasMany(TherapistAppointment::class);
     }
+
+    // ✅ MANY-TO-MANY με παιδιά (customers)
+    public function customers()
+    {
+        return $this->belongsToMany(Customer::class, 'customer_professional')
+        ->using(CustomerProfessional::class)
+        ->withTimestamps();
+    }
 }

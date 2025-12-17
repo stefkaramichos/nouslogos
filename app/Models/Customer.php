@@ -37,5 +37,11 @@ class Customer extends Model
     {
         return $this->hasMany(\App\Models\CustomerFile::class);
     }
+    public function professionals()
+    {
+        return $this->belongsToMany(\App\Models\Professional::class, 'customer_professional')
+            ->using(\App\Models\CustomerProfessional::class)
+            ->withTimestamps();
+    }
 
 }

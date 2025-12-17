@@ -30,10 +30,8 @@
                         name="last_name"
                         class="form-control"
                         value="{{ old('last_name', $professional->last_name) }}"
-                        
                     >
                 </div>
-
 
                 <div class="mb-3">
                     <label class="form-label">Ειδικότητα</label>
@@ -45,7 +43,6 @@
                         <option value="Ψυχοθεραπευτής" @selected(old('eidikotita', $professional->eidikotita) == 'Ψυχοθεραπευτής')>Ψυχοθεραπευτής</option>
                     </select>
                 </div>
-
 
                 {{-- <div class="mb-3">
                     <label class="form-label">Τηλέφωνο</label>
@@ -74,7 +71,7 @@
                         Αν ανεβάσετε νέα εικόνα, θα αντικαταστήσει την παλιά.
                     </small>
                 </div>
-
+--}}
 
                 <div class="mb-3">
                     <label class="form-label">Email</label>
@@ -84,8 +81,7 @@
                         class="form-control"
                         value="{{ old('email', $professional->email) }}"
                     >
-                </div> --}}
-
+                </div> 
                 {{-- Μισθός --}}
                 {{-- <div class="mb-3">
                     <label class="form-label">Μισθός (€/μήνα)</label>
@@ -112,7 +108,28 @@
                     </select>
                 </div>
 
-                  @if(auth()->user()->role === 'owner')
+                {{-- ✅ ΝΕΟ: Παιδιά (Customers) --}}
+                <div class="mb-3">
+                    <label class="form-label">Παιδιά</label>
+                    <select name="customers[]" class="form-select js-select2" multiple>
+                        @php
+                            $selectedCustomers = collect(old('customers', $professional->customers->pluck('id')->toArray()));
+                        @endphp
+
+                        @foreach($customers as $customer)
+                            <option value="{{ $customer->id }}"
+                                @selected($selectedCustomers->contains($customer->id))
+                            >
+                                {{ $customer->last_name }} {{ $customer->first_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <small class="text-muted">
+                        Προαιρετικό. Κρατήστε πατημένο Ctrl (Windows) ή Command (Mac) για πολλαπλή επιλογή.
+                    </small>
+                </div>
+
+                @if(auth()->user()->role === 'owner')
                     <hr>
 
                     <div class="mb-3">
@@ -146,3 +163,14 @@
         </div>
     </div>
 @endsection
+@push('scripts')
+<script>
+  $(function () {
+    $('.js-select2').select2({
+      placeholder: 'Αναζήτηση παιδιών...',
+      allowClear: true,
+      width: '100%'
+    });
+  });
+</script>
+@endpush

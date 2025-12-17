@@ -13,6 +13,9 @@
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 
     <style>
         body { min-height: 100vh; overflow-x: hidden; }
@@ -155,7 +158,7 @@
                             </li>
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('professionals.*')) active @endif"
-                                   href="{{ route('professionals.index') }}">💼 Επαγγελματίες</a>
+                                   href="{{ route('professionals.index') }}">💼 Θεραπευτές</a>
                             </li>
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('appointments.*')) active @endif"
