@@ -1,16 +1,16 @@
 @extends('layouts.app')
 
-@section('title', 'Επαγγελματίες')
+@section('title', 'Θεραπευτές')
 
 @section('content')
     <div class="card">
         <div class="card-header">
 
             <div class="d-flex justify-content-between align-items-center">
-                <span>Λίστα Επαγγελματιών</span>
+                <span>Λίστα Θεραπευτών</span>
 
                 <a href="{{ route('professionals.create') }}" class="btn btn-primary btn-sm ms-3">
-                    + Προσθήκη Επαγγελματία
+                    + Προσθήκη Θεραπευτή
                 </a>
             </div>
 
@@ -42,12 +42,12 @@
                 <table class="table table-striped mb-0 align-middle">
                     <thead>
                     <tr>
-                        <th>Φωτο</th>
+                        {{-- <th>Φωτο</th> --}}
                         <th>Ονοματεπώνυμο</th>
-                        <th>Τηλέφωνο</th>
+                        {{-- <th>Τηλέφωνο</th>
                         <th>Email</th>
-                        <th>Μισθός</th>
-                        <th>Εταιρεία</th>
+                        <th>Μισθός</th> --}}
+                        <th>Γραφείο</th>
                         {{-- <th>Χρέωση (€)</th>
                         <th>Ποσό Επαγγελματία</th> --}}
                         <th>Ενέργειες</th>
@@ -56,7 +56,7 @@
                     <tbody>
                     @forelse($professionals as $professional)
                         <tr>
-                           <td>
+                           {{-- <td>
                                 @if($professional->profile_image)
                                     <img src="{{ asset('storage/'.$professional->profile_image) }}"
                                         alt="Profile image"
@@ -65,26 +65,17 @@
                                 @else
                                     <span class="badge bg-secondary">{{ mb_substr($professional->first_name, 0, 1) }}</span>
                                 @endif
-                            </td>
+                            </td> --}}
   
                             <td>
-                                @if($professional->role != 'grammatia') <a href="{{ route('professionals.show', $professional) }}"> @endif
+                                @if($professional->role != 'grammatia') <a href="{{ route('professionals.show', $professional) }}" style="text-decoration: none; color:inherit"> @endif
                                     {{ $professional->last_name }} {{ $professional->first_name }}
                                 @if($professional->role != 'grammatia')</a> @endif
                             </td>
 
-                            <td>{{ $professional->phone }}</td>
-                            <td>{{ $professional->email ?? '-' }}</td>
-                            <td>
-                                @if(!is_null($professional->salary))
-                                    {{ number_format($professional->salary, 2, ',', '.') }} €
-                                @else
-                                    -
-                                @endif
-                            </td>
                             <td>
                                 @forelse($professional->companies as $company)
-                                    <span class="badge bg-primary">{{ $company->name }}</span>
+                                    <span class="badge" style="background-color: #b21691">{{ $company->name }}</span>
                                 @empty
                                     -
                                 @endforelse
@@ -115,30 +106,40 @@
                                 </form>
                                 --}}
 
-                              
-                          @if(auth()->user()->role === 'owner' && $professional->role != 'owner')
-                            <!-- Toggle ενεργός / ανενεργός -->
-                            <form action="{{ route('professionals.toggle-active', $professional) }}"
-                                method="POST"
-                                class="d-inline">
-                                @csrf
-                                @method('PATCH')
+                                    
+                                @if(auth()->user()->role === 'owner' && $professional->role != 'owner')
+                                    <!-- Toggle ενεργός / ανενεργός -->
+                                    <form action="{{ route('professionals.toggle-active', $professional) }}"
+                                        method="POST"
+                                        class="d-inline">
+                                        @csrf
+                                        @method('PATCH')
 
-                                @if($professional->is_active)
-                                    <button class="btn btn-sm btn-success"
-                                            title="Απενεργοποίηση επαγγελματία">
-                                        <i class="bi bi-toggle-on"></i>
-                                    </button>
-                                @else
-                                    <button class="btn btn-sm btn-outline-secondary"
-                                            title="Ενεργοποίηση επαγγελματία">
-                                        <i class="bi bi-toggle-off"></i>
-                                    </button>
+                                        @if($professional->is_active)
+                                            <button class="btn btn-sm btn-success"
+                                                    title="Απενεργοποίηση επαγγελματία">
+                                                <i class="bi bi-toggle-on"></i>
+                                            </button>
+                                        @else
+                                            <button class="btn btn-sm btn-outline-secondary"
+                                                    title="Ενεργοποίηση επαγγελματία">
+                                                <i class="bi bi-toggle-off"></i>
+                                            </button>
+                                        @endif
+                                    </form>
                                 @endif
-                            </form>
-                        @endif
-
                             </td>
+
+                            {{-- <td>{{ $professional->phone }}</td>
+                            <td>{{ $professional->email ?? '-' }}</td>
+                            <td>
+                                @if(!is_null($professional->salary))
+                                    {{ number_format($professional->salary, 2, ',', '.') }} €
+                                @else
+                                    -
+                                @endif
+                            </td> --}}
+                        
 
                         </tr>
                     @empty

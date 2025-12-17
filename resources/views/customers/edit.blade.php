@@ -46,7 +46,7 @@
                     >
                 </div>
 
-                <div class="mb-3">
+                {{-- <div class="mb-3">
                     <label class="form-label">Email (προαιρετικό)</label>
                     <input
                         type="email"
@@ -84,7 +84,7 @@
                     class="form-control"
                     rows="3"
                 >{{ old('informations', $customer->informations) }}</textarea>
-            </div>
+            </div> --}}
 
 
 

@@ -64,7 +64,7 @@
                     <li class="nav-item mb-1">
                         <a class="nav-link @if(request()->routeIs('professionals.*')) active @endif"
                            href="{{ route('professionals.index') }}">
-                            💼 Επαγγελματίες
+                            💼 Θεραπευτές
                         </a>
                     </li>
                     <li class="nav-item mb-1">

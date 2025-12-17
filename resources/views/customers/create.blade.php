@@ -28,26 +28,26 @@
                     <input type="text" name="phone" class="form-control"
                            value="{{ old('phone') }}" >
                 </div>
-
+{{-- 
                 <div class="mb-3">
                     <label class="form-label">Email (προαιρετικό)</label>
                     <input type="email" name="email" class="form-control"
                            value="{{ old('email') }}">
                 </div>
 
-                {{-- ΔΟΥ --}}
+             
                 <div class="mb-3">
                     <label class="form-label">ΔΟΥ</label>
                     <input type="text" name="tax_office" class="form-control"
                            value="{{ old('tax_office') }}">
                 </div>
 
-                {{-- ΑΦΜ --}}
+               
                 <div class="mb-3">
                     <label class="form-label">ΑΦΜ</label>
                     <input type="text" name="vat_number" class="form-control"
                            value="{{ old('vat_number') }}">
-                </div>
+                </div> --}}
 
                 <div class="mb-3">
                     <label class="form-label">Εταιρεία</label>
@@ -62,14 +62,14 @@
                 </div>
 
                 {{-- Πληροφορίες / Σημειώσεις --}} 
-                <div class="mb-3">
+                {{-- <div class="mb-3">
                     <label class="form-label">Πληροφορίες</label>
                     <textarea
                         name="informations"
                         class="form-control"
                         rows="3"
                     >{{ old('informations') }}</textarea>
-                </div>
+                </div> --}}
 
                 <button class="btn btn-primary">Αποθήκευση</button>
                 <a href="{{ route('customers.index') }}" class="btn btn-secondary">Ακύρωση</a>

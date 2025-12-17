@@ -32,8 +32,9 @@ class CustomerController extends Controller
                     });
             })
             ->orderBy('last_name')
-            ->paginate(25)
-            ->withQueryString();   // <-- keeps search when switching page
+            // ->paginate(25)
+            // ->withQueryString();   // <-- keeps search when switching page
+            ->get(); // temporary replacement so code still works
 
         return view('customers.index', compact('customers', 'search'));
     }

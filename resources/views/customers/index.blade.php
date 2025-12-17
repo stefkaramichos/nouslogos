@@ -42,14 +42,9 @@
                 <table class="table table-striped mb-0 align-middle">
                     <thead>
                     <tr>
-                        <th>#</th>
+                        <th>Γραφείο</th>
                         <th>Ονοματεπώνυμο</th>
                         <th>Τηλέφωνο</th>
-                        <th>Email</th>
-                        <th>ΑΦΜ</th>
-                        <th>ΔΟΥ</th>
-                        <th>Εταιρεία</th>
-                        <th>Πληροφορίες</th>
                         <th>Ενέργειες</th>
                     </tr>
                     </thead>
@@ -57,30 +52,30 @@
                     <tbody>
                     @forelse($customers as $customer)
                         <tr>
-                            <td>{{ $customer->id }}</td>
+                            {{-- <td>{{ $customer->id }}</td> --}}
 
+                            <td>{{ $customer->company->name ?? '-' }}</td>
                             <td>
-                                <a href="{{ route('customers.show', $customer) }}">
-                                    {{ $customer->last_name }} {{ $customer->first_name }}
+                                <a href="{{ route('customers.show', $customer) }}" style="text-decoration: none; color: inherit;">
+                                    {{ $customer->first_name }} {{ $customer->last_name }} 
                                 </a>
                             </td>
 
                             <td>{{ $customer->phone }}</td>
 
-                            <td>{{ $customer->email ?? '-' }}</td>
+                            {{-- <td>{{ $customer->email ?? '-' }}</td>
 
                             <td>{{ $customer->vat_number ?? '-' }}</td>
 
                             <td>{{ $customer->tax_office ?? '-' }}</td>
 
-                            <td>{{ $customer->company->name ?? '-' }}</td>
 
-                            <td>{{ Str::limit($customer->informations, 20) ?? '-' }}</td>
+                            <td>{{ Str::limit($customer->informations, 20) ?? '-' }}</td> --}}
 
                             <td>
                                 {{-- View --}}
                                 <a href="{{ route('appointments.create', ['customer_id' => $customer->id, 'redirect' => request()->fullUrl()]) }}"
-                                    class="btn btn-sm btn-info text-white" τιτλε="Προσθήκη Ραντεβού">
+                                    class="btn btn-sm btn-success text-white" title="Προσθήκη Ραντεβού">
                                         +
                                     </a>
 
@@ -118,8 +113,8 @@
                 </table>
             </div>
         </div>
-        <div class="card-footer">
+        {{-- <div class="card-footer">
             {{ $customers->links() }}
-        </div>
+        </div> --}}
     </div>
 @endsection

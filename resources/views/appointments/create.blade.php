@@ -27,9 +27,9 @@
 
               {{-- ΕΠΑΓΓΕΛΜΑΤΙΑΣ --}}
                 <div class="mb-3">
-                    <label class="form-label">Επαγγελματίας</label>
+                    <label class="form-label">Θεραπευτής</label>
                     <select name="professional_id" id="professional_select" class="form-select select2" required>
-                        <option value="">-- Επιλέξτε επαγγελματία --</option>
+                        <option value="">-- Επιλέξτε Θεραπευτή --</option>
                         @foreach($professionals as $professional)
                             <option
                                 value="{{ $professional->id }}"
@@ -107,7 +107,7 @@
 
                 {{-- ΠΟΣΟ ΕΠΑΓΓΕΛΜΑΤΙΑ --}}
                 <div class="mb-3" id="professional_amount_group">
-                    <label class="form-label">Ποσό Επαγγελματία (€)</label>
+                    <label class="form-label">Ποσό Θεραπευτή (€)</label>
                     <input
                         type="number"
                         step="0.01"
