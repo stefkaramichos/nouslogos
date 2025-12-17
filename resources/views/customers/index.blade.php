@@ -57,7 +57,7 @@
                             <td>{{ $customer->company->name ?? '-' }}</td>
                             <td>
                                 <a href="{{ route('customers.show', $customer) }}" style="text-decoration: none; color: inherit;">
-                                    {{ $customer->first_name }} {{ $customer->last_name }} 
+                                     {{ $customer->last_name }} {{ $customer->first_name }}
                                 </a>
                             </td>
 
