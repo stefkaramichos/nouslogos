@@ -32,8 +32,15 @@ Route::middleware('auth')->group(function () {
 
     // Αρχική -> ραντεβού
     Route::get('/', function () {
-        return redirect()->route('customers.index');
+        $user = auth()->user();
+
+        if ($user->role === 'therapist') {
+            return redirect()->route('therapist_appointments.index'); // /my-appointments
+        }
+
+        return redirect()->route('customers.index'); // owner, grammatia, etc
     })->name('dashboard');
+
 
     Route::get('/professionals/company', [\App\Http\Controllers\ProfessionalController::class, 'getCompany'])
     ->name('professionals.getCompany');

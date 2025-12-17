@@ -114,7 +114,7 @@
             <div class="d-flex justify-content-start gap-3 icon-actions">
                 @if($user && in_array($user->role, ['owner', 'grammatia']))
                     <a href="{{ route('appointments.recycle') }}" class="btn btn-outline-secondary" title="Recycle Ραντεβού">
-                        <i class="bi bi-arrow-counterclockwise"></i>
+                        <i class="bi bi-trash"></i>
                     </a>
 
                     <a href="{{ route('notifications.index') }}" class="btn btn-outline-primary" title="Ειδοποιήσεις">
@@ -195,7 +195,7 @@
                     <div class="d-flex justify-content-start gap-3 icon-actions">
                         @if($user && in_array($user->role, ['owner', 'grammatia']))
                             <a href="{{ route('appointments.recycle') }}" class="btn btn-outline-secondary" title="Recycle Ραντεβού">
-                                <i class="bi bi-arrow-counterclockwise"></i>
+                                <i class="bi bi-trash"></i>
                             </a>
 
                             <a href="{{ route('notifications.index') }}" class="btn btn-outline-primary" title="Ειδοποιήσεις">

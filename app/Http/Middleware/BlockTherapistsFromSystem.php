@@ -16,6 +16,7 @@ class BlockTherapistsFromSystem
         if ($user && $user->role === 'therapist') {
 
             $allowedRoutes = [
+                'dashboard',
                 'therapist_appointments.index',
                 'therapist_appointments.create',
                 'therapist_appointments.store',
