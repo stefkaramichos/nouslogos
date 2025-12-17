@@ -34,7 +34,20 @@
                     >
                 </div>
 
+
                 <div class="mb-3">
+                    <label class="form-label">Ειδικότητα</label>
+                    <select name="eidikotita" class="form-select">
+                        <option value="">-- Επιλέξτε ειδικότητα --</option>
+                        <option value="Λογοθεραπευτής" @selected(old('eidikotita', $professional->eidikotita) == 'Λογοθεραπευτής')>Λογοθεραπευτής</option>
+                        <option value="Ειδικός παιδαγωγός" @selected(old('eidikotita', $professional->eidikotita) == 'Ειδικός παιδαγωγός')>Ειδικός παιδαγωγός</option>
+                        <option value="Εργοθεραπευτής" @selected(old('eidikotita', $professional->eidikotita) == 'Εργοθεραπευτής')>Εργοθεραπευτής</option>
+                        <option value="Ψυχοθεραπευτής" @selected(old('eidikotita', $professional->eidikotita) == 'Ψυχοθεραπευτής')>Ψυχοθεραπευτής</option>
+                    </select>
+                </div>
+
+
+                {{-- <div class="mb-3">
                     <label class="form-label">Τηλέφωνο</label>
                     <input
                         type="text"
@@ -71,10 +84,10 @@
                         class="form-control"
                         value="{{ old('email', $professional->email) }}"
                     >
-                </div>
+                </div> --}}
 
                 {{-- Μισθός --}}
-                <div class="mb-3">
+                {{-- <div class="mb-3">
                     <label class="form-label">Μισθός (€/μήνα)</label>
                     <input
                         type="number"
@@ -84,10 +97,10 @@
                         class="form-control"
                         value="{{ old('salary', $professional->salary) }}"
                     >
-                </div>
+                </div> --}}
 
                 <div class="mb-3">
-                    <label class="form-label">Εταιρείες</label>
+                    <label class="form-label">Γραφείο</label>
                     <select name="companies[]" class="form-select" multiple required>
                         @foreach($companies as $company)
                             <option value="{{ $company->id }}"

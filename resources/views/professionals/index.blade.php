@@ -43,7 +43,8 @@
                     <thead>
                     <tr>
                         {{-- <th>Φωτο</th> --}}
-                        <th>Ονοματεπώνυμο</th>
+                        <th>Ονοματεπώνυμο</th> 
+                        <th>Ειδικότητα</th>
                         {{-- <th>Τηλέφωνο</th>
                         <th>Email</th>
                         <th>Μισθός</th> --}}
@@ -71,6 +72,10 @@
                                 @if($professional->role != 'grammatia') <a href="{{ route('professionals.show', $professional) }}" style="text-decoration: none; color:inherit"> @endif
                                     {{ $professional->last_name }} {{ $professional->first_name }}
                                 @if($professional->role != 'grammatia')</a> @endif
+                            </td>
+
+                            <td>
+                                {{ $professional->eidikotita }}
                             </td>
 
                             <td>

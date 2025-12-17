@@ -22,6 +22,18 @@
                 </div>
 
                 <div class="mb-3">
+                    <label class="form-label">Ειδικότητα</label>
+                    <select name="eidikotita" class="form-select">
+                        <option value="">-- Επιλέξτε ειδικότητα --</option>
+                        <option value="Λογοθεραπευτής" @selected(old('eidikotita') == 'Λογοθεραπευτής')>Λογοθεραπευτής</option>
+                        <option value="Ειδικός παιδαγωγός" @selected(old('eidikotita') == 'Ειδικός παιδαγωγός')>Ειδικός παιδαγωγός</option>
+                        <option value="Εργοθεραπευτής" @selected(old('eidikotita') == 'Εργοθεραπευτής')>Εργοθεραπευτής</option>
+                        <option value="Ψυχοθεραπευτής" @selected(old('eidikotita') == 'Ψυχοθεραπευτής')>Ψυχοθεραπευτής</option>
+                    </select>
+                </div>
+
+
+                {{-- <div class="mb-3">
                     <label class="form-label">Τηλέφωνο</label>
                     <input type="text" name="phone" class="form-control" value="{{ old('phone') }}" >
                 </div>
@@ -30,11 +42,11 @@
                     <label class="form-label">Φωτογραφία Προφίλ</label>
                     <input type="file" name="profile_image" class="form-control" accept="image/*">
                     <small class="text-muted">Επιτρέπονται εικόνες (jpg, png, webp, μέχρι 2MB).</small>
-                </div>
+                </div> --}}
 
 
                 {{-- Μισθός --}}
-                <div class="mb-3">
+                {{-- <div class="mb-3">
                     <label class="form-label">Μισθός (€/μήνα)</label>
                     <input
                         type="number"
@@ -44,10 +56,10 @@
                         class="form-control"
                         value="{{ old('salary') }}"
                     >
-                </div>
+                </div> --}}
 
                 <div class="mb-3">
-                    <label class="form-label">Εταιρείες</label>
+                    <label class="form-label">Γραφείο</label>
                     <select name="companies[]" class="form-select" multiple required>
                         @foreach($companies as $company)
                             <option value="{{ $company->id }}">
@@ -60,10 +72,10 @@
                     </small>
                 </div>
 
-                <div class="mb-3">
+                {{-- <div class="mb-3">
                     <label class="form-label">Email</label>
                     <input type="email" name="email" class="form-control" value="{{ old('email') }}" required>
-                </div>
+                </div> --}}
 
                 <div class="mb-3">
                     <label class="form-label">Κωδικός</label>

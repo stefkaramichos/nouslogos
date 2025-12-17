@@ -21,6 +21,7 @@ class Professional extends Authenticatable
         'is_active',
         'password',
         'role',
+        'eidikotita',
         'profile_image',
     ];
 

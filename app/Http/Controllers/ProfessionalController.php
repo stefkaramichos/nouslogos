@@ -59,6 +59,7 @@ class ProfessionalController extends Controller
                 'salary'         => 'nullable|numeric|min:0',
                 'password'       => 'required|string|min:6|confirmed',
                 'profile_image'  => 'nullable|image|mimes:jpeg,png,jpg,webp,gif|max:2048',
+                'eidikotita' => 'nullable|in:Λογοθεραπευτής,Ειδικός παιδαγωγός,Εργοθεραπευτής,Ψυχοθεραπευτής',
             ],
             [
                 'password.required'  => 'Ο κωδικός είναι υποχρεωτικός.',
@@ -143,6 +144,7 @@ class ProfessionalController extends Controller
             'service_fee'    => 'nullable|numeric|min:0',
             'percentage_cut' => 'nullable|numeric|min:0',
             'salary'         => 'nullable|numeric|min:0',
+            'eidikotita' => 'nullable|in:Λογοθεραπευτής,Ειδικός παιδαγωγός,Εργοθεραπευτής,Ψυχοθεραπευτής',
             'profile_image'  => 'nullable|image|mimes:jpeg,png,jpg,webp,gif',
         ];
 
