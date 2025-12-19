@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\Professional;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class TherapistAppointmentController extends Controller
 {
@@ -15,7 +16,7 @@ class TherapistAppointmentController extends Controller
      */
     public function index(Request $request)
     {
-        $user = Auth::user(); // εδώ είναι Professional (με role owner/therapist/grammatia)
+        $user = Auth::user(); // Professional (role owner/therapist/grammatia)
 
         if (!$user || ($user->role !== 'therapist' && $user->role !== 'owner')) {
             abort(403, 'Δεν έχετε πρόσβαση σε αυτή τη σελίδα.');
@@ -24,6 +25,42 @@ class TherapistAppointmentController extends Controller
         $from       = $request->input('from');
         $to         = $request->input('to');
         $customerId = $request->input('customer_id');
+        $quick      = $request->input('quick'); // today|tomorrow|week|month
+
+        // ---------------------------------------------------
+        // Quick date filters override from/to if provided
+        // ---------------------------------------------------
+        if (!empty($quick)) {
+            $now = Carbon::now();
+
+            switch ($quick) {
+                case 'today':
+                    $from = $now->toDateString();
+                    $to   = $now->toDateString();
+                    break;
+
+                case 'tomorrow':
+                    $t = $now->copy()->addDay();
+                    $from = $t->toDateString();
+                    $to   = $t->toDateString();
+                    break;
+
+                case 'week':
+                    // Ελλάδα: συνήθως Δευτέρα-Κυριακή
+                    $from = $now->copy()->startOfWeek(Carbon::MONDAY)->toDateString();
+                    $to   = $now->copy()->endOfWeek(Carbon::SUNDAY)->toDateString();
+                    break;
+
+                case 'month':
+                    $from = $now->copy()->startOfMonth()->toDateString();
+                    $to   = $now->copy()->endOfMonth()->toDateString();
+                    break;
+
+                default:
+                    // άγνωστο -> μην πειράξεις
+                    break;
+            }
+        }
 
         // ---------------------------
         // professional_id με default τον owner
@@ -32,13 +69,11 @@ class TherapistAppointmentController extends Controller
 
         if ($user->role === 'owner') {
             if ($request->has('professional_id')) {
-                // Αν υπάρχει στο query:
-                //  - "" → όλοι οι επαγγελματίες
-                //  - "14" → συγκεκριμένος επαγγελματίας
+                // "" → όλοι οι επαγγελματίες
+                // "14" → συγκεκριμένος
                 $professionalId = $request->input('professional_id') ?: null;
             } else {
                 // Πρώτη φόρτωση → default ο συνδεδεμένος owner
-                // π.χ. owner με id=1 → βλέπει ραντεβού του professional_id = 1
                 $professionalId = $user->id;
             }
         }
@@ -51,8 +86,7 @@ class TherapistAppointmentController extends Controller
         }
 
         if ($user->role === 'owner') {
-            // Owner βλέπει ΟΛΑ τα ραντεβού (χωρίς company restriction)
-            // Αν έχει οριστεί professionalId (είτε default owner, είτε επιλεγμένος από φίλτρο)
+            // Owner βλέπει ΟΛΑ
             if (!empty($professionalId)) {
                 $query->where('professional_id', $professionalId);
             }
@@ -72,11 +106,13 @@ class TherapistAppointmentController extends Controller
             $query->where('customer_id', $customerId);
         }
 
-        $appointments = $query->orderBy('start_time', 'asc')->get();
+        // ✅ Order by date DESC + pagination
+        $appointments = $query
+            ->orderBy('start_time', 'desc')
+            ->paginate(15)
+            ->withQueryString();
 
         // ✅ Customers dropdown:
-        // - therapist: μόνο τα παιδιά που του ανήκουν (pivot)
-        // - owner: ΟΛΑ τα παιδιά
         if ($user->role === 'therapist') {
             $customers = Customer::whereHas('professionals', function ($q) use ($user) {
                     $q->where('professionals.id', $user->id);
@@ -93,7 +129,6 @@ class TherapistAppointmentController extends Controller
         $professionals = [];
 
         if ($user->role === 'owner') {
-            // Όλοι οι επαγγελματίες εκτός από role=grammatia
             $professionals = Professional::where('role', '!=', 'grammatia')
                 ->orderBy('last_name')
                 ->get();
@@ -103,6 +138,7 @@ class TherapistAppointmentController extends Controller
             'appointments',
             'from',
             'to',
+            'quick',
             'user',
             'customers',
             'customerId',
@@ -123,9 +159,6 @@ class TherapistAppointmentController extends Controller
             abort(403, 'Δεν έχετε πρόσβαση σε αυτή τη σελίδα.');
         }
 
-        // ✅ Customers dropdown:
-        // - therapist: μόνο τα παιδιά που του ανήκουν
-        // - owner: όλα
         if ($user->role === 'therapist') {
             $customers = Customer::whereHas('professionals', function ($q) use ($user) {
                     $q->where('professionals.id', $user->id);
@@ -159,7 +192,6 @@ class TherapistAppointmentController extends Controller
                     'required',
                     'exists:customers,id',
                     function ($attribute, $value, $fail) use ($user) {
-                        // 🔒 Αν είναι therapist, πρέπει το παιδί να του "ανήκει"
                         if ($user->role === 'therapist') {
                             $allowed = Customer::where('id', $value)
                                 ->whereHas('professionals', function ($q) use ($user) {
@@ -183,7 +215,7 @@ class TherapistAppointmentController extends Controller
         );
 
         TherapistAppointment::create([
-            'professional_id' => $user->id, // ο συνδεδεμένος επαγγελματίας (owner ή therapist)
+            'professional_id' => $user->id,
             'customer_id'     => $data['customer_id'],
             'start_time'      => $data['start_time'],
             'notes'           => $data['notes'] ?? null,
@@ -194,9 +226,6 @@ class TherapistAppointmentController extends Controller
             ->with('success', 'Το ραντεβού καταχωρήθηκε επιτυχώς.');
     }
 
-    /**
-     * ✏️ Φόρμα επεξεργασίας ραντεβού
-     */
     public function edit(TherapistAppointment $therapistAppointment)
     {
         $user = Auth::user();
@@ -205,15 +234,11 @@ class TherapistAppointmentController extends Controller
             abort(403, 'Δεν έχετε πρόσβαση σε αυτό το ραντεβού.');
         }
 
-        // Therapist: μόνο τα δικά του
         if ($user->role === 'therapist' &&
             $therapistAppointment->professional_id !== $user->id) {
             abort(403, 'Δεν έχετε πρόσβαση σε αυτό το ραντεβού.');
         }
 
-        // ✅ Customers dropdown:
-        // - therapist: μόνο τα δικά του παιδιά
-        // - owner: όλα
         if ($user->role === 'therapist') {
             $customers = Customer::whereHas('professionals', function ($q) use ($user) {
                     $q->where('professionals.id', $user->id);
@@ -234,9 +259,6 @@ class TherapistAppointmentController extends Controller
         ]);
     }
 
-    /**
-     * 💾 Αποθήκευση αλλαγών ραντεβού
-     */
     public function update(Request $request, TherapistAppointment $therapistAppointment)
     {
         $user = Auth::user();
@@ -245,7 +267,6 @@ class TherapistAppointmentController extends Controller
             abort(403, 'Δεν έχετε πρόσβαση σε αυτό το ραντεβού.');
         }
 
-        // Therapist: μόνο τα δικά του
         if ($user->role === 'therapist' &&
             $therapistAppointment->professional_id !== $user->id) {
             abort(403, 'Δεν έχετε πρόσβαση σε αυτό το ραντεβού.');
@@ -257,7 +278,6 @@ class TherapistAppointmentController extends Controller
                     'required',
                     'exists:customers,id',
                     function ($attribute, $value, $fail) use ($user) {
-                        // 🔒 Αν είναι therapist, πρέπει το παιδί να του "ανήκει"
                         if ($user->role === 'therapist') {
                             $allowed = Customer::where('id', $value)
                                 ->whereHas('professionals', function ($q) use ($user) {
@@ -291,9 +311,6 @@ class TherapistAppointmentController extends Controller
             ->with('success', 'Το ραντεβού ενημερώθηκε επιτυχώς.');
     }
 
-    /**
-     * 🗑 Διαγραφή ραντεβού
-     */
     public function destroy(TherapistAppointment $therapistAppointment)
     {
         $user = Auth::user();
@@ -302,7 +319,6 @@ class TherapistAppointmentController extends Controller
             abort(403, 'Δεν έχετε πρόσβαση σε αυτό το ραντεβού.');
         }
 
-        // Therapist: μόνο τα δικά του
         if ($user->role === 'therapist' &&
             $therapistAppointment->professional_id !== $user->id) {
             abort(403, 'Δεν έχετε πρόσβαση σε αυτό το ραντεβού.');
