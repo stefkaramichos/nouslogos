@@ -1,8 +1,13 @@
+{{-- resources/views/professionals/index.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Θεραπευτές')
 
 @section('content')
+    @php
+        $selectedCompany = request('company_id');
+    @endphp
+
     <div class="card">
         <div class="card-header">
 
@@ -16,6 +21,9 @@
 
             {{-- Search bar --}}
             <form method="GET" action="{{ route('professionals.index') }}" class="mt-3">
+                {{-- keep company filter while searching --}}
+                <input type="hidden" name="company_id" value="{{ request('company_id') }}">
+
                 <div class="input-group">
                     <input type="text"
                            name="search"
@@ -27,13 +35,35 @@
                         Αναζήτηση
                     </button>
 
-                    @if(isset($search) && $search !== '')
+                    @if((isset($search) && $search !== '') || request('company_id'))
                         <a href="{{ route('professionals.index') }}" class="btn btn-outline-secondary">
                             Καθαρισμός
                         </a>
                     @endif
                 </div>
             </form>
+
+            {{-- QUICK SEARCH BUTTONS BY COMPANY --}}
+            <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">
+                {{-- All --}}
+                <a href="{{ route('professionals.index', array_filter([
+                        'search' => request('search'),
+                        // company_id intentionally omitted
+                    ])) }}"
+                   class="btn btn-sm {{ empty($selectedCompany) ? 'btn-primary' : 'btn-outline-primary' }}">
+                    Όλοι
+                </a>
+
+                @foreach(($companies ?? collect()) as $company)
+                    <a href="{{ route('professionals.index', array_filter([
+                            'search' => request('search'),
+                            'company_id' => $company->id,
+                        ])) }}"
+                       class="btn btn-sm {{ (string)$selectedCompany === (string)$company->id ? 'btn-primary' : 'btn-outline-primary' }}">
+                        {{ $company->name }}
+                    </a>
+                @endforeach
+            </div>
 
         </div>
 
@@ -43,7 +73,7 @@
                     <thead>
                     <tr>
                         {{-- <th>Φωτο</th> --}}
-                        <th>Ονοματεπώνυμο</th> 
+                        <th>Ονοματεπώνυμο</th>
                         <th>Ειδικότητα</th>
                         {{-- <th>Τηλέφωνο</th>
                         <th>Email</th>
@@ -67,11 +97,15 @@
                                     <span class="badge bg-secondary">{{ mb_substr($professional->first_name, 0, 1) }}</span>
                                 @endif
                             </td> --}}
-  
+
                             <td>
-                                @if($professional->role != 'grammatia') <a href="{{ route('professionals.show', $professional) }}" style="text-decoration: none; color:inherit"> @endif
+                                @if($professional->role != 'grammatia')
+                                    <a href="{{ route('professionals.show', $professional) }}" style="text-decoration: none; color:inherit">
+                                @endif
                                     {{ $professional->last_name }} {{ $professional->first_name }}
-                                @if($professional->role != 'grammatia')</a> @endif
+                                @if($professional->role != 'grammatia')
+                                    </a>
+                                @endif
                             </td>
 
                             <td>
@@ -111,7 +145,6 @@
                                 </form>
                                 --}}
 
-                                    
                                 @if(auth()->user()->role === 'owner' && $professional->role != 'owner')
                                     <!-- Toggle ενεργός / ανενεργός -->
                                     <form action="{{ route('professionals.toggle-active', $professional) }}"
@@ -144,7 +177,6 @@
                                     -
                                 @endif
                             </td> --}}
-                        
 
                         </tr>
                     @empty

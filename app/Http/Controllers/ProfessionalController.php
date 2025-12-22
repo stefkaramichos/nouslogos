@@ -20,10 +20,17 @@ class ProfessionalController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $companyId = $request->input('company_id');
 
         $professionals = Professional::with(['companies', 'customers'])
+            ->when($companyId, function ($query) use ($companyId) {
+                $query->whereHas('companies', function ($q) use ($companyId) {
+                    $q->where('companies.id', $companyId);
+                });
+            })
             ->when($search, function ($query) use ($search) {
-                $query->where('first_name', 'like', "%$search%")
+                $query->where(function ($qq) use ($search) {
+                    $qq->where('first_name', 'like', "%$search%")
                     ->orWhere('last_name', 'like', "%$search%")
                     ->orWhere('phone', 'like', "%$search%")
                     ->orWhere('email', 'like', "%$search%")
@@ -32,14 +39,18 @@ class ProfessionalController extends Controller
                     })
                     ->orWhereHas('customers', function ($q) use ($search) {
                         $q->where('first_name', 'like', "%$search%")
-                          ->orWhere('last_name', 'like', "%$search%");
+                            ->orWhere('last_name', 'like', "%$search%");
                     });
+                });
             })
             ->orderBy('last_name')
             ->get();
 
-        return view('professionals.index', compact('professionals', 'search'));
+        $companies = Company::where('is_active', 1)->orderBy('name')->get();
+
+        return view('professionals.index', compact('professionals', 'search', 'companies'));
     }
+
 
     public function create()
     {

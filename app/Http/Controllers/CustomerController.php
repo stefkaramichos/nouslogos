@@ -17,26 +17,30 @@ use Illuminate\Support\Str;
 
 class CustomerController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $search = $request->input('search');
+        $search = request('search');
+        $companyId = request('company_id');
 
-        $customers = Customer::with('company')
-            ->when($search, function ($query) use ($search) {
-                $query->where('first_name', 'like', "%$search%")
-                    ->orWhere('last_name', 'like', "%$search%")
-                    ->orWhere('phone', 'like', "%$search%")
-                    ->orWhere('email', 'like', "%$search%")
-                    ->orWhereHas('company', function ($q) use ($search) {
-                        $q->where('name', 'like', "%$search%");
-                    });
+        $customers = Customer::query()
+            ->with('company')
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->when($search, function ($q) use ($search) {
+                $q->where(function ($qq) use ($search) {
+                    $qq->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhereHas('company', fn ($qc) => $qc->where('name', 'like', "%{$search}%"));
+                });
             })
             ->orderBy('last_name')
-            // ->paginate(25)
-            // ->withQueryString();   // <-- keeps search when switching page
-            ->get(); // temporary replacement so code still works
+            ->orderBy('first_name')
+            ->get();
 
-        return view('customers.index', compact('customers', 'search'));
+        $companies = Company::where('is_active', 1)->orderBy('name')->get();
+
+        return view('customers.index', compact('customers', 'companies', 'search'));
     }
 
     public function uploadFile(Request $request, Customer $customer)
