@@ -18,23 +18,29 @@ use Illuminate\Support\Str;
 
 class CustomerController extends Controller
 {
+
     public function index(Request $request)
     {
         $search = $request->input('search');
 
-        // ✅ SESSION PERSISTED COMPANY FILTER
-        if ($request->has('company_id')) {
-            // user clicked a button (or used query param)
-            // store it (even if it's empty -> "All")
+        // ✅ If user clicked "Όλοι" (clear button)
+        if ($request->boolean('clear_company')) {
+            $request->session()->forget('customers_company_id');
+        }
+
+        // ✅ If user explicitly clicked a company button (company_id is present)
+        // (Do NOT store when clear_company is used)
+        if (!$request->boolean('clear_company') && $request->has('company_id')) {
             $request->session()->put('customers_company_id', $request->input('company_id'));
         }
 
-        // if not provided in URL, use the saved one
-        $companyId = $request->input('company_id', $request->session()->get('customers_company_id'));
+        // ✅ Use URL company_id if present, otherwise the remembered one from session
+        $companyId = $request->has('company_id')
+            ? $request->input('company_id')
+            : $request->session()->get('customers_company_id');
 
-        // OPTIONAL: if you want "All" to clear session completely
-        if ($companyId === null || $companyId === '') {
-            $request->session()->forget('customers_company_id');
+        // normalize empty to null
+        if ($companyId === '' || $companyId === null) {
             $companyId = null;
         }
 
@@ -56,8 +62,14 @@ class CustomerController extends Controller
 
         $companies = Company::where('is_active', 1)->orderBy('id')->get();
 
-        return view('customers.index', compact('customers', 'companies', 'search', 'companyId'));
+        return view('customers.index', [
+            'customers' => $customers,
+            'companies' => $companies,
+            'search'    => $search,
+            'companyId' => $companyId, // ✅ pass to blade for "active" button + hidden input
+        ]);
     }
+
 
 
     public function uploadFile(Request $request, Customer $customer)

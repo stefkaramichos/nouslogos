@@ -47,13 +47,14 @@
             {{-- QUICK SEARCH BUTTONS BY COMPANY --}}
             <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">
                 {{-- All --}}
-                <a href="{{ route('professionals.index', array_filter([
+                <a href="{{ route('professionals.index', [
                         'search' => request('search'),
-                        // company_id intentionally omitted
-                    ])) }}"
-                   class="btn btn-sm {{ empty($selectedCompany) ? 'btn-primary' : 'btn-outline-primary' }}">
+                        'clear_company' => 1,   // ✅ explicit clear flag
+                    ]) }}"
+                class="btn btn-sm {{ empty($selectedCompany) ? 'btn-primary' : 'btn-outline-primary' }}">
                     Όλοι
                 </a>
+
 
                 @foreach(($companies ?? collect()) as $company)
                     <a href="{{ route('professionals.index', array_filter([

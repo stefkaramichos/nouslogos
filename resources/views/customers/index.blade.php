@@ -46,13 +46,15 @@
 
             {{-- Quick search buttons by company --}}
             <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">
-                {{-- All --}}
-                <a href="{{ route('customers.index', array_filter([
+             
+                <a href="{{ route('customers.index', [
                         'search' => request('search'),
-                    ])) }}"
-                   class="btn btn-sm {{ empty($selectedCompany) ? 'btn-primary' : 'btn-outline-primary' }}">
+                        'clear_company' => 1,
+                    ]) }}"
+                class="btn btn-sm {{ empty($selectedCompany) ? 'btn-primary' : 'btn-outline-primary' }}">
                     Όλοι
                 </a>
+
 
                 {{-- Companies --}}
                 @foreach(($companies ?? collect()) as $company)
