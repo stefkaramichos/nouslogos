@@ -47,7 +47,7 @@
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">Επαγγελματίες</label>
+                    <label class="form-label">Θεραπευτές</label>
                     <select name="professionals[]" class="form-select js-select2" multiple>
                         @php
                             $selected = collect(old(
