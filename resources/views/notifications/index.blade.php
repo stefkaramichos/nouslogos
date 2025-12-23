@@ -43,7 +43,7 @@
             <table class="table table-hover align-middle">
                 <thead>
                 <tr>
-                    <th>#</th>
+                    <th>Δημιουργήθηκε</th>
                     <th>Σημείωση</th>
                     <th>Ημερομηνία ειδοποίησης</th>
                     <th>Κατάσταση</th>
@@ -53,7 +53,7 @@
                 <tbody>
                 @forelse($notifications as $n)
                     <tr>
-                        <td>{{ $n->id }}</td>
+                        <td>{{ optional($n->created_at)->timezone(config('app.timezone'))->format('d/m/Y H:i') }}</td>
                         <td title="{{ $n->note }}">{{ \Illuminate\Support\Str::limit($n->note, 60) }}</td>
                         <td>{{ optional($n->notify_at)->timezone(config('app.timezone'))->format('d/m/Y H:i') }}</td>
 
