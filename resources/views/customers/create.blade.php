@@ -50,6 +50,23 @@
                 </div> --}}
 
                 <div class="mb-3">
+                    <label class="form-label">Επαγγελματίες</label>
+                    <select name="professionals[]" class="form-select js-select2" multiple>
+                        @php
+                            $selected = collect(old('professionals', []));
+                        @endphp
+
+                        @foreach($professionals as $p)
+                            <option value="{{ $p->id }}" @selected($selected->contains($p->id))>
+                                {{ trim(($p->last_name ?? '').' '.($p->first_name ?? '')) }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <small class="text-muted">Προαιρετικό.</small>
+                </div>
+
+
+                <div class="mb-3">
                     <label class="form-label">Εταιρεία</label>
                     <select name="company_id" class="form-select" >
                         <option value="">-- Επιλέξτε εταιρεία --</option>
@@ -77,3 +94,14 @@
         </div>
     </div>
 @endsection
+@push('scripts')
+<script>
+  $(function () {
+    $('.js-select2').select2({
+      placeholder: 'Αναζήτηση επαγγελματιών...',
+      allowClear: true,
+      width: '100%'
+    });
+  });
+</script>
+@endpush

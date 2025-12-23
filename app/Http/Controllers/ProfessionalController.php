@@ -46,7 +46,7 @@ class ProfessionalController extends Controller
             ->orderBy('last_name')
             ->get();
 
-        $companies = Company::where('is_active', 1)->orderBy('name')->get();
+        $companies = Company::where('is_active', 1)->orderBy('id')->get();
 
         return view('professionals.index', compact('professionals', 'search', 'companies'));
     }

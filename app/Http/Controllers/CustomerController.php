@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\Payment;
 use App\Models\Customer;
 use App\Models\Appointment;
+use App\Models\Professional;
 use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
@@ -23,7 +24,7 @@ class CustomerController extends Controller
         $companyId = request('company_id');
 
         $customers = Customer::query()
-            ->with('company')
+            ->with(['company', 'professionals'])   // ✅ add professionals here
             ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
@@ -38,7 +39,7 @@ class CustomerController extends Controller
             ->orderBy('first_name')
             ->get();
 
-        $companies = Company::where('is_active', 1)->orderBy('name')->get();
+        $companies = Company::where('is_active', 1)->orderBy('id')->get();
 
         return view('customers.index', compact('customers', 'companies', 'search'));
     }
@@ -115,47 +116,60 @@ class CustomerController extends Controller
     {
         $companies = Company::all();
 
-        return view('customers.create', compact('companies'));
+        // pick what you want here:
+        // a) all active professionals
+        $professionals = Professional::where('is_active', 1)
+            ->orderBy('last_name')->orderBy('first_name')
+            ->get();
+
+        return view('customers.create', compact('companies', 'professionals'));
     }
 
     public function store(Request $request)
     {
-        $data = $request->validate(
-            [
-                'first_name' => 'required|string|max:100',
-                'last_name'  => 'required|string|max:100',
-                'phone'      => 'nullable|string|max:30',
-                'email'      => 'nullable|email|max:150',
-                'company_id' => 'nullable|exists:companies,id',
+        $data = $request->validate([
+            'first_name' => 'required|string|max:100',
+            'last_name'  => 'required|string|max:100',
+            'phone'      => 'nullable|string|max:30',
+            'email'      => 'nullable|email|max:150',
+            'company_id' => 'nullable|exists:companies,id',
+            'tax_office' => 'nullable|string|max:100',
+            'vat_number' => 'nullable|string|max:20',
+            'informations' => 'nullable|string',
 
-                // ΝΕΑ ΠΕΔΙΑ
-                'tax_office' => 'nullable|string|max:100', // ΔΟΥ
-                'vat_number' => 'nullable|string|max:20',  // ΑΦΜ
+            // ✅ NEW
+            'professionals' => 'nullable|array',
+            'professionals.*' => 'exists:professionals,id',
+        ]);
 
-                'informations' => 'nullable|string',       // 👈 ΝΕΟ
-            ],
-            [
-                'first_name.required' => 'Το μικρό όνομα είναι υποχρεωτικό.',
-                'last_name.required'  => 'Το επίθετο είναι υποχρεωτικό.',
-                'phone.required'      => 'Το τηλέφωνο είναι υποχρεωτικό.',
-                'company_id.required' => 'Η εταιρεία είναι υποχρεωτική.',
-            ]
-        );
+        $professionalIds = $data['professionals'] ?? [];
+        unset($data['professionals']);
 
-        Customer::create($data);
+        $customer = Customer::create($data);
 
-        return redirect()
-            ->route('customers.index')
-            ->with('success', 'Ο πελάτης δημιουργήθηκε επιτυχώς.');
+        // ✅ link in pivot
+        $customer->professionals()->sync($professionalIds);
+
+        return redirect()->route('customers.index')->with('success', 'Ο πελάτης δημιουργήθηκε επιτυχώς.');
     }
+
 
     public function edit(Request $request, Customer $customer)
     {
         $companies = Company::all();
-        $redirect = $request->input('redirect'); // <--- we capture it
 
-        return view('customers.edit', compact('customer', 'companies', 'redirect'));
+        $professionals = Professional::where('is_active', 1)
+            ->orderBy('last_name')->orderBy('first_name')
+            ->get();
+
+        $redirect = $request->input('redirect');
+
+        // so blade can show selected professionals
+        $customer->load('professionals');
+
+        return view('customers.edit', compact('customer', 'companies', 'professionals', 'redirect'));
     }
+
 
     public function update(Request $request, Customer $customer)
     {
@@ -168,21 +182,27 @@ class CustomerController extends Controller
             'tax_office'   => 'nullable|string|max:100',
             'vat_number'   => 'nullable|string|max:20',
             'informations' => 'nullable|string',
+
+            // ✅ NEW
+            'professionals' => 'nullable|array',
+            'professionals.*' => 'exists:professionals,id',
         ]);
+
+        $professionalIds = $data['professionals'] ?? [];
+        unset($data['professionals']);
 
         $customer->update($data);
 
-        // Return to previous page if provided
+        // ✅ update pivot
+        $customer->professionals()->sync($professionalIds);
+
         if ($request->filled('redirect_to')) {
-            return redirect($request->input('redirect_to'))
-                ->with('success', 'Ο πελάτης ενημερώθηκε επιτυχώς.');
+            return redirect($request->input('redirect_to'))->with('success', 'Ο πελάτης ενημερώθηκε επιτυχώς.');
         }
 
-        // Fallback
-        return redirect()
-            ->route('customers.index')
-            ->with('success', 'Ο πελάτης ενημερώθηκε επιτυχώς.');
+        return redirect()->route('customers.index')->with('success', 'Ο πελάτης ενημερώθηκε επιτυχώς.');
     }
+
 
 
     public function show(Request $request, Customer $customer)
@@ -190,6 +210,7 @@ class CustomerController extends Controller
         // Φορτώνουμε τις βασικές σχέσεις του πελάτη
         $customer->load([
             'company',
+            'professionals',
             'appointments.professional',
             'appointments.company',
             'appointments.payment',

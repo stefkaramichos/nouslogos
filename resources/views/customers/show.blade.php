@@ -19,6 +19,17 @@
                     <p><strong>Τηλέφωνο:</strong> {{ $customer->phone }}</p>
                     {{-- <p><strong>Email:</strong> {{ $customer->email ?? '-' }}</p> --}}
                     <p><strong>Γραφείο:</strong> {{ $customer->company->name ?? '-' }}</p>
+                    <p>
+                        <strong>Θεραπευτές:</strong>
+                        @if($customer->professionals->isEmpty())
+                            <span class="text-muted">-</span>
+                        @else
+                            {{ $customer->professionals
+                                ->map(fn($p) => trim(($p->last_name ?? '').' '.($p->first_name ?? '')))
+                                ->implode(', ')
+                            }}
+                        @endif
+                    </p>
                     <p><strong>Σύνολο Ραντεβού (με βάση τα φίλτρα):</strong> {{ $appointmentsCount }}</p>
                 </div>
 

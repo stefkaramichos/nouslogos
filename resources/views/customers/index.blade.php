@@ -75,6 +75,7 @@
                         <th>Γραφείο</th>
                         <th>Ονοματεπώνυμο</th>
                         <th>Τηλέφωνο</th>
+                        <th>Θεραπευτές</th>
                         <th class="text-end">Ενέργειες</th>
                     </tr>
                     </thead>
@@ -92,6 +93,19 @@
                             </td>
 
                             <td>{{ $customer->phone ?? '-' }}</td>
+
+                            <td>
+                                @php
+                                    $pros = $customer->professionals ?? collect();
+                                @endphp
+
+                                @if($pros->isEmpty())
+                                    <span class="text-muted">-</span>
+                                @else
+                                    {{-- show as comma separated --}}
+                                    {{ $pros->map(fn($p) => trim(($p->last_name ?? '').' '.($p->first_name ?? '')))->implode(', ') }}
+                                @endif
+                            </td>
 
                             <td class="text-end">
                                 {{-- Add Appointment --}}
