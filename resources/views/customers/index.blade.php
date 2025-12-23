@@ -76,6 +76,7 @@
                         <th>Ονοματεπώνυμο</th>
                         <th>Τηλέφωνο</th>
                         <th>Θεραπευτές</th>
+                        <th>Πληροφορίες</th>
                         <th class="text-end">Ενέργειες</th>
                     </tr>
                     </thead>
@@ -107,6 +108,18 @@
                                 @endif
                             </td>
 
+                            <td>
+                                @if($customer->informations)
+                                    <span
+                                        title="{{ $customer->informations }}"
+                                        style="cursor: help;"
+                                    >
+                                        {{ Str::limit($customer->informations, 30) }}
+                                    </span>
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
+                            </td>
                             <td class="text-end">
                                 {{-- Add Appointment --}}
                                 <a href="{{ route('appointments.create', ['customer_id' => $customer->id, 'redirect' => request()->fullUrl()]) }}"

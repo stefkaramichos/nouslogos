@@ -95,16 +95,8 @@
                     
                 >
             </div>
-
-            <div class="mb-3">
-                <label class="form-label">Πληροφορίες</label>
-                <textarea
-                    name="informations"
-                    class="form-control"
-                    rows="3"
-                >{{ old('informations', $customer->informations) }}</textarea>
-            </div> --}}
-
+--}}
+           
 
 
                 <div class="mb-3">
@@ -121,6 +113,17 @@
                         @endforeach
                     </select>
                 </div>
+
+
+                <div class="mb-3">
+                    <label class="form-label">Πληροφορίες</label>
+                    <textarea
+                        name="informations"
+                        class="form-control"
+                        rows="3"
+                    >{{ old('informations', $customer->informations) }}</textarea>
+                </div> 
+
 
                 <button class="btn btn-primary">Αποθήκευση Αλλαγών</button>
                 <a href="{{ route('customers.index') }}" class="btn btn-secondary">Ακύρωση</a>
