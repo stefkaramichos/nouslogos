@@ -6,7 +6,7 @@
 @section('content')
     @php
         $search = $search ?? request('search');
-        $selectedCompany = request('company_id');
+        $selectedCompany = $companyId ?? request('company_id');  // ✅ session-aware
     @endphp
 
     <div class="card">
@@ -22,7 +22,8 @@
             {{-- Search bar --}}
             <form method="GET" action="{{ route('customers.index') }}" class="mt-3">
                 {{-- keep company filter while searching --}}
-                <input type="hidden" name="company_id" value="{{ request('company_id') }}">
+                <input type="hidden" name="company_id" value="{{ $selectedCompany }}">
+
 
                 <div class="input-group">
                     <input type="text"
@@ -152,7 +153,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="text-center text-muted py-4">
+                            <td colspan="6" class="text-center text-muted py-4">
                                 Δεν υπάρχουν πελάτες για εμφάνιση.
                             </td>
                         </tr>

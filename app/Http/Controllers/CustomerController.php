@@ -18,21 +18,36 @@ use Illuminate\Support\Str;
 
 class CustomerController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $search = request('search');
-        $companyId = request('company_id');
+        $search = $request->input('search');
+
+        // ✅ SESSION PERSISTED COMPANY FILTER
+        if ($request->has('company_id')) {
+            // user clicked a button (or used query param)
+            // store it (even if it's empty -> "All")
+            $request->session()->put('customers_company_id', $request->input('company_id'));
+        }
+
+        // if not provided in URL, use the saved one
+        $companyId = $request->input('company_id', $request->session()->get('customers_company_id'));
+
+        // OPTIONAL: if you want "All" to clear session completely
+        if ($companyId === null || $companyId === '') {
+            $request->session()->forget('customers_company_id');
+            $companyId = null;
+        }
 
         $customers = Customer::query()
-            ->with(['company', 'professionals'])   // ✅ add professionals here
+            ->with(['company', 'professionals'])
             ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
                     $qq->where('first_name', 'like', "%{$search}%")
-                    ->orWhere('last_name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhereHas('company', fn ($qc) => $qc->where('name', 'like', "%{$search}%"));
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhereHas('company', fn ($qc) => $qc->where('name', 'like', "%{$search}%"));
                 });
             })
             ->orderBy('last_name')
@@ -41,8 +56,9 @@ class CustomerController extends Controller
 
         $companies = Company::where('is_active', 1)->orderBy('id')->get();
 
-        return view('customers.index', compact('customers', 'companies', 'search'));
+        return view('customers.index', compact('customers', 'companies', 'search', 'companyId'));
     }
+
 
     public function uploadFile(Request $request, Customer $customer)
     {

@@ -20,7 +20,19 @@ class ProfessionalController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
-        $companyId = $request->input('company_id');
+
+        // ✅ SESSION PERSISTED COMPANY FILTER (professionals page)
+        if ($request->has('company_id')) {
+            $request->session()->put('professionals_company_id', $request->input('company_id'));
+        }
+
+        $companyId = $request->input('company_id', $request->session()->get('professionals_company_id'));
+
+        // Optional: clicking "Όλοι" clears session
+        if ($companyId === null || $companyId === '') {
+            $request->session()->forget('professionals_company_id');
+            $companyId = null;
+        }
 
         $professionals = Professional::with(['companies', 'customers'])
             ->when($companyId, function ($query) use ($companyId) {
@@ -31,16 +43,16 @@ class ProfessionalController extends Controller
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($qq) use ($search) {
                     $qq->where('first_name', 'like', "%$search%")
-                    ->orWhere('last_name', 'like', "%$search%")
-                    ->orWhere('phone', 'like', "%$search%")
-                    ->orWhere('email', 'like', "%$search%")
-                    ->orWhereHas('companies', function ($q) use ($search) {
-                        $q->where('name', 'like', "%$search%");
-                    })
-                    ->orWhereHas('customers', function ($q) use ($search) {
-                        $q->where('first_name', 'like', "%$search%")
-                            ->orWhere('last_name', 'like', "%$search%");
-                    });
+                        ->orWhere('last_name', 'like', "%$search%")
+                        ->orWhere('phone', 'like', "%$search%")
+                        ->orWhere('email', 'like', "%$search%")
+                        ->orWhereHas('companies', function ($q) use ($search) {
+                            $q->where('name', 'like', "%$search%");
+                        })
+                        ->orWhereHas('customers', function ($q) use ($search) {
+                            $q->where('first_name', 'like', "%$search%")
+                                ->orWhere('last_name', 'like', "%$search%");
+                        });
                 });
             })
             ->orderBy('last_name')
@@ -48,8 +60,10 @@ class ProfessionalController extends Controller
 
         $companies = Company::where('is_active', 1)->orderBy('id')->get();
 
-        return view('professionals.index', compact('professionals', 'search', 'companies'));
+        // ✅ pass companyId too
+        return view('professionals.index', compact('professionals', 'search', 'companies', 'companyId'));
     }
+
 
 
     public function create()

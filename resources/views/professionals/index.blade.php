@@ -5,8 +5,9 @@
 
 @section('content')
     @php
-        $selectedCompany = request('company_id');
+        $selectedCompany = $companyId ?? request('company_id'); // ✅ session-aware
     @endphp
+
 
     <div class="card">
         <div class="card-header">
@@ -22,7 +23,7 @@
             {{-- Search bar --}}
             <form method="GET" action="{{ route('professionals.index') }}" class="mt-3">
                 {{-- keep company filter while searching --}}
-                <input type="hidden" name="company_id" value="{{ request('company_id') }}">
+                <input type="hidden" name="company_id" value="{{ $selectedCompany }}">
 
                 <div class="input-group">
                     <input type="text"
