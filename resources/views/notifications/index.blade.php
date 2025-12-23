@@ -54,7 +54,17 @@
                 @forelse($notifications as $n)
                     <tr>
                         <td>{{ optional($n->created_at)->timezone(config('app.timezone'))->format('d/m/Y H:i') }}</td>
-                        <td title="{{ $n->note }}">{{ \Illuminate\Support\Str::limit($n->note, 60) }}</td>
+                        @php
+                            $colors = ['#e3f2fd', '#e8f5e9', '#e1ffe3', '#fce4ec', '#ede7f6'];
+                            $bg = $colors[$n->professional_id % count($colors)];
+                        @endphp
+
+                        <td style="background-color: {{ $bg }};"
+                            class="rounded px-2"
+                            title="{{ $n->note }}">
+                            {{ \Illuminate\Support\Str::limit($n->note, 60) }}
+                        </td>
+
                         <td>{{ optional($n->notify_at)->timezone(config('app.timezone'))->format('d/m/Y H:i') }}</td>
 
                         <td>

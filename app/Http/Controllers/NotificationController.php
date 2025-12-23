@@ -3,29 +3,66 @@
 namespace App\Http\Controllers;
 
 use App\Models\Notification;
-use Carbon\Carbon; 
+use App\Models\Professional;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
-    private function currentProfessionalId(): int
+    private function currentProfessional(): Professional
     {
-        return (int) auth()->id(); // επειδή κάνεις Auth::attempt() από professionals
+        // επειδή κάνεις Auth::attempt() από professionals
+        return Professional::with('companies')->findOrFail(auth()->id());
+    }
+
+    /**
+     * Επιστρέφει query για ειδοποιήσεις που επιτρέπεται να βλέπει ο χρήστης.
+     * - grammatia: βλέπει ειδοποιήσεις από επαγγελματίες που μοιράζονται τουλάχιστον ένα ίδιο γραφείο (company).
+     * - όλοι οι άλλοι: βλέπουν μόνο τις δικές τους.
+     */
+    private function visibleNotificationsQuery(Professional $me): Builder
+    {
+        $q = Notification::query()->orderByDesc('notify_at');
+
+        if ($me->role === 'grammatia') {
+            $companyIds = $me->companies->pluck('id');
+
+            // αν δεν έχει γραφείο, μην δείχνεις τίποτα
+            if ($companyIds->isEmpty()) {
+                return $q->whereRaw('1=0');
+            }
+
+            // χρειάζεται Notification::professional() relation (belongsTo Professional)
+            return $q->whereHas('professional', function ($p) use ($companyIds) {
+                $p->whereHas('companies', function ($c) use ($companyIds) {
+                    $c->whereIn('companies.id', $companyIds);
+                });
+            });
+        }
+
+        return $q->where('professional_id', $me->id);
     }
 
     public function index(Request $request)
     {
-        $pid = $this->currentProfessionalId();
+        $me = $this->currentProfessional();
 
         $from = $request->get('from');
         $to   = $request->get('to');
         $onlyUnread = $request->boolean('unread');
 
-        $q = Notification::where('professional_id', $pid)->orderByDesc('notify_at');
+        $q = $this->visibleNotificationsQuery($me);
 
-        if ($from) $q->whereDate('notify_at', '>=', $from);
-        if ($to)   $q->whereDate('notify_at', '<=', $to);
-        if ($onlyUnread) $q->where('is_read', false);
+        if ($from) {
+            $q->whereDate('notify_at', '>=', $from);
+        }
+        if ($to) {
+            $q->whereDate('notify_at', '<=', $to);
+        }
+        if ($onlyUnread) {
+            $q->where('is_read', false);
+        }
 
         $notifications = $q->paginate(20)->withQueryString();
 
@@ -39,7 +76,7 @@ class NotificationController extends Controller
 
     public function store(Request $request)
     {
-        $pid = $this->currentProfessionalId();
+        $me = $this->currentProfessional();
 
         $data = $request->validate([
             'note'      => ['required', 'string', 'max:5000'],
@@ -47,7 +84,7 @@ class NotificationController extends Controller
         ]);
 
         Notification::create([
-            'professional_id' => $pid,
+            'professional_id' => $me->id,
             'note'            => $data['note'],
             'notify_at'       => Carbon::parse($data['notify_at']),
             'is_read'         => false,
@@ -58,13 +95,14 @@ class NotificationController extends Controller
 
     public function edit(Notification $notification)
     {
-        $this->authorizeOwner($notification);
+        $this->authorizeVisible($notification);
+
         return view('notifications.edit', compact('notification'));
     }
 
     public function update(Request $request, Notification $notification)
     {
-        $this->authorizeOwner($notification);
+        $this->authorizeVisible($notification);
 
         $data = $request->validate([
             'note'      => ['required', 'string', 'max:5000'],
@@ -78,7 +116,8 @@ class NotificationController extends Controller
 
     public function destroy(Notification $notification)
     {
-        $this->authorizeOwner($notification);
+        $this->authorizeVisible($notification);
+
         $notification->delete();
 
         return back()->with('success', 'Η ειδοποίηση διαγράφηκε.');
@@ -89,9 +128,9 @@ class NotificationController extends Controller
      */
     public function due()
     {
-        $pid = $this->currentProfessionalId();
+        $me = $this->currentProfessional();
 
-        $due = Notification::where('professional_id', $pid)
+        $due = $this->visibleNotificationsQuery($me)
             ->where('is_read', false)
             ->where('notify_at', '<=', now())
             ->orderBy('notify_at')
@@ -110,13 +149,12 @@ class NotificationController extends Controller
         );
     }
 
-
     /**
      * Mark as read (για να μην ξαναπετάει popup)
      */
     public function markRead(Notification $notification)
     {
-        $this->authorizeOwner($notification);
+        $this->authorizeVisible($notification);
 
         $notification->update([
             'is_read' => true,
@@ -126,10 +164,31 @@ class NotificationController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    private function authorizeOwner(Notification $notification): void
+    private function authorizeVisible(Notification $notification): void
     {
-        if ((int)$notification->professional_id !== $this->currentProfessionalId()) {
-            abort(403, 'Δεν έχετε πρόσβαση.');
+        $me = $this->currentProfessional();
+
+        // ο δημιουργός πάντα έχει πρόσβαση
+        if ((int) $notification->professional_id === (int) $me->id) {
+            return;
         }
+
+        // grammatia: πρόσβαση αν ο ιδιοκτήτης της ειδοποίησης είναι σε κοινό γραφείο
+        if ($me->role === 'grammatia') {
+            $myCompanyIds = $me->companies->pluck('id');
+
+            $owner = Professional::with('companies')->find($notification->professional_id);
+            if (!$owner) {
+                abort(403, 'Δεν έχετε πρόσβαση.');
+            }
+
+            $ownerCompanyIds = $owner->companies->pluck('id');
+
+            if ($myCompanyIds->intersect($ownerCompanyIds)->isNotEmpty()) {
+                return;
+            }
+        }
+
+        abort(403, 'Δεν έχετε πρόσβαση.');
     }
 }
