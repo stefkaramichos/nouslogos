@@ -17,6 +17,10 @@ use Illuminate\Support\Facades\DB;
 
 class CustomerController extends Controller
 {
+    /* =========================================================
+     |  FILES
+     ========================================================= */
+
     public function view(Customer $customer, CustomerFile $file)
     {
         if ((int)$file->customer_id !== (int)$customer->id) {
@@ -36,14 +40,90 @@ class CustomerController extends Controller
         );
     }
 
+    public function uploadFile(Request $request, Customer $customer)
+    {
+        $request->validate([
+            'file'  => 'required|file|max:10240', // 10MB
+            'notes' => 'nullable|string|max:1000',
+        ], [
+            'file.required' => 'Πρέπει να επιλέξετε αρχείο.',
+            'file.file'     => 'Μη έγκυρο αρχείο.',
+            'file.max'      => 'Το αρχείο δεν μπορεί να ξεπερνά τα 10MB.',
+        ]);
+
+        $uploaded = $request->file('file');
+
+        $originalName = $uploaded->getClientOriginalName();
+        $mime         = $uploaded->getClientMimeType();
+        $size         = $uploaded->getSize();
+
+        $disk = 'local';
+
+        $storedName = Str::random(12) . '_' . time() . '_' . preg_replace('/\s+/', '_', $originalName);
+        $dir        = "customer-files/{$customer->id}";
+        $path       = $uploaded->storeAs($dir, $storedName, $disk);
+
+        CustomerFile::create([
+            'customer_id'   => $customer->id,
+            'uploaded_by'   => Auth::user()?->id,
+            'original_name' => $originalName,
+            'stored_name'   => $storedName,
+            'path'          => $path,
+            'disk'          => $disk,
+            'mime_type'     => $mime,
+            'size'          => $size,
+            'notes'         => $request->input('notes'),
+        ]);
+
+        return back()->with('success', 'Το αρχείο ανέβηκε επιτυχώς.');
+    }
+
+    public function downloadFile(Customer $customer, CustomerFile $file)
+    {
+        if ((int)$file->customer_id !== (int)$customer->id) {
+            abort(404);
+        }
+
+        $disk = $file->disk ?? 'local';
+
+        if (!Storage::disk($disk)->exists($file->path)) {
+            return back()->with('error', 'Το αρχείο δεν βρέθηκε στο storage.');
+        }
+
+        return Storage::disk($disk)->download($file->path, $file->original_name);
+    }
+
+    public function deleteFile(Request $request, Customer $customer, CustomerFile $file)
+    {
+        if ((int)$file->customer_id !== (int)$customer->id) {
+            abort(404);
+        }
+
+        $disk = $file->disk ?? 'local';
+
+        if ($file->path && Storage::disk($disk)->exists($file->path)) {
+            Storage::disk($disk)->delete($file->path);
+        }
+
+        $file->delete();
+
+        return back()->with('success', 'Το αρχείο διαγράφηκε επιτυχώς.');
+    }
+
+    /* =========================================================
+     |  INDEX / CRUD CUSTOMER
+     ========================================================= */
+
     public function index(Request $request)
     {
         $search = $request->input('search');
 
+        // ✅ If user clicked "Όλοι"
         if ($request->boolean('clear_company')) {
             $request->session()->forget('customers_company_id');
         }
 
+        // ✅ remember chosen company
         if (!$request->boolean('clear_company') && $request->has('company_id')) {
             $request->session()->put('customers_company_id', $request->input('company_id'));
         }
@@ -82,82 +162,13 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function uploadFile(Request $request, Customer $customer)
-    {
-        $request->validate([
-            'file'  => 'required|file|max:10240',
-            'notes' => 'nullable|string|max:1000',
-        ], [
-            'file.required' => 'Πρέπει να επιλέξετε αρχείο.',
-            'file.file'     => 'Μη έγκυρο αρχείο.',
-            'file.max'      => 'Το αρχείο δεν μπορεί να ξεπερνά τα 10MB.',
-        ]);
-
-        $uploaded = $request->file('file');
-
-        $originalName = $uploaded->getClientOriginalName();
-        $mime = $uploaded->getClientMimeType();
-        $size = $uploaded->getSize();
-
-        $disk = 'local';
-
-        $storedName = Str::random(12) . '_' . time() . '_' . preg_replace('/\s+/', '_', $originalName);
-        $dir  = "customer-files/{$customer->id}";
-        $path = $uploaded->storeAs($dir, $storedName, $disk);
-
-        CustomerFile::create([
-            'customer_id'    => $customer->id,
-            'uploaded_by'    => Auth::user()?->id,
-            'original_name'  => $originalName,
-            'stored_name'    => $storedName,
-            'path'           => $path,
-            'disk'           => $disk,
-            'mime_type'      => $mime,
-            'size'           => $size,
-            'notes'          => $request->input('notes'),
-        ]);
-
-        return back()->with('success', 'Το αρχείο ανέβηκε επιτυχώς.');
-    }
-
-    public function downloadFile(Customer $customer, CustomerFile $file)
-    {
-        if ((int)$file->customer_id !== (int)$customer->id) {
-            abort(404);
-        }
-
-        $disk = $file->disk ?? 'local';
-
-        if (!Storage::disk($disk)->exists($file->path)) {
-            return back()->with('error', 'Το αρχείο δεν βρέθηκε στο storage.');
-        }
-
-        return Storage::disk($disk)->download($file->path, $file->original_name);
-    }
-
-    public function deleteFile(Request $request, Customer $customer, CustomerFile $file)
-    {
-        if ((int)$file->customer_id !== (int)$customer->id) {
-            abort(404);
-        }
-
-        $disk = $file->disk ?? 'local';
-
-        if ($file->path && Storage::disk($disk)->exists($file->path)) {
-            Storage::disk($disk)->delete($file->path);
-        }
-
-        $file->delete();
-
-        return back()->with('success', 'Το αρχείο διαγράφηκε επιτυχώς.');
-    }
-
     public function create()
     {
         $companies = Company::all();
 
         $professionals = Professional::where('is_active', 1)
-            ->orderBy('last_name')->orderBy('first_name')
+            ->orderBy('last_name')
+            ->orderBy('first_name')
             ->get();
 
         return view('customers.create', compact('companies', 'professionals'));
@@ -166,16 +177,16 @@ class CustomerController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'first_name' => 'required|string|max:100',
-            'last_name'  => 'required|string|max:100',
-            'phone'      => 'nullable|string|max:100',
-            'email'      => 'nullable|email|max:150',
-            'company_id' => 'nullable|exists:companies,id',
-            'tax_office' => 'nullable|string|max:100',
-            'vat_number' => 'nullable|string|max:20',
-            'informations' => 'nullable|string',
+            'first_name'    => 'required|string|max:100',
+            'last_name'     => 'required|string|max:100',
+            'phone'         => 'nullable|string|max:100',
+            'email'         => 'nullable|email|max:150',
+            'company_id'    => 'nullable|exists:companies,id',
+            'tax_office'    => 'nullable|string|max:100',
+            'vat_number'    => 'nullable|string|max:20',
+            'informations'  => 'nullable|string',
 
-            'professionals' => 'nullable|array',
+            'professionals'   => 'nullable|array',
             'professionals.*' => 'exists:professionals,id',
         ]);
 
@@ -193,10 +204,12 @@ class CustomerController extends Controller
         $companies = Company::all();
 
         $professionals = Professional::where('is_active', 1)
-            ->orderBy('last_name')->orderBy('first_name')
+            ->orderBy('last_name')
+            ->orderBy('first_name')
             ->get();
 
         $redirect = $request->input('redirect');
+
         $customer->load('professionals');
 
         return view('customers.edit', compact('customer', 'companies', 'professionals', 'redirect'));
@@ -205,16 +218,16 @@ class CustomerController extends Controller
     public function update(Request $request, Customer $customer)
     {
         $data = $request->validate([
-            'first_name'   => 'required|string|max:100',
-            'last_name'    => 'required|string|max:100',
-            'phone'        => 'nullable|string|max:100',
-            'email'        => 'nullable|email|max:150',
-            'company_id'   => 'nullable|exists:companies,id',
-            'tax_office'   => 'nullable|string|max:100',
-            'vat_number'   => 'nullable|string|max:20',
-            'informations' => 'nullable|string',
+            'first_name'    => 'required|string|max:100',
+            'last_name'     => 'required|string|max:100',
+            'phone'         => 'nullable|string|max:100',
+            'email'         => 'nullable|email|max:150',
+            'company_id'    => 'nullable|exists:companies,id',
+            'tax_office'    => 'nullable|string|max:100',
+            'vat_number'    => 'nullable|string|max:20',
+            'informations'  => 'nullable|string',
 
-            'professionals' => 'nullable|array',
+            'professionals'   => 'nullable|array',
             'professionals.*' => 'exists:professionals,id',
         ]);
 
@@ -231,20 +244,39 @@ class CustomerController extends Controller
         return redirect()->route('customers.index')->with('success', 'Ο πελάτης ενημερώθηκε επιτυχώς.');
     }
 
+    public function destroy(Customer $customer)
+    {
+        $customer->delete();
+
+        return redirect()
+            ->route('customers.index')
+            ->with('success', 'Ο πελάτης διαγράφηκε επιτυχώς.');
+    }
+
+    /* =========================================================
+     |  SHOW CUSTOMER + APPOINTMENTS + PAYMENTS (SPLIT)
+     ========================================================= */
+
     public function show(Request $request, Customer $customer)
     {
-        // ✅ CRITICAL: φορτώνουμε payments (όχι μόνο latest payment)
+        /**
+         * ✅ CRITICAL:
+         * - appointments.payments (hasMany) για split
+         * - ΟΧΙ appointments.payment
+         */
         $customer->load([
             'company',
             'professionals',
             'appointments.professional',
             'appointments.company',
-            'appointments.payments',   // ✅ split totals
+            'appointments.payments',
             'appointments.creator',
-            'files.uploader'
+            'files.uploader',
         ]);
 
-        // 🔹 Ιστορικό πληρωμών (όλες οι πληρωμές του πελάτη)
+        /**
+         * 🔹 Ιστορικό πληρωμών (ομαδοποίηση ανά ημερομηνία paid_at)
+         */
         $payments = Payment::where('customer_id', $customer->id)
             ->orderByDesc('paid_at')
             ->orderByDesc('id')
@@ -252,10 +284,12 @@ class CustomerController extends Controller
 
         $paymentsByDate = $payments->groupBy(function ($payment) {
             if (!$payment->paid_at) return 'Χωρίς ημερομηνία';
-            return Carbon::parse($payment->paid_at)->toDateString();
+            return Carbon::parse($payment->paid_at)->toDateString(); // Y-m-d
         });
 
-        // 🔹 Date filter
+        /**
+         * 🔹 Date filter για ραντεβού λίστας (μένει όπως το είχες)
+         */
         $range = $request->input('range', 'month'); // month/day/all
         $nav   = $request->input('nav');
 
@@ -300,13 +334,16 @@ class CustomerController extends Controller
         $paymentStatus = $request->input('payment_status'); // unpaid/partial/full/all
         $paymentMethod = $request->input('payment_method'); // cash/card/all
 
+        /**
+         * 🔹 Collection appointments (όχι DB query)
+         */
         $appointmentsCollection = $customer->appointments
             ->sortByDesc('start_time')
             ->values();
 
         $filteredAppointments = $appointmentsCollection;
 
-        // ημερομηνία
+        // Date range for list
         if ($from && $to) {
             $filteredAppointments = $filteredAppointments->filter(function ($a) use ($from, $to) {
                 if (!$a->start_time) return false;
@@ -315,7 +352,7 @@ class CustomerController extends Controller
             });
         }
 
-        // ✅ πληρωμή status βασισμένο σε payments sum
+        // Payment status based on payments sum
         if ($paymentStatus && $paymentStatus !== 'all') {
             $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentStatus) {
                 $total = (float)($a->total_price ?? 0);
@@ -330,7 +367,7 @@ class CustomerController extends Controller
             });
         }
 
-        // ✅ method filter: αν έχει έστω μία πληρωμή με το method
+        // method filter (cash/card): true αν υπάρχει έστω μία πληρωμή με method
         if ($paymentMethod && $paymentMethod !== 'all') {
             $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentMethod) {
                 return $a->payments->contains(fn($p) => $p->method === $paymentMethod);
@@ -339,27 +376,31 @@ class CustomerController extends Controller
 
         $filteredAppointments = $filteredAppointments->values();
 
-        // GLOBAL totals
+        /**
+         * 🔹 GLOBAL totals (χωρίς φίλτρα)
+         */
         $allAppointments = $appointmentsCollection;
 
         $globalAppointmentsCount = $allAppointments->count();
-
         $globalTotalAmount = $allAppointments->sum(fn($a) => (float)($a->total_price ?? 0));
         $globalPaidTotal   = $allAppointments->sum(fn($a) => (float)$a->payments->sum('amount'));
         $globalOutstandingTotal = max($globalTotalAmount - $globalPaidTotal, 0);
 
-        // Filtered totals
+        /**
+         * 🔹 Totals filtered (αν θες)
+         */
         $appointmentsCount = $filteredAppointments->count();
-
-        $filteredTotalAmount = $filteredAppointments->sum(fn($a) => (float)($a->total_price ?? 0));
-        $filteredPaidTotal   = $filteredAppointments->sum(fn($a) => (float)$a->payments->sum('amount'));
-        $filteredOutstandingTotal = max($filteredTotalAmount - $filteredPaidTotal, 0);
-
         $cashTotal = $filteredAppointments->sum(fn($a) => (float)$a->payments->where('method', 'cash')->sum('amount'));
         $cardTotal = $filteredAppointments->sum(fn($a) => (float)$a->payments->where('method', 'card')->sum('amount'));
 
-        $appointments = $filteredAppointments;
+        /**
+         * ✅ OUTSTANDING PREVIEW (ΟΛΑ τα χρωστούμενα, χωρίς ημερομηνίες)
+         */
+        [$outstandingCount, $outstandingAmount] = $this->calcOutstandingForCustomer($customer->id);
 
+        /**
+         * 🔹 Prev/Next URLs
+         */
         $filters = [
             'range'          => $range,
             'day'            => $day,
@@ -396,6 +437,9 @@ class CustomerController extends Controller
             $selectedLabel = Carbon::createFromFormat('Y-m', $month)->locale('el')->translatedFormat('F Y');
         }
 
+        // pass to view
+        $appointments = $filteredAppointments;
+
         return view('customers.show', compact(
             'customer',
             'appointments',
@@ -408,85 +452,103 @@ class CustomerController extends Controller
 
             'cashTotal',
             'cardTotal',
+
             'filters',
             'paymentsByDate',
+
             'prevUrl',
             'nextUrl',
-            'selectedLabel'
+            'selectedLabel',
+
+            'outstandingCount',
+            'outstandingAmount'
         ));
     }
 
-    // ✅ preview: δείχνει "πόσο απομένει" στο διάστημα, με split payments
-    public function paymentPreview(Request $request, Customer $customer)
+    /**
+     * ✅ helper: outstanding για ΟΛΑ τα ραντεβού (total - sum(payments))
+     */
+    private function calcOutstandingForCustomer(int $customerId): array
     {
-        $data = $request->validate([
-            'from' => 'required|date',
-            'to'   => 'required|date|after_or_equal:from',
-        ]);
-
-        $from = Carbon::parse($data['from'])->startOfDay();
-        $to   = Carbon::parse($data['to'])->endOfDay();
-
-        $appointments = Appointment::where('customer_id', $customer->id)
-            ->whereBetween('start_time', [$from, $to])
+        $appointments = Appointment::where('customer_id', $customerId)
             ->whereNotNull('total_price')
             ->where('total_price', '>', 0)
             ->with('payments')
             ->get();
 
+        $count = 0;
         $dueTotal = 0.0;
 
         foreach ($appointments as $a) {
             $total = (float)($a->total_price ?? 0);
             $paid  = (float)$a->payments->sum('amount');
-            $dueTotal += max(0, $total - $paid);
+            $due   = max(0, $total - $paid);
+
+            if ($due > 0.0001) {
+                $count++;
+                $dueTotal += $due;
+            }
         }
 
+        return [$count, round($dueTotal, 2)];
+    }
+
+    /**
+     * ✅ (optional) ajax preview endpoint
+     */
+    public function paymentPreviewOutstanding(Request $request, Customer $customer)
+    {
+        [$count, $due] = $this->calcOutstandingForCustomer($customer->id);
+
         return response()->json([
-            'count'     => $appointments->count(),
-            'amount'    => round($dueTotal, 2),
-            'formatted' => number_format($dueTotal, 2, ',', '.') . ' €',
+            'count'     => $count,
+            'amount'    => $due,
+            'formatted' => number_format($due, 2, ',', '.') . ' €',
         ]);
     }
 
-    // ✅ split πληρωμή βάσει ημερομηνιών
-    public function payAllSplit(Request $request, Customer $customer)
+    /**
+     * ✅ ΠΛΗΡΩΝΕΙ ΟΛΑ ΤΑ ΧΡΩΣΤΟΥΜΕΝΑ (ΧΩΡΙΣ ΗΜΕΡΟΜΗΝΙΕΣ)
+     * ✅ split μετρητών: cash Y + cash N + card
+     */
+    public function payOutstandingSplit(Request $request, Customer $customer)
     {
         $data = $request->validate([
-            'from'        => 'required|date',
-            'to'          => 'required|date|after_or_equal:from',
+            // ✅ ο χρήστης διαλέγει πότε έγινε/καταχωρήθηκε η πληρωμή
+            // στείλτο από input datetime-local
+            'paid_at'       => 'required|date',
 
-            'cash_amount' => 'nullable|numeric|min:0',
-            'cash_tax'    => 'nullable|in:Y,N',
+            'cash_y_amount' => 'nullable|numeric|min:0',
+            'cash_n_amount' => 'nullable|numeric|min:0',
 
-            'card_amount' => 'nullable|numeric|min:0',
-            'card_bank'   => 'nullable|string|max:255',
+            'card_amount'   => 'nullable|numeric|min:0',
+            'card_bank'     => 'nullable|string|max:255',
 
-            'notes'       => 'nullable|string|max:1000',
-        ]);
+            'notes'         => 'nullable|string|max:1000',
+        ], [
+            'paid_at.required' => 'Πρέπει να επιλέξετε ημερομηνία/ώρα πληρωμής.',
+        ]); 
 
-        $from = Carbon::parse($data['from'])->startOfDay();
-        $to   = Carbon::parse($data['to'])->endOfDay();
+        $cashY = (float)($data['cash_y_amount'] ?? 0);
+        $cashN = (float)($data['cash_n_amount'] ?? 0);
+        $card  = (float)($data['card_amount'] ?? 0);
 
-        $cashAmount = (float)($data['cash_amount'] ?? 0);
-        $cardAmount = (float)($data['card_amount'] ?? 0);
-
-        if ($cashAmount <= 0 && $cardAmount <= 0) {
-            return back()->with('error', 'Βάλτε ποσό σε Μετρητά ή/και Κάρτα.');
+        if ($cashY <= 0 && $cashN <= 0 && $card <= 0) {
+            return back()->with('error', 'Βάλτε ποσό σε τουλάχιστον ένα πεδίο (Μετρητά με/χωρίς απόδειξη ή Κάρτα).');
         }
 
+        // ✅ paid_at από user
+        $paidAt = Carbon::parse($data['paid_at']);
+
+        // όλα τα ραντεβού του πελάτη (με ποσό)
         $appointments = Appointment::where('customer_id', $customer->id)
-            ->whereBetween('start_time', [$from, $to])
             ->whereNotNull('total_price')
             ->where('total_price', '>', 0)
-            ->orderBy('start_time')
             ->with('payments')
+            ->orderBy('start_time')
             ->get();
 
-        if ($appointments->isEmpty()) {
-            return back()->with('error', 'Δεν βρέθηκαν ραντεβού με ποσό στο επιλεγμένο διάστημα.');
-        }
-
+        // συνολικό due
         $dueTotal = 0.0;
         foreach ($appointments as $a) {
             $total = (float)$a->total_price;
@@ -494,15 +556,21 @@ class CustomerController extends Controller
             $dueTotal += max(0, $total - $paid);
         }
 
-        $incoming = $cashAmount + $cardAmount;
-
-        if ($incoming > $dueTotal + 0.0001) {
-            return back()->with('error', 'Το ποσό που δώσατε είναι μεγαλύτερο από το υπόλοιπο του διαστήματος.');
+        if ($dueTotal <= 0.0001) {
+            return back()->with('error', 'Δεν υπάρχουν χρωστούμενα ραντεβού για αυτόν τον πελάτη.');
         }
 
-        DB::transaction(function () use ($appointments, $customer, $cashAmount, $cardAmount, $data) {
+        $incoming = $cashY + $cashN + $card;
 
-            $allocate = function (float $amount, string $method) use (&$appointments, $customer, $data) {
+        if ($incoming > $dueTotal + 0.0001) {
+            return back()->with('error', 'Το ποσό που δώσατε είναι μεγαλύτερο από το συνολικό υπόλοιπο.');
+        }
+
+        DB::transaction(function () use ($appointments, $customer, $cashY, $cashN, $card, $data, $paidAt) {
+
+            $allocate = function (float $amount, string $method, string $tax, ?string $bank = null)
+                use (&$appointments, $customer, $data, $paidAt) {
+
                 $remaining = $amount;
 
                 foreach ($appointments as $a) {
@@ -516,27 +584,20 @@ class CustomerController extends Controller
 
                     $payNow = min($due, $remaining);
 
-                    if ($method === 'card') {
-                        $tax  = 'Y';
-                        $bank = $data['card_bank'] ?? null;
-                    } else {
-                        $tax  = (($data['cash_tax'] ?? 'N') === 'Y') ? 'Y' : 'N';
-                        $bank = null;
-                    }
-
                     $payment = Payment::create([
                         'appointment_id' => $a->id,
                         'customer_id'    => $customer->id,
                         'amount'         => $payNow,
-                        'is_full'        => false, // θα το μαρκάρουμε κάτω αν καλύφθηκε
-                        'paid_at'        => now(),
+                        'is_full'        => false,
+                        'paid_at'        => $paidAt,              // ✅ ΟΧΙ now()
                         'method'         => $method,
                         'tax'            => $tax,
                         'bank'           => $bank,
-                        'notes'          => $data['notes'] ?? 'Split πληρωμή βάσει διαστήματος.',
+                        'notes'          => $data['notes'] ?? 'Πληρωμή χρωστούμενων (split).',
+                        'created_by'     => Auth::id(),           // ✅ ποιος την πέρασε
                     ]);
 
-                    // update in-memory collection για να δουλεύουν τα sums στο ίδιο request
+                    // update in-memory
                     $a->payments->push($payment);
 
                     $remaining -= $payNow;
@@ -545,10 +606,16 @@ class CustomerController extends Controller
                 return $remaining;
             };
 
-            if ($cashAmount > 0) $allocate($cashAmount, 'cash');
-            if ($cardAmount > 0) $allocate($cardAmount, 'card');
+            // σειρά:
+            if ($cashY > 0) $allocate($cashY, 'cash', 'Y', null);
+            if ($cashN > 0) $allocate($cashN, 'cash', 'N', null);
 
-            // is_full: μαρκάρουμε την τελευταία πληρωμή του appointment αν πλέον καλύφθηκε
+            if ($card > 0) {
+                $bank = $data['card_bank'] ?? null;
+                $allocate($card, 'card', 'Y', $bank);
+            }
+
+            // is_full στο τελευταίο payment κάθε appointment αν καλύφθηκε
             foreach ($appointments as $a) {
                 $total = (float)$a->total_price;
                 $paid  = (float)$a->payments->sum('amount');
@@ -567,9 +634,47 @@ class CustomerController extends Controller
             }
         });
 
-        return back()->with('success', 'Η split πληρωμή καταχωρήθηκε επιτυχώς.');
+        return back()->with('success', 'Η πληρωμή καταχωρήθηκε επιτυχώς.');
     }
 
+    /**
+     * ✅ Διαγραφή πληρωμών grouped ανά ημέρα (paid_at)
+     */
+    public function destroyPaymentsByDay(Request $request, Customer $customer)
+    {
+        $data = $request->validate([
+            'day_key' => 'required|string',
+        ]);
+
+        $dayKey = $data['day_key'];
+
+        // χωρίς ημερομηνία
+        if ($dayKey === 'no-date') {
+            $deleted = Payment::where('customer_id', $customer->id)
+                ->whereNull('paid_at')
+                ->delete();
+
+            return back()->with('success', "Διαγράφηκαν {$deleted} πληρωμές (χωρίς ημερομηνία).");
+        }
+
+        // Y-m-d
+        try {
+            $start = Carbon::createFromFormat('Y-m-d', $dayKey)->startOfDay();
+            $end   = Carbon::createFromFormat('Y-m-d', $dayKey)->endOfDay();
+        } catch (\Exception $e) {
+            return back()->with('error', 'Μη έγκυρη ημερομηνία.');
+        }
+
+        $deleted = Payment::where('customer_id', $customer->id)
+            ->whereBetween('paid_at', [$start, $end])
+            ->delete();
+
+        return back()->with('success', "Διαγράφηκαν {$deleted} πληρωμές για {$dayKey}.");
+    }
+
+    /**
+     * ✅ Delete appointments (soft delete) selected
+     */
     public function deleteAppointments(Request $request, Customer $customer)
     {
         $appointmentIds = $request->input('appointments', []);
@@ -587,52 +692,9 @@ class CustomerController extends Controller
         }
 
         foreach ($appointments as $appointment) {
-            $appointment->delete();
+            $appointment->delete(); // soft delete
         }
 
         return back()->with('success', 'Τα επιλεγμένα ραντεβού διαγράφηκαν επιτυχώς.');
     }
-
-    public function destroy(Customer $customer)
-    {
-        $customer->delete();
-
-        return redirect()
-            ->route('customers.index')
-            ->with('success', 'Ο πελάτης διαγράφηκε επιτυχώς.');
-    }
-
-    public function destroyPaymentsByDay(Request $request, Customer $customer)
-    {
-        $data = $request->validate([
-            'day_key' => 'required|string',
-        ]);
-
-        $dayKey = $data['day_key'];
-
-        // Special case: πληρωμές χωρίς ημερομηνία
-        if ($dayKey === 'no-date') {
-            $deleted = Payment::where('customer_id', $customer->id)
-                ->whereNull('paid_at')
-                ->delete();
-
-            return back()->with('success', "Διαγράφηκαν {$deleted} πληρωμές (χωρίς ημερομηνία).");
-        }
-
-        // Κανονική ημερομηνία Y-m-d
-        try {
-            $start = \Carbon\Carbon::createFromFormat('Y-m-d', $dayKey)->startOfDay();
-            $end   = \Carbon\Carbon::createFromFormat('Y-m-d', $dayKey)->endOfDay();
-        } catch (\Exception $e) {
-            return back()->with('error', 'Μη έγκυρη ημερομηνία.');
-        }
-
-        $deleted = Payment::where('customer_id', $customer->id)
-            ->whereBetween('paid_at', [$start, $end])
-            ->delete();
-
-        return back()->with('success', "Διαγράφηκαν {$deleted} πληρωμές για {$dayKey}.");
-    }
-
-
 }

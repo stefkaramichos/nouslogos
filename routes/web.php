@@ -136,14 +136,14 @@ Route::middleware('auth')->group(function () {
         [CustomerController::class, 'paymentPreview']
     )->name('customers.paymentPreview');
 
-    Route::post('/customers/{customer}/pay-all-split', [CustomerController::class, 'payAllSplit'])
-        ->name('customers.payAllSplit');
-
-    Route::get('/customers/{customer}/payment-preview', [CustomerController::class, 'paymentPreview'])
-        ->name('customers.paymentPreview');
-
-    Route::delete('/customers/{customer}/payments-by-day', [CustomerController::class, 'destroyPaymentsByDay'])
+    Route::delete('/customers/{customer}/payments/by-day', [CustomerController::class, 'destroyPaymentsByDay'])
         ->name('customers.payments.destroyByDay');
+
+    Route::get('/customers/{customer}/payments/preview-outstanding', [CustomerController::class, 'paymentPreviewOutstanding'])
+        ->name('customers.paymentPreviewOutstanding');
+
+    Route::post('/customers/{customer}/payments/pay-outstanding-split', [CustomerController::class, 'payOutstandingSplit'])
+        ->name('customers.payOutstandingSplit');
 
 });
 

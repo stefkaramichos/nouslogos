@@ -442,80 +442,92 @@
                 </table>
             </div>
 
-             {{-- ===================== SPLIT PAYMENT FORM + PREVIEW ===================== --}}
+            {{-- ===================== OUTSTANDING SPLIT PAYMENT (NO DATES) ===================== --}}
             <div class="border rounded p-3 mb-3" style="background:#f8f9fa">
-                <h6 class="mb-2">💶 Πληρωμή βάσει ημερομηνιών</h6>
+                <h6 class="mb-2">💶 Πληρωμή όλων των χρωστούμενων ραντεβού</h6>
 
-                {{-- Preview box --}}
-                <div id="paymentPreviewBox" class="border rounded p-3 mb-3 bg-white">
+                {{-- Preview box (server-side) --}}
+                <div class="border rounded p-3 mb-3 bg-white">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="text-muted small">
-                            Ραντεβού στο διάστημα: <strong><span id="previewCount">0</span></strong>
+                            Χρωστούμενα ραντεβού: <strong>{{ $outstandingCount ?? 0 }}</strong>
                         </div>
                         <div class="fs-5 fw-bold">
-                            Υπόλοιπο: <span id="previewAmount">0,00 €</span>
+                            Υπόλοιπο: <span>{{ number_format($outstandingAmount ?? 0, 2, ',', '.') }} €</span>
                         </div>
                     </div>
-                    <div id="previewHint" class="text-muted small mt-2">
-                        Επιλέξτε πρώτα <strong>Από</strong> και <strong>Μέχρι</strong> για να εμφανιστεί το υπόλοιπο.
-                    </div>
+                    @if(($outstandingAmount ?? 0) <= 0)
+                        <div class="text-muted small mt-2">
+                            Δεν υπάρχουν χρωστούμενα.
+                        </div>
+                    @else
+                        <div class="text-muted small mt-2">
+                            Συμπλήρωσε ποσά. Μπορείς να κάνεις split ακόμα και στα μετρητά (με/χωρίς απόδειξη).
+                        </div>
+                    @endif
                 </div>
 
-                {{-- Split form --}}
-                <form id="payAllSplitForm"
-                      method="POST"
-                      action="{{ route('customers.payAllSplit', $customer) }}">
+                <form method="POST" action="{{ route('customers.payOutstandingSplit', $customer) }}">
                     @csrf
 
                     <div class="row g-2 align-items-end">
+                        {{-- CASH WITH RECEIPT --}}
                         <div class="col-md-2">
-                            <label class="form-label">Από</label>
-                            <input type="date" name="from" id="split_from" class="form-control" required>
+                            <label class="form-label">Μετρητά (Με απόδειξη) €</label>
+                            <input type="number" step="0.01" min="0" name="cash_y_amount"
+                                class="form-control" placeholder="0.00">
                         </div>
 
+                        {{-- CASH WITHOUT RECEIPT --}}
                         <div class="col-md-2">
-                            <label class="form-label">Μέχρι</label>
-                            <input type="date" name="to" id="split_to" class="form-control" required>
+                            <label class="form-label">Μετρητά (Χωρίς απόδειξη) €</label>
+                            <input type="number" step="0.01" min="0" name="cash_n_amount"
+                                class="form-control" placeholder="0.00">
                         </div>
 
+                        {{-- CARD --}}
                         <div class="col-md-2">
-                            <label class="form-label">Μετρητά (€)</label>
-                            <input type="number" step="0.01" min="0" name="cash_amount" class="form-control" placeholder="0.00">
-                        </div>
-
-                        <div class="col-md-2">
-                            <label class="form-label">Μετρητά: Απόδειξη</label>
-                            <select name="cash_tax" class="form-select">
-                                <option value="Y">Με απόδειξη</option>
-                                <option value="N" selected>Χωρίς απόδειξη</option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-2">
-                            <label class="form-label">Κάρτα (€)</label>
-                            <input type="number" step="0.01" min="0" name="card_amount" class="form-control" placeholder="0.00">
+                            <label class="form-label">Κάρτα €</label>
+                            <input type="number" step="0.01" min="0" name="card_amount"
+                                class="form-control" placeholder="0.00">
                         </div>
 
                         <div class="col-md-2">
                             <label class="form-label">Τράπεζα (Κάρτα)</label>
-                            <input type="text" name="card_bank" class="form-control" maxlength="255" placeholder="π.χ. Alpha">
+                            <input type="text" name="card_bank" class="form-control" maxlength="255"
+                                placeholder="π.χ. Alpha">
                         </div>
 
-                        {{-- <div class="col-md-10 mt-2">
-                            <label class="form-label">Σημείωση</label>
+                        <div class="col-md-2">
+                            <label class="form-label">Ημερομηνία Πληρωμής</label>
+                            <input
+                                type="date"
+                                name="paid_at"
+                                class="form-control"
+                                value="{{ now()->toDateString() }}"
+                                required
+                            >
+                        </div>
+
+
+                        {{-- <div class="col-md-9 mt-2">
+                            <label class="form-label">Σημείωση (προαιρετικό)</label>
                             <input type="text" name="notes" class="form-control" maxlength="1000"
-                                   placeholder="π.χ. Split πληρωμή βάσει διαστήματος">
+                                placeholder="π.χ. Πληρωμή χρωστούμενων (split).">
                         </div> --}}
 
                         <div class="col-md-2 mt-2 text-end">
-                            <button type="submit" class="btn btn-success w-100">
+                            <button type="submit"
+                                    class="btn btn-success w-100"
+                                    onclick="return confirm('Θέλετε να καταχωρήσετε αυτή την πληρωμή σε ΟΛΑ τα χρωστούμενα ραντεβού;');">
                                 💶 Καταχώρηση Πληρωμής
                             </button>
                         </div>
                     </div>
                 </form>
             </div>
-            {{-- ===================== /SPLIT PAYMENT ===================== --}}
+            {{-- ===================== /OUTSTANDING SPLIT PAYMENT ===================== --}}
+
 
         </div>
     </div>
