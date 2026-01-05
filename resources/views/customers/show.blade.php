@@ -56,12 +56,32 @@
                             @endphp
 
                             <div class="mb-2">
-                                <div>
-                                    <strong>{{ $dateLabel }}</strong>
-                                    <span class="badge bg-primary ms-1">
-                                        {{ number_format($dayTotal, 2, ',', '.') }} €
-                                    </span>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ $dateLabel }}</strong>
+                                        <span class="badge bg-primary ms-1">
+                                            {{ number_format($dayTotal, 2, ',', '.') }} €
+                                        </span>
+                                    </div>
+
+                                    <form method="POST"
+                                        action="{{ route('customers.payments.destroyByDay', $customer) }}"
+                                        class="m-0"
+                                        onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε ΟΛΕΣ τις πληρωμές αυτής της ημέρας;');">
+                                        @csrf
+                                        @method('DELETE')
+
+                                        {{-- περνάμε το group key --}}
+                                        <input type="hidden"
+                                            name="day_key"
+                                            value="{{ $dateKey === 'Χωρίς ημερομηνία' ? 'no-date' : $dateKey }}">
+
+                                        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">
+                                            Διαγραφή Πληρωμής
+                                        </button>
+                                    </form>
                                 </div>
+
 
                                 @foreach($dayPayments as $payment)
                                     <div class="text-muted" style="font-size: 0.75rem;">
@@ -489,7 +509,7 @@
 
                         <div class="col-md-2 mt-2 text-end">
                             <button type="submit" class="btn btn-success w-100">
-                                💶 Καταχώρηση Split
+                                💶 Καταχώρηση Πληρωμής
                             </button>
                         </div>
                     </div>

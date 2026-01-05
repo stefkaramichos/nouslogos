@@ -601,4 +601,38 @@ class CustomerController extends Controller
             ->route('customers.index')
             ->with('success', 'Ο πελάτης διαγράφηκε επιτυχώς.');
     }
+
+    public function destroyPaymentsByDay(Request $request, Customer $customer)
+    {
+        $data = $request->validate([
+            'day_key' => 'required|string',
+        ]);
+
+        $dayKey = $data['day_key'];
+
+        // Special case: πληρωμές χωρίς ημερομηνία
+        if ($dayKey === 'no-date') {
+            $deleted = Payment::where('customer_id', $customer->id)
+                ->whereNull('paid_at')
+                ->delete();
+
+            return back()->with('success', "Διαγράφηκαν {$deleted} πληρωμές (χωρίς ημερομηνία).");
+        }
+
+        // Κανονική ημερομηνία Y-m-d
+        try {
+            $start = \Carbon\Carbon::createFromFormat('Y-m-d', $dayKey)->startOfDay();
+            $end   = \Carbon\Carbon::createFromFormat('Y-m-d', $dayKey)->endOfDay();
+        } catch (\Exception $e) {
+            return back()->with('error', 'Μη έγκυρη ημερομηνία.');
+        }
+
+        $deleted = Payment::where('customer_id', $customer->id)
+            ->whereBetween('paid_at', [$start, $end])
+            ->delete();
+
+        return back()->with('success', "Διαγράφηκαν {$deleted} πληρωμές για {$dayKey}.");
+    }
+
+
 }

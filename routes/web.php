@@ -142,6 +142,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/customers/{customer}/payment-preview', [CustomerController::class, 'paymentPreview'])
         ->name('customers.paymentPreview');
 
+    Route::delete('/customers/{customer}/payments-by-day', [CustomerController::class, 'destroyPaymentsByDay'])
+        ->name('customers.payments.destroyByDay');
 
 });
 
