@@ -16,102 +16,102 @@ use Carbon\Carbon;
 class AppointmentController extends Controller
 {
    public function index(Request $request)
-{
-    // dropdown lists
-    $customers     = Customer::orderBy('last_name')->get();
-    $professionals = Professional::orderBy('last_name')->get();
-    $companies     = Company::orderBy('name')->get();
+    {
+        // dropdown lists
+        $customers     = Customer::orderBy('last_name')->get();
+        $professionals = Professional::orderBy('last_name')->get();
+        $companies     = Company::orderBy('name')->get();
 
-    // filters
-    $from = $request->input('from');
-    $to   = $request->input('to');
+        // filters
+        $from = $request->input('from');
+        $to   = $request->input('to');
 
-    if (!$request->hasAny(['from','to','customer_id','professional_id','company_id','status','payment_status','payment_method'])) {
-        $from = now()->toDateString();
-        $to   = now()->toDateString();
+        if (!$request->hasAny(['from','to','customer_id','professional_id','company_id','status','payment_status','payment_method'])) {
+            $from = now()->toDateString();
+            $to   = now()->toDateString();
+        }
+
+        $customerId     = $request->input('customer_id');
+        $professionalId = $request->input('professional_id');
+        $companyId      = $request->input('company_id');
+        $status         = $request->input('status');
+        $paymentStatus  = $request->input('payment_status');
+        $paymentMethod  = $request->input('payment_method');
+
+        // ✅ base query (payments όχι payment)
+        $query = Appointment::with(['customer', 'professional', 'company', 'payments'])
+            ->orderBy('start_time', 'desc');
+
+        if ($from) $query->whereDate('start_time', '>=', $from);
+        if ($to)   $query->whereDate('start_time', '<=', $to);
+
+        if ($customerId)     $query->where('customer_id', $customerId);
+        if ($professionalId) $query->where('professional_id', $professionalId);
+        if ($companyId)      $query->where('company_id', $companyId);
+
+        if ($status && $status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        $appointments = $query->get();
+
+        // ✅ payment_status filter (με βάση paid_total)
+        if ($paymentStatus && $paymentStatus !== 'all') {
+            $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
+                $total = (float) ($a->total_price ?? 0);
+                $paid  = (float) $a->payments->sum('amount');
+
+                if ($paymentStatus === 'unpaid')  return $paid <= 0;
+                if ($paymentStatus === 'partial') return $paid > 0 && $paid < $total;
+                if ($paymentStatus === 'full')    return $total > 0 && $paid >= $total;
+
+                return true;
+            });
+        }
+
+        // ✅ payment_method filter (υπάρχει έστω μία πληρωμή με method)
+        if ($paymentMethod && $paymentMethod !== 'all') {
+            $appointments = $appointments->filter(function ($a) use ($paymentMethod) {
+                return $a->payments->where('method', $paymentMethod)->sum('amount') > 0;
+            });
+        }
+
+        // manual pagination (25 per page)
+        $perPage = 25;
+        $currentPage = Paginator::resolveCurrentPage() ?: 1;
+
+        $currentItems = $appointments->values()->forPage($currentPage, $perPage);
+
+        $appointments = new LengthAwarePaginator(
+            $currentItems,
+            $appointments->count(),
+            $perPage,
+            $currentPage,
+            [
+                'path'  => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
+
+        $filters = [
+            'from'            => $from,
+            'to'              => $to,
+            'customer_id'     => $customerId,
+            'professional_id' => $professionalId,
+            'company_id'      => $companyId,
+            'status'          => $status ?? 'all',
+            'payment_status'  => $paymentStatus ?? 'all',
+            'payment_method'  => $paymentMethod ?? 'all',
+        ];
+
+        return view('appointments.index', compact(
+            'appointments',
+            'filters',
+            'customers',
+            'professionals',
+            'companies'
+        ));
     }
-
-    $customerId     = $request->input('customer_id');
-    $professionalId = $request->input('professional_id');
-    $companyId      = $request->input('company_id');
-    $status         = $request->input('status');
-    $paymentStatus  = $request->input('payment_status');
-    $paymentMethod  = $request->input('payment_method');
-
-    // ✅ base query (payments όχι payment)
-    $query = Appointment::with(['customer', 'professional', 'company', 'payments'])
-        ->orderBy('start_time', 'desc');
-
-    if ($from) $query->whereDate('start_time', '>=', $from);
-    if ($to)   $query->whereDate('start_time', '<=', $to);
-
-    if ($customerId)     $query->where('customer_id', $customerId);
-    if ($professionalId) $query->where('professional_id', $professionalId);
-    if ($companyId)      $query->where('company_id', $companyId);
-
-    if ($status && $status !== 'all') {
-        $query->where('status', $status);
-    }
-
-    $appointments = $query->get();
-
-    // ✅ payment_status filter (με βάση paid_total)
-    if ($paymentStatus && $paymentStatus !== 'all') {
-        $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
-            $total = (float) ($a->total_price ?? 0);
-            $paid  = (float) $a->payments->sum('amount');
-
-            if ($paymentStatus === 'unpaid')  return $paid <= 0;
-            if ($paymentStatus === 'partial') return $paid > 0 && $paid < $total;
-            if ($paymentStatus === 'full')    return $total > 0 && $paid >= $total;
-
-            return true;
-        });
-    }
-
-    // ✅ payment_method filter (υπάρχει έστω μία πληρωμή με method)
-    if ($paymentMethod && $paymentMethod !== 'all') {
-        $appointments = $appointments->filter(function ($a) use ($paymentMethod) {
-            return $a->payments->where('method', $paymentMethod)->sum('amount') > 0;
-        });
-    }
-
-    // manual pagination (25 per page)
-    $perPage = 25;
-    $currentPage = Paginator::resolveCurrentPage() ?: 1;
-
-    $currentItems = $appointments->values()->forPage($currentPage, $perPage);
-
-    $appointments = new LengthAwarePaginator(
-        $currentItems,
-        $appointments->count(),
-        $perPage,
-        $currentPage,
-        [
-            'path'  => $request->url(),
-            'query' => $request->query(),
-        ]
-    );
-
-    $filters = [
-        'from'            => $from,
-        'to'              => $to,
-        'customer_id'     => $customerId,
-        'professional_id' => $professionalId,
-        'company_id'      => $companyId,
-        'status'          => $status ?? 'all',
-        'payment_status'  => $paymentStatus ?? 'all',
-        'payment_method'  => $paymentMethod ?? 'all',
-    ];
-
-    return view('appointments.index', compact(
-        'appointments',
-        'filters',
-        'customers',
-        'professionals',
-        'companies'
-    ));
-}
 
 
     public function getLastForCustomer(Request $request)

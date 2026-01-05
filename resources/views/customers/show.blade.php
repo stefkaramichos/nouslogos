@@ -473,14 +473,14 @@
                     <div class="row g-2 align-items-end">
                         {{-- CASH WITH RECEIPT --}}
                         <div class="col-md-2">
-                            <label class="form-label">Μετρητά (Με απόδειξη) €</label>
+                            <label class="form-label">Μετρητά (ΜΑ) €</label>
                             <input type="number" step="0.01" min="0" name="cash_y_amount"
                                 class="form-control" placeholder="0.00">
                         </div>
 
                         {{-- CASH WITHOUT RECEIPT --}}
                         <div class="col-md-2">
-                            <label class="form-label">Μετρητά (Χωρίς απόδειξη) €</label>
+                            <label class="form-label">Μετρητά (ΧΑ) €</label>
                             <input type="number" step="0.01" min="0" name="cash_n_amount"
                                 class="form-control" placeholder="0.00">
                         </div>

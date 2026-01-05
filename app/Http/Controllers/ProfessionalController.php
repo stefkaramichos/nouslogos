@@ -59,7 +59,7 @@ class ProfessionalController extends Controller
                         })
                         ->orWhereHas('customers', function ($q) use ($search) {
                             $q->where('first_name', 'like', "%{$search}%")
-                            ->orWhere('last_name', 'like', "%{$search}%");
+                                ->orWhere('last_name', 'like', "%{$search}%");
                         });
                 });
             })
@@ -72,12 +72,9 @@ class ProfessionalController extends Controller
             'professionals' => $professionals,
             'search'        => $search,
             'companies'     => $companies,
-            'companyId'     => $companyId, // ✅ for active button + hidden input
+            'companyId'     => $companyId,
         ]);
     }
-
-
-
 
     public function create()
     {
@@ -101,7 +98,6 @@ class ProfessionalController extends Controller
                 'companies'      => 'required|array',
                 'companies.*'    => 'exists:companies,id',
 
-                // ✅ ΝΕΟ: παιδιά για τον επαγγελματία (many-to-many)
                 'customers'      => 'nullable|array',
                 'customers.*'    => 'exists:customers,id',
 
@@ -118,20 +114,16 @@ class ProfessionalController extends Controller
             ]
         );
 
-        // Hash password
         $data['password'] = Hash::make($request->password);
 
-        // Αποθήκευση εικόνας προφίλ, αν υπάρχει
         if ($request->hasFile('profile_image')) {
             $path = $request->file('profile_image')->store('professionals', 'public');
             $data['profile_image'] = $path;
         }
 
-        // Πάρε τις εταιρείες
         $companyIds = $data['companies'];
         unset($data['companies']);
 
-        // ✅ Πάρε τα παιδιά (προαιρετικά)
         $customerIds = $data['customers'] ?? [];
         unset($data['customers']);
 
@@ -139,10 +131,7 @@ class ProfessionalController extends Controller
 
         $professional = Professional::create($data);
 
-        // Sync εταιρειών
         $professional->companies()->sync($companyIds);
-
-        // ✅ Sync παιδιών (many-to-many)
         $professional->customers()->sync($customerIds);
 
         return redirect()
@@ -170,7 +159,6 @@ class ProfessionalController extends Controller
         $companies = Company::all();
         $customers = Customer::orderBy('last_name')->orderBy('first_name')->get();
 
-        // για να είναι διαθέσιμα στο view (edit) τα τρέχοντα children
         $professional->load('customers', 'companies');
 
         return view('professionals.edit', compact('professional', 'companies', 'customers'));
@@ -192,7 +180,6 @@ class ProfessionalController extends Controller
 
     public function update(Request $request, Professional $professional)
     {
-        // Βασικοί κανόνες για όλους
         $rules = [
             'first_name'     => 'required|string|max:100',
             'last_name'      => 'nullable|string|max:100',
@@ -204,7 +191,6 @@ class ProfessionalController extends Controller
             'companies'      => 'required|array',
             'companies.*'    => 'exists:companies,id',
 
-            // ✅ ΝΕΟ: παιδιά για τον επαγγελματία (many-to-many)
             'customers'      => 'nullable|array',
             'customers.*'    => 'exists:customers,id',
 
@@ -215,30 +201,23 @@ class ProfessionalController extends Controller
             'profile_image'  => 'nullable|image|mimes:jpeg,png,jpg,webp,gif',
         ];
 
-        // Αν ο τρέχων χρήστης είναι owner, επιτρέπουμε αλλαγή κωδικού
         if (Auth::user()->role === 'owner') {
             $rules['password'] = 'nullable|string|min:6|confirmed';
         }
 
         $messages = [
             'first_name.required' => 'Το μικρό όνομα είναι υποχρεωτικό.',
-            'last_name.required'  => 'Το επίθετο είναι υποχρεωτικό.',
-            // 'phone.required'      => 'Το τηλέφωνο είναι υποχρεωτικό.', // το έχεις nullable πάνω
             'password.confirmed'  => 'Οι κωδικοί δεν ταιριάζουν.',
             'password.min'        => 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες.',
         ];
 
         $data = $request->validate($rules, $messages);
 
-        // Password για owner
         if (Auth::user()->role === 'owner' && !empty($data['password'])) {
             $professional->password = Hash::make($data['password']);
         }
 
-        // Κρατάμε τις εταιρείες ξεχωριστά
-        $companyIds = $data['companies'] ?? [];
-
-        // ✅ Κρατάμε και τα παιδιά ξεχωριστά
+        $companyIds  = $data['companies'] ?? [];
         $customerIds = $data['customers'] ?? [];
 
         unset(
@@ -249,29 +228,23 @@ class ProfessionalController extends Controller
         );
 
         if ($request->hasFile('profile_image')) {
-            // σβήσε παλιά αν υπάρχει
             if ($professional->profile_image) {
                 Storage::disk('public')->delete($professional->profile_image);
             }
-
             $path = $request->file('profile_image')->store('professionals', 'public');
             $data['profile_image'] = $path;
         }
 
-        // ενημέρωσε και το legacy company_id με την πρώτη εταιρεία
         if (!empty($companyIds)) {
             $data['company_id'] = $companyIds[0];
         }
 
-        // Update βασικών πεδίων
         $professional->update($data);
 
-        // Sync εταιρειών
         if (!empty($companyIds)) {
             $professional->companies()->sync($companyIds);
         }
 
-        // ✅ Sync παιδιών (αν δεν επιλέξεις κανένα, θα αδειάσει)
         $professional->customers()->sync($customerIds);
 
         return redirect()
@@ -290,26 +263,27 @@ class ProfessionalController extends Controller
 
     public function show(Request $request, Professional $professional)
     {
-        // Παίρνουμε τα φίλτρα από το request
-        $from           = $request->input('from');            // date
-        $to             = $request->input('to');              // date
-        $customerName   = $request->input('customer');        // text
-        $paymentStatus  = $request->input('payment_status');  // all / unpaid / partial / full
-        $paymentMethod  = $request->input('payment_method');  // all / cash / card
+        // Φίλτρα
+        $from         = $request->input('from');
+        $to           = $request->input('to');
+        $customerName = $request->input('customer');
 
-        // ✅ Default: σημερινή ημέρα, αν δεν έχει σταλεί ΚΑΝΕΝΑ φίλτρο
+        // (κρατάω τα πεδία για να μη σπάσουν links, αλλά δεν τα εμφανίζεις τώρα στο view)
+        $paymentStatus = $request->input('payment_status'); // all/unpaid/partial/full
+        $paymentMethod = $request->input('payment_method'); // all/cash/card
+
+        // ✅ Default: σημερινή ημέρα αν δεν έχει δοθεί τίποτα
         if (!$request->hasAny(['from', 'to', 'customer', 'payment_status', 'payment_method'])) {
             $from = now()->toDateString();
             $to   = now()->toDateString();
         }
 
-        // ----------------- MAIN APPOINTMENTS -----------------
+        // ----------------- MAIN APPOINTMENTS (με payments) -----------------
         $appointmentsCollection = $professional->appointments()
-            ->with(['customer', 'company', 'payment'])
+            ->with(['customer', 'company', 'payments']) // ✅ ΟΧΙ payment
             ->orderBy('start_time', 'desc')
             ->get();
 
-        // Φίλτρα πάνω στην collection (appointments)
         $filteredAppointments = $appointmentsCollection;
 
         if ($from) {
@@ -327,85 +301,68 @@ class ProfessionalController extends Controller
         if ($customerName) {
             $name = mb_strtolower($customerName);
             $filteredAppointments = $filteredAppointments->filter(function ($a) use ($name) {
-                if (!$a->customer) {
-                    return false;
-                }
-                $full    = mb_strtolower($a->customer->first_name.' '.$a->customer->last_name);
-                $fullRev = mb_strtolower($a->customer->last_name.' '.$a->customer->first_name);
+                if (!$a->customer) return false;
+
+                $full    = mb_strtolower($a->customer->first_name . ' ' . $a->customer->last_name);
+                $fullRev = mb_strtolower($a->customer->last_name . ' ' . $a->customer->first_name);
+
                 return str_contains($full, $name) || str_contains($fullRev, $name);
             });
         }
 
+        // ✅ payment status με βάση SUM(payments)
         if ($paymentStatus && $paymentStatus !== 'all') {
             $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentStatus) {
-                $total = $a->total_price ?? 0;
-                $paid  = $a->payment->amount ?? 0;
+                $total = (float)($a->total_price ?? 0);
+                $paid  = (float)$a->payments->sum('amount');
 
-                if ($paymentStatus === 'unpaid') {
-                    return $paid <= 0;
-                }
-
-                if ($paymentStatus === 'partial') {
-                    return $paid > 0 && $paid < $total;
-                }
-
-                if ($paymentStatus === 'full') {
-                    return $total > 0 && $paid >= $total;
-                }
-
-                return true;
+                return match ($paymentStatus) {
+                    'unpaid'  => $paid <= 0,
+                    'partial' => $paid > 0 && $paid < $total,
+                    'full'    => $total > 0 && $paid >= $total,
+                    default   => true,
+                };
             });
         }
 
+        // ✅ method: αν έχει έστω μία πληρωμή με το method
         if ($paymentMethod && $paymentMethod !== 'all') {
             $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentMethod) {
-                if (!$a->payment) {
-                    return false;
-                }
-                return $a->payment->method === $paymentMethod;
+                return $a->payments->contains(fn($p) => $p->method === $paymentMethod);
             });
         }
 
-        // Μετά τα φίλτρα – ΣΤΑΤΙΣΤΙΚΑ ΣΕ ΟΛΑ ΤΑ ΦΙΛΤΡΑΡΙΣΜΕΝΑ
+        // Στατιστικά στα φιλτραρισμένα
         $appointmentsCount = $filteredAppointments->count();
-        $totalAmount = $filteredAppointments->sum(fn($a) => $a->total_price ?? 0);
+
+        $totalAmount = $filteredAppointments->sum(fn($a) => (float)($a->total_price ?? 0));
 
         $professionalTotalCut = $filteredAppointments->sum(function ($a) use ($professional) {
-            if (!is_null($a->professional_amount)) {
-                return $a->professional_amount;
-            }
-            return $professional->percentage_cut;
+            // αν το ραντεβού έχει override, πάρε το, αλλιώς default του επαγγελματία
+            return (float)($a->professional_amount ?? $professional->percentage_cut ?? 0);
         });
 
-        $paidTotal = $filteredAppointments->sum(fn($a) => $a->payment->amount ?? 0);
+        $paidTotal = $filteredAppointments->sum(fn($a) => (float)$a->payments->sum('amount'));
         $outstandingTotal = max($totalAmount - $paidTotal, 0);
 
+        // Πόσο "θεωρείται" πληρωμένος ο επαγγελματίας (μόνο όταν appointment είναι fully paid)
         $professionalPaid = $filteredAppointments->sum(function ($a) {
-            if (!$a->payment) {
-                return 0;
-            }
-            $total = $a->total_price ?? 0;
-            $paid  = $a->payment->amount ?? 0;
+            $total = (float)($a->total_price ?? 0);
+            $paid  = (float)$a->payments->sum('amount');
 
             return ($total > 0 && $paid >= $total)
-                ? ($a->professional_amount ?? 0)
-                : 0;
+                ? (float)($a->professional_amount ?? 0)
+                : 0.0;
         });
 
         $professionalOutstanding = max($professionalTotalCut - $professionalPaid, 0);
 
-        // ----------------- THERAPIST APPOINTMENTS ΜΕ ΦΙΛΤΡΑ -----------------
-
+        // ----------------- THERAPIST APPOINTMENTS (προσωπικό ημερολόγιο θεραπευτή) -----------------
         $therapistQuery = TherapistAppointment::with('customer')
             ->where('professional_id', $professional->id);
 
-        if ($from) {
-            $therapistQuery->whereDate('start_time', '>=', $from);
-        }
-
-        if ($to) {
-            $therapistQuery->whereDate('start_time', '<=', $to);
-        }
+        if ($from) $therapistQuery->whereDate('start_time', '>=', $from);
+        if ($to)   $therapistQuery->whereDate('start_time', '<=', $to);
 
         if ($customerName) {
             $name = mb_strtolower($customerName);
@@ -417,11 +374,11 @@ class ProfessionalController extends Controller
 
         $therapistAppointments = $therapistQuery->get();
 
-        // Map για main appointments (customer + date) για εύκολο matching
+        // Matching main vs therapist appointments by (customer_id + date)
         $mainKeys = [];
         foreach ($filteredAppointments as $a) {
             if ($a->customer_id && $a->start_time) {
-                $key = $a->customer_id.'|'.$a->start_time->toDateString();
+                $key = $a->customer_id . '|' . $a->start_time->toDateString();
                 $mainKeys[$key] = true;
             }
         }
@@ -430,11 +387,9 @@ class ProfessionalController extends Controller
         $therapistMissing = [];
 
         foreach ($therapistAppointments as $ta) {
-            if (!$ta->start_time) {
-                continue;
-            }
+            if (!$ta->start_time) continue;
 
-            $key = $ta->customer_id.'|'.$ta->start_time->toDateString();
+            $key = $ta->customer_id . '|' . $ta->start_time->toDateString();
 
             if (isset($mainKeys[$key])) {
                 $therapistMatches[$key] = true;
@@ -443,7 +398,7 @@ class ProfessionalController extends Controller
             }
         }
 
-        // ✅ Manual pagination για τα φιλτραρισμένα ραντεβού
+        // ✅ Manual pagination για filtered appointments
         $perPage = 25;
         $currentPage = Paginator::resolveCurrentPage() ?: 1;
 
@@ -458,7 +413,7 @@ class ProfessionalController extends Controller
             $currentPage,
             [
                 'path'  => $request->url(),
-                'query' => $request->query(), // κρατάμε τα φίλτρα στα links
+                'query' => $request->query(),
             ]
         );
 
