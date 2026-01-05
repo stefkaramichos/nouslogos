@@ -89,6 +89,7 @@
                         <option value="ergotherapia"  @selected($oldStatus === 'ergotherapia')>Εργοθεραπεία</option>
                         <option value="omadiki"       @selected($oldStatus === 'omadiki')>Ομαδική</option>
                         <option value="eidikos"       @selected($oldStatus === 'eidikos')>Ειδικός παιδαγωγός</option>
+                        <option value="aksiologisi"   @selected($oldStatus === 'aksiologisi')>Αξιολόγηση</option>
                     </select>
                 </div>
 

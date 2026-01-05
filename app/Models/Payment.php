@@ -17,6 +17,7 @@ class Payment extends Model
         'paid_at',
         'method',
         'tax',
+        'bank',
         'notes',
     ];
 

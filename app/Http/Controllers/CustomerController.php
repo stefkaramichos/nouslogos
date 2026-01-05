@@ -19,6 +19,27 @@ use Illuminate\Support\Str;
 class CustomerController extends Controller
 {
 
+
+    public function view(Customer $customer, CustomerFile $file)
+    {
+        if ((int)$file->customer_id !== (int)$customer->id) {
+            abort(403);
+        }
+
+        $disk = $file->disk ?? 'local';
+
+        if (!Storage::disk($disk)->exists($file->path)) {
+            abort(404, 'Το αρχείο δεν βρέθηκε.');
+        }
+
+        return Storage::disk($disk)->response(
+            $file->path,
+            $file->original_name,
+            ['Content-Disposition' => 'inline']
+        );
+    }
+
+
     public function index(Request $request)
     {
         $search = $request->input('search');
@@ -90,16 +111,19 @@ class CustomerController extends Controller
         $size = $uploaded->getSize();
 
         // αποθήκευση στο storage/app/customer-files/{customer_id}/
+        $disk = 'local'; // ✅
+
         $storedName = Str::random(12) . '_' . time() . '_' . preg_replace('/\s+/', '_', $originalName);
-        $dir = "customer-files/{$customer->id}";
-        $path = $uploaded->storeAs($dir, $storedName); // default disk = local
+        $dir  = "customer-files/{$customer->id}";
+        $path = $uploaded->storeAs($dir, $storedName, $disk); // ✅
 
         CustomerFile::create([
             'customer_id'    => $customer->id,
-            'uploaded_by'    => Auth::user()?->id, // professional id
+            'uploaded_by'    => Auth::user()?->id,
             'original_name'  => $originalName,
             'stored_name'    => $storedName,
             'path'           => $path,
+            'disk'           => $disk, // ✅ ΠΟΛΥ ΣΗΜΑΝΤΙΚΟ
             'mime_type'      => $mime,
             'size'           => $size,
             'notes'          => $request->input('notes'),
@@ -110,17 +134,19 @@ class CustomerController extends Controller
 
     public function downloadFile(Customer $customer, CustomerFile $file)
     {
-        // ασφάλεια: να ανήκει στον πελάτη
         if ((int)$file->customer_id !== (int)$customer->id) {
             abort(404);
         }
 
-        if (!Storage::exists($file->path)) {
+        $disk = $file->disk ?? 'local';
+
+        if (!Storage::disk($disk)->exists($file->path)) {
             return back()->with('error', 'Το αρχείο δεν βρέθηκε στο storage.');
         }
 
-        return Storage::download($file->path, $file->original_name);
+        return Storage::disk($disk)->download($file->path, $file->original_name);
     }
+
 
     public function deleteFile(Request $request, Customer $customer, CustomerFile $file)
     {
@@ -232,7 +258,6 @@ class CustomerController extends Controller
     }
 
 
-
     public function show(Request $request, Customer $customer)
     {
         // Φορτώνουμε τις βασικές σχέσεις του πελάτη
@@ -263,19 +288,65 @@ class CustomerController extends Controller
         });
 
         /**
+         * 🔹 ΝΕΟ FILTER ΗΜΕΡΟΜΗΝΙΑΣ:
+         * range = month | day | all
+         * default = current month
+         */
+        $range = $request->input('range', 'month'); // month/day/all
+        $nav   = $request->input('nav');            // prev/next
+
+        $day   = $request->input('day');            // Y-m-d
+        $month = $request->input('month');          // Y-m
+
+        // Default values
+        if ($range === 'day') {
+            $day = $day ?: now()->toDateString(); // default = today
+            $month = null;
+        } elseif ($range === 'month') {
+            $month = $month ?: now()->format('Y-m'); // default = current month
+            $day = null;
+        } else {
+            // all
+            $day = null;
+            $month = null;
+        }
+
+        // Handle prev/next navigation
+        if ($nav === 'prev' || $nav === 'next') {
+            if ($range === 'day') {
+                $base = Carbon::parse($day ?: now()->toDateString());
+                $base = $nav === 'prev' ? $base->subDay() : $base->addDay();
+                $day  = $base->toDateString();
+            } elseif ($range === 'month') {
+                $base = Carbon::createFromFormat('Y-m', $month ?: now()->format('Y-m'))->startOfMonth();
+                $base = $nav === 'prev' ? $base->subMonth() : $base->addMonth();
+                $month = $base->format('Y-m');
+            }
+        }
+
+        // Compute from/to (date strings) depending on range
+        $from = null;
+        $to   = null;
+
+        if ($range === 'day' && $day) {
+            $from = Carbon::parse($day)->toDateString();
+            $to   = Carbon::parse($day)->toDateString();
+        } elseif ($range === 'month' && $month) {
+            $m    = Carbon::createFromFormat('Y-m', $month);
+            $from = $m->copy()->startOfMonth()->toDateString();
+            $to   = $m->copy()->endOfMonth()->toDateString();
+        } else {
+            // all => no date filtering
+            $from = null;
+            $to   = null;
+        }
+
+        /**
          * 🔹 Παίρνουμε τα φίλτρα από το request
          */
-        $from          = $request->input('from');
-        $to            = $request->input('to');
         $status        = $request->input('status');           // (προαιρετικά, αν το χρησιμοποιήσεις αργότερα)
         $paymentStatus = $request->input('payment_status');
         $paymentMethod = $request->input('payment_method');
-
-        // Αν δεν έχει σταλεί ΚΑΝΕΝΑ φίλτρο, βάζουμε default τρέχον μήνα
-        if (!$request->hasAny(['from', 'to', 'status', 'payment_status', 'payment_method'])) {
-            $from = now()->startOfMonth()->toDateString();
-            $to   = now()->endOfMonth()->toDateString();
-        }
 
         /**
          * 🔹 Ξεκινάμε από όλα τα ραντεβού του πελάτη (όχι διαγραμμένα)
@@ -288,26 +359,15 @@ class CustomerController extends Controller
         $filteredAppointments = $appointmentsCollection;
 
         /**
-         * 🔹 Φίλτρο: Ημερομηνία από
+         * 🔹 Φίλτρο: Ημερομηνία (σύμφωνα με range)
          */
-        if ($from) {
-            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($from) {
+        if ($from && $to) {
+            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($from, $to) {
                 if (!$a->start_time) {
                     return false;
                 }
-                return $a->start_time->toDateString() >= $from;
-            });
-        }
-
-        /**
-         * 🔹 Φίλτρο: Ημερομηνία έως
-         */
-        if ($to) {
-            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($to) {
-                if (!$a->start_time) {
-                    return false;
-                }
-                return $a->start_time->toDateString() <= $to;
+                $d = $a->start_time->toDateString();
+                return $d >= $from && $d <= $to;
             });
         }
 
@@ -358,19 +418,36 @@ class CustomerController extends Controller
         $filteredAppointments = $filteredAppointments->values();
 
         /**
+         * 🔹 GLOBAL Στατιστικά (χωρίς φίλτρα) - αυτά θα δείχνεις πάνω
+         */
+        $allAppointments = $appointmentsCollection; // όλα τα ραντεβού του πελάτη (όχι soft deleted)
+
+        $globalAppointmentsCount = $allAppointments->count();
+
+        $globalTotalAmount = $allAppointments->sum(function ($a) {
+            return $a->total_price ?? 0;
+        });
+
+        $globalPaidTotal = $allAppointments->sum(function ($a) {
+            return $a->payment->amount ?? 0;
+        });
+
+        $globalOutstandingTotal = max($globalTotalAmount - $globalPaidTotal, 0);
+
+        /**
          * 🔹 Στατιστικά με βάση ΤΑ ΦΙΛΤΡΑΡΙΣΜΕΝΑ ραντεβού
          */
         $appointmentsCount = $filteredAppointments->count();
 
-        $totalAmount = $filteredAppointments->sum(function ($a) {
+        $filteredTotalAmount = $filteredAppointments->sum(function ($a) {
             return $a->total_price ?? 0;
         });
 
-        $paidTotal = $filteredAppointments->sum(function ($a) {
+        $filteredPaidTotal = $filteredAppointments->sum(function ($a) {
             return $a->payment->amount ?? 0;
         });
 
-        $outstandingTotal = max($totalAmount - $paidTotal, 0);
+        $filteredOutstandingTotal = max($filteredTotalAmount - $filteredPaidTotal, 0);
 
         $cashTotal = $filteredAppointments->sum(function ($a) {
             return ($a->payment && $a->payment->method === 'cash')
@@ -385,85 +462,160 @@ class CustomerController extends Controller
         });
 
         /**
-         * 🔹 Manual pagination πάνω στη filtered συλλογή
+         * 🔹 ΧΩΡΙΣ PAGINATION: περνάμε ΟΛΗ τη συλλογή στο blade
          */
-        $perPage     = 25;
-        $currentPage = Paginator::resolveCurrentPage() ?: 1;
-
-        $currentItems = $filteredAppointments
-            ->forPage($currentPage, $perPage);
-
-        $appointments = new LengthAwarePaginator(
-            $currentItems,
-            $filteredAppointments->count(),
-            $perPage,
-            $currentPage,
-            [
-                'path'  => $request->url(),
-                'query' => $request->query(), // κρατάμε τα φίλτρα στο pagination links
-            ]
-        );
+        $appointments = $filteredAppointments;
 
         /**
          * 🔹 Φίλτρα που περνάμε στο Blade
          */
         $filters = [
-            'from'           => $from,
-            'to'             => $to,
+            'range'          => $range,
+            'day'            => $day,
+            'month'          => $month,
+
             'status'         => $status ?? 'all',
             'payment_status' => $paymentStatus ?? 'all',
             'payment_method' => $paymentMethod ?? 'all',
         ];
 
+        /**
+         * 🔹 URLs για Prev/Next (ΣΤΑΘΕΡΑ: πάντα κουβαλάνε day/month)
+         */
+        $prevUrl = null;
+        $nextUrl = null;
+
+        if ($range !== 'all') {
+            $baseQuery = $request->query();
+            unset($baseQuery['nav']);
+
+            if ($range === 'day') {
+                $baseQuery['range'] = 'day';
+                $baseQuery['day']   = $day ?: now()->toDateString();
+                unset($baseQuery['month']);
+            } elseif ($range === 'month') {
+                $baseQuery['range'] = 'month';
+                $baseQuery['month'] = $month ?: now()->format('Y-m');
+                unset($baseQuery['day']);
+            }
+
+            $prevUrl = $request->url() . '?' . http_build_query(array_merge($baseQuery, ['nav' => 'prev']));
+            $nextUrl = $request->url() . '?' . http_build_query(array_merge($baseQuery, ['nav' => 'next']));
+        }
+
+        /**
+         * 🔹 Label για Blade: "Έχετε επιλέξει: ..."
+         */
+        $selectedLabel = 'Όλα';
+
+        if ($range === 'day' && $day) {
+            $selectedLabel = Carbon::parse($day)->locale('el')->translatedFormat('D d/m/Y'); // Δευ 05/01/2026
+        } elseif ($range === 'month' && $month) {
+            $selectedLabel = Carbon::createFromFormat('Y-m', $month)->locale('el')->translatedFormat('F Y'); // Ιανουάριος 2026
+        }
+
         return view('customers.show', compact(
             'customer',
             'appointments',
             'appointmentsCount',
-            'totalAmount',
-            'paidTotal',
-            'outstandingTotal',
+
+            // ✅ GLOBAL totals για το πάνω summary
+            'globalAppointmentsCount',
+            'globalTotalAmount',
+            'globalPaidTotal',
+            'globalOutstandingTotal',
+
+            // (αν θες να τα δείχνεις κάπου αλλού)
+            // 'filteredTotalAmount',
+            // 'filteredPaidTotal',
+            // 'filteredOutstandingTotal',
+
             'cashTotal',
             'cardTotal',
             'filters',
-            'paymentsByDate'
+            'paymentsByDate',
+            'prevUrl',
+            'nextUrl',
+            'selectedLabel'
         ));
+    }
+
+    public function paymentPreview(Request $request, Customer $customer)
+    {
+        $request->validate([
+            'from' => 'required|date',
+            'to'   => 'required|date|after_or_equal:from',
+        ]);
+
+        $from = Carbon::parse($request->from)->startOfDay();
+        $to   = Carbon::parse($request->to)->endOfDay();
+
+        $appointments = Appointment::where('customer_id', $customer->id)
+            ->whereNotNull('start_time')
+            ->whereBetween('start_time', [$from, $to])
+            ->get();
+
+        $total = $appointments->sum(function ($a) {
+            return $a->total_price ?? 0;
+        });
+
+        return response()->json([
+            'count' => $appointments->count(),
+            'total' => round($total, 2),
+            'formatted' => number_format($total, 2, ',', '.') . ' €',
+        ]);
     }
 
 
     public function payAll(Request $request, Customer $customer)
     {
-        // IDs των επιλεγμένων ραντεβών
-        $appointmentIds = $request->input('appointments', []);
+        $data = $request->validate([
+            'from'   => 'required|date',
+            'to'     => 'required|date|after_or_equal:from',
+            'method' => 'required|in:cash,card',
+            'tax'    => 'nullable|in:Y,N',
+            'bank'   => 'nullable|string|max:255', // ✅ NEW
+        ], [
+            'from.required' => 'Πρέπει να επιλέξετε Από ημερομηνία.',
+            'to.required'   => 'Πρέπει να επιλέξετε Έως ημερομηνία.',
+            'to.after_or_equal' => 'Το Έως πρέπει να είναι μετά ή ίσο με το Από.',
+            'method.required' => 'Πρέπει να επιλέξετε τρόπο πληρωμής.',
+            'method.in' => 'Η μέθοδος πληρωμής πρέπει να είναι Μετρητά ή Κάρτα.',
+            'tax.in' => 'Η τιμή ΦΠΑ πρέπει να είναι Ν ή Y.',
+        ]);
 
-        if (empty($appointmentIds)) {
-            return back()->with('error', 'Δεν επιλέχθηκαν ραντεβού για πληρωμή.');
-        }
+        $from = Carbon::parse($data['from'])->startOfDay();
+        $to   = Carbon::parse($data['to'])->endOfDay();
 
-        // Κοινός τρόπος πληρωμής για όλα
-        $method = $request->input('method');
-
-        if (!in_array($method, ['cash', 'card'], true)) {
-            return back()->with('error', 'Πρέπει να επιλέξετε τρόπο πληρωμής (μετρητά ή κάρτα).');
-        }
+        $method = $data['method'];
 
         // TAX – κοινό για όλα
         if ($method === 'card') {
             // Κάρτα ⇒ πάντα με απόδειξη
             $tax = 'Y';
         } else {
-            // Μετρητά ⇒ επιλογή χρήστη
-            $tax = $request->input('tax') === 'Y' ? 'Y' : 'N';
+            // Μετρητά ⇒ επιλογή χρήστη, default N
+            $tax = ($request->input('tax') === 'Y') ? 'Y' : 'N';
         }
 
-        // Φορτώνουμε ραντεβού του συγκεκριμένου πελάτη για ασφάλεια
-        $customer->load(['appointments.payment']);
+        $bank = $data['bank'] ?? null;
 
-        foreach ($customer->appointments as $appointment) {
-            if (!in_array($appointment->id, $appointmentIds)) {
-                continue;
-            }
+        // Παίρνουμε όλα τα ραντεβού του πελάτη στο διάστημα
+        $appointments = Appointment::where('customer_id', $customer->id)
+            ->whereNotNull('start_time')
+            ->whereBetween('start_time', [$from, $to])
+            ->get();
 
+        if ($appointments->isEmpty()) {
+            return back()->with('error', 'Δεν βρέθηκαν ραντεβού στο επιλεγμένο χρονικό διάστημα.');
+        }
+
+        $updated = 0;
+
+        foreach ($appointments as $appointment) {
             $total = $appointment->total_price ?? 0;
+
+            // Αγνόησε ραντεβού χωρίς ποσό
             if ($total <= 0) {
                 continue;
             }
@@ -477,13 +629,22 @@ class CustomerController extends Controller
                     'paid_at'     => now(),
                     'method'      => $method,
                     'tax'         => $tax,
-                    'notes'       => 'Μαζική πληρωμή επιλεγμένων ραντεβού.',
+                    'bank'        => $bank, // ✅ NEW
+                    'notes'       => 'Μαζική πληρωμή βάσει ημερομηνιών.',
                 ]
             );
+
+            $updated++;
         }
 
-        return back()->with('success', 'Οι πληρωμές για τα επιλεγμένα ραντεβού ενημερώθηκαν επιτυχώς.');
+        if ($updated === 0) {
+            return back()->with('error', 'Δεν υπήρχαν ραντεβού με ποσό > 0 στο διάστημα.');
+        }
+
+        return back()->with('success', "Ενημερώθηκαν πληρωμές για {$updated} ραντεβού στο επιλεγμένο διάστημα.");
     }
+
+
 
     public function deleteAppointments(Request $request, Customer $customer)
     {

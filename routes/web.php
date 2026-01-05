@@ -125,7 +125,17 @@ Route::middleware('auth')->group(function () {
 
     Route::delete('/customers/{customer}/files/{file}', [CustomerController::class, 'deleteFile'])
         ->name('customers.files.destroy');
-            
+       
+    Route::get(
+        '/customers/{customer}/files/{file}/view',
+        [CustomerController::class, 'view']
+    )->name('customers.files.view');
+
+    Route::get(
+        '/customers/{customer}/payment-preview',
+        [CustomerController::class, 'paymentPreview']
+    )->name('customers.paymentPreview');
+
 });
 
 Route::get('/hash-password', [\App\Http\Controllers\HashController::class, 'hashPassword']);

@@ -17,20 +17,7 @@
                 <div class="col-md-4">
                     <p><strong>Ονοματεπώνυμο:</strong> {{ $customer->last_name }} {{ $customer->first_name }}</p>
                     <p><strong>Τηλέφωνο:</strong> {{ $customer->phone }}</p>
-                    {{-- <p><strong>Email:</strong> {{ $customer->email ?? '-' }}</p> --}}
-                    <p><strong>Γραφείο:</strong> {{ $customer->company->name ?? '-' }}</p>
-                    <p>
-                        <strong>Θεραπευτές:</strong>
-                        @if($customer->professionals->isEmpty())
-                            <span class="text-muted">-</span>
-                        @else
-                            {{ $customer->professionals
-                                ->map(fn($p) => trim(($p->last_name ?? '').' '.($p->first_name ?? '')))
-                                ->implode(', ')
-                            }}
-                        @endif
-                    </p>
-                    <p><strong>Σύνολο Ραντεβού (με βάση τα φίλτρα):</strong> {{ $appointmentsCount }}</p>
+                    <p><strong>Πληροφορίες: </strong> {!! $customer->informations ? nl2br(e($customer->informations)) : '-' !!}</p>
                 </div>
 
                 {{-- <div class="col-md-3">
@@ -43,19 +30,19 @@
                     <p>
                         <strong>Συνολικό Ποσό Ραντεβού:</strong><br>
                         <span class="badge bg-primary fs-6">
-                            {{ number_format($totalAmount, 2, ',', '.') }} €
+                            {{ number_format($globalTotalAmount, 2, ',', '.') }} €
                         </span>
                     </p>
                     <p>
                         <strong>Συνολικό Ποσό που Έχει Πληρώσει:</strong><br>
                         <span class="badge bg-success fs-6">
-                            {{ number_format($paidTotal, 2, ',', '.') }} €
+                            {{ number_format($globalPaidTotal, 2, ',', '.') }} €
                         </span>
                     </p>
                     <p>
                         <strong>Υπόλοιπο (απλήρωτο):</strong><br>
-                        <span class="badge {{ $outstandingTotal > 0 ? 'bg-danger' : 'bg-secondary' }} fs-6">
-                            {{ number_format($outstandingTotal, 2, ',', '.') }} €
+                        <span class="badge {{ $globalOutstandingTotal > 0 ? 'bg-danger' : 'bg-secondary' }} fs-6">
+                            {{ number_format($globalOutstandingTotal, 2, ',', '.') }} €
                         </span>
                     </p>
                 </div>
@@ -210,6 +197,22 @@
                                             </td>
                                             <td>{{ $f->notes ?? '-' }}</td>
                                             <td class="text-end">
+                                                @php
+                                                    $canPreview = Str::startsWith($f->mime_type, [
+                                                        'image/',
+                                                        'application/pdf',
+                                                        'text/'
+                                                    ]);
+                                                @endphp
+
+                                                @if($canPreview)
+                                                    <a class="btn btn-sm btn-outline-secondary"
+                                                    target="_blank"
+                                                    href="{{ route('customers.files.view', ['customer' => $customer->id, 'file' => $f->id]) }}">
+                                                        Άνοιγμα
+                                                    </a>
+                                                @endif
+
                                                 <a class="btn btn-sm btn-outline-primary"
                                                 href="{{ route('customers.files.download', ['customer' => $customer->id, 'file' => $f->id]) }}">
                                                     Download
@@ -265,45 +268,74 @@
         <div class="card-body">
 
             {{-- Φίλτρα --}}
-            <form method="GET" action="{{ route('customers.show', $customer) }} " class="mb-3">
-                <div class="row g-2">
-                    <div class="col-md-3">
-                        <label class="form-label">Από Ημερομηνία</label>
-                        <input type="date" name="from" class="form-control"
-                               value="{{ $filters['from'] ?? '' }}">
-                    </div>
+            <form method="GET" action="{{ route('customers.show', $customer) }}" class="mb-2">
+                @php
+                    $range = $filters['range'] ?? 'month';
+                    $day   = $filters['day'] ?? now()->format('Y-m-d');
+                    $month = $filters['month'] ?? now()->format('Y-m');
+                    $ps    = $filters['payment_status'] ?? 'all';
+                @endphp
 
+                <div class="row g-2 align-items-end">
                     <div class="col-md-3">
-                        <label class="form-label">Έως Ημερομηνία</label>
-                        <input type="date" name="to" class="form-control"
-                               value="{{ $filters['to'] ?? '' }}">
-                    </div>
-
-                    <div class="col-md-3">
-                        <label class="form-label">Κατάσταση Πληρωμής</label>
-                        @php $ps = $filters['payment_status'] ?? 'all'; @endphp
-                        <select name="payment_status" class="form-select">
-                            <option value="all" @selected($ps === 'all')>Όλα</option>
-                            <option value="unpaid" @selected($ps === 'unpaid')>Απλήρωτα</option>
-                            <option value="partial" @selected($ps === 'partial')>Μερικώς πληρωμένα</option>
-                            <option value="full" @selected($ps === 'full')>Πλήρως πληρωμένα</option>
+                        <label class="form-label">Περίοδος</label>
+                        <select name="range" class="form-select" onchange="this.form.submit()">
+                            <option value="month" @selected($range === 'month')>Μήνας</option>
+                            <option value="day"   @selected($range === 'day')>Ημέρα</option>
+                            <option value="all"   @selected($range === 'all')>Όλα</option>
                         </select>
                     </div>
 
-                    <div class="col-md-3 d-flex align-items-end justify-content-end">
-                        <button class="btn btn-outline-primary me-2">
-                            Εφαρμογή Φίλτρων
+                    <div class="col-md-3">
+                        @if($range === 'day')
+                            {{-- <label class="form-label">Ημέρα</label> --}}
+                            <input type="date" hidden name="day" class="form-control" value="{{ $day }}">
+                        @elseif($range === 'month')
+                            {{-- <label class="form-label">Μήνας</label> --}}
+                            <input type="month" hidden name="month" class="form-control" value="{{ $month }}">
+                        @else
+                            <label class="form-label">Περίοδος</label>
+                            <input type="text" class="form-control" value="Όλα" disabled>
+                        @endif
+                    </div>
+
+                    {{-- <div class="col-md-3">
+                        <label class="form-label">Κατάσταση Πληρωμής</label>
+                        <select name="payment_status" class="form-select">
+                            <option value="all"     @selected($ps === 'all')>Όλα</option>
+                            <option value="unpaid"  @selected($ps === 'unpaid')>Απλήρωτα</option>
+                            <option value="partial" @selected($ps === 'partial')>Μερικώς πληρωμένα</option>
+                            <option value="full"    @selected($ps === 'full')>Πλήρως πληρωμένα</option>
+                        </select>
+                    </div> --}}
+
+                    <div class="col-md-12 d-flex gap-2 justify-content-start">
+                        @if($range !== 'all')
+                            <a href="{{ $prevUrl }}" class="btn btn-outline-secondary">← Προηγούμενο</a>
+                            <a href="{{ $nextUrl }}" class="btn btn-outline-secondary">Επόμενο →</a>
+                        @endif
+
+                        {{-- <button class="btn btn-outline-primary">
+                            Εφαρμογή
                         </button>
+
                         <a href="{{ route('customers.show', $customer) }}" class="btn btn-outline-secondary">
                             Καθαρισμός
-                        </a>
+                        </a> --}}
                     </div>
                 </div>
             </form>
 
+            {{-- ✅ Εμφάνιση επιλεγμένης ημερομηνίας/περιόδου στα Ραντεβού --}}
+            <div class="mb-3">
+                <span class="text-muted">Έχετε επιλέξει:</span>
+                <span class="badge bg-dark">{{ $selectedLabel ?? 'Όλα' }}</span>
+            </div>
+
+
             {{-- Πίνακας ραντεβών --}}
             <div class="table-responsive mb-3">
-                @include('../includes/selected_dates')
+                {{-- @include('../includes/selected_dates') --}}
                 {{-- Φόρμα για μαζική διαγραφή επιλεγμένων ραντεβών --}}
                 <form id="deleteAllForm"
                     method="POST"
@@ -339,6 +371,7 @@
                         <th>Υπηρεσία</th>
                         <th>Σύνολο (€)</th>
                         <th>Πληρωμή</th>
+                        <th>Σημειώσεις</th>
                         <th>Ενέργειες</th>
                     </tr>
                     </thead>
@@ -436,6 +469,8 @@
                                 @endif
                             </td>
 
+                            <td style="white-space: pre-wrap;">{{ Str::limit($appointment->notes ?? '-', 50) }}</td>
+
                             {{-- Ενέργειες --}}
                             <td>
                                 {{-- Επεξεργασία Ραντεβού --}}
@@ -482,24 +517,57 @@
                 </table>
             </div>
 
-            {{-- Σελιδοποίηση ραντεβών --}}
-            <div class="d-flex justify-content-center mb-3">
-                {{ $appointments->links() }}
+
+            {{-- ===================== ΠΡΟΕΠΙΣΚΟΠΗΣΗ ΠΛΗΡΩΜΗΣ ===================== --}}
+            <div id="paymentPreviewBox"
+                class="border rounded p-3 mb-3"
+                style="background:#f8f9fa">
+                <h6 class="mb-2">
+                    💶 Σύνολο Πληρωμής για το Επιλεγμένο Διάστημα
+                </h6>
+
+                {{-- κατάσταση πριν επιλεγούν ημερομηνίες --}}
+                <div id="previewHint" class="text-muted small">
+                    Επιλέξτε πρώτα <strong>Από</strong> και <strong>Μέχρι</strong> για να εμφανιστεί το ποσό.
+                </div>
+
+                {{-- κατάσταση μετά την επιλογή --}}
+                <div id="previewData" class="d-none">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-muted small">
+                            Ραντεβού που θα πληρωθούν:
+                            <strong><span id="previewCount">0</span></strong>
+                        </div>
+
+                        <div class="fs-5 fw-bold text-success">
+                            <span id="previewAmount">0,00 €</span>
+                        </div>
+                    </div>
+                </div>
             </div>
+            {{-- ===================== /ΠΡΟΕΠΙΣΚΟΠΗΣΗ ΠΛΗΡΩΜΗΣ ===================== --}}
+
 
             {{-- Φόρμα για μαζική πληρωμή επιλεγμένων ραντεβών --}}
+           {{-- Φόρμα για μαζική πληρωμή βάσει ημερομηνιών --}}
             <form id="payAllForm"
-                  method="POST"
-                  action="{{ route('customers.payAll', $customer) }}"
-                  onsubmit="return preparePayAllForm();">
+                method="POST"
+                action="{{ route('customers.payAll', $customer) }}">
                 @csrf
-
-                {{-- εδώ θα μπουν δυναμικά τα hidden appointments[] --}}
-                <div id="appointmentsHiddenContainer"></div>
-
+               
                 <div class="row g-2 mt-3 align-items-end">
-                    <div class="col-md-3">
-                        <label class="form-label">Τρόπος πληρωμής (για όλα τα επιλεγμένα)</label>
+                    <div class="col-md-2">
+                        <label class="form-label">Από</label>
+                         <input type="date" name="from" id="pay_from" class="form-control" required>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">Μέχρι</label>
+                        <input type="date" name="to"   id="pay_to"   class="form-control" required>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">Τρόπος πληρωμής</label>
                         <select name="method" id="bulk_method" class="form-select" required>
                             <option value="">-- Επιλέξτε --</option>
                             <option value="cash">Μετρητά</option>
@@ -507,17 +575,22 @@
                         </select>
                     </div>
 
-                    <div class="col-md-3" id="bulk_tax_wrapper">
-                        <label class="form-label">ΦΠΑ (για όλα τα επιλεγμένα)</label>
+                    <div class="col-md-2" id="bulk_tax_wrapper">
+                        <label class="form-label">ΦΠΑ</label>
                         <select name="tax" id="bulk_tax" class="form-select">
                             <option value="Y">Με απόδειξη</option>
                             <option value="N" selected>Χωρίς απόδειξη</option>
                         </select>
                     </div>
 
-                    <div class="col-md-6 text-end">
-                        <button type="submit" class="btn btn-success">
-                            💶 Πληρωμή επιλεγμένων ραντεβού (πλήρης εξόφληση)
+                    <div class="col-md-2">
+                        <label class="form-label">Τράπεζα</label>
+                        <input type="text" name="bank" class="form-control" maxlength="255" placeholder="π.χ. Alpha, Eurobank...">
+                    </div>
+
+                    <div class="col-md-2 text-end">
+                        <button type="submit" class="btn btn-success w-100">
+                            💶 Πληρωμή ραντεβού στο διάστημα (πλήρης εξόφληση)
                         </button>
                     </div>
                 </div>
@@ -733,5 +806,51 @@
     });
 });
 
-    </script>
+document.addEventListener('DOMContentLoaded', function () {
+    const fromInput = document.getElementById('pay_from');
+    const toInput   = document.getElementById('pay_to');
+
+    const hintEl    = document.getElementById('previewHint');
+    const dataWrap  = document.getElementById('previewData');
+
+    const amountEl  = document.getElementById('previewAmount');
+    const countEl   = document.getElementById('previewCount');
+
+    function resetPreview() {
+        hintEl.classList.remove('d-none');
+        dataWrap.classList.add('d-none');
+    }
+
+    function updatePreview() {
+        const from = fromInput.value;
+        const to   = toInput.value;
+
+        if (!from || !to) {
+            resetPreview();
+            return;
+        }
+
+        fetch(`{{ route('customers.paymentPreview', $customer) }}?from=${from}&to=${to}`, {
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            hintEl.classList.add('d-none');
+            dataWrap.classList.remove('d-none');
+
+            amountEl.textContent = data.formatted;
+            countEl.textContent  = data.count;
+        })
+        .catch(() => {
+            resetPreview();
+        });
+    }
+
+    resetPreview();
+
+    fromInput.addEventListener('change', updatePreview);
+    toInput.addEventListener('change', updatePreview);
+});
+
+</script>
 @endsection
