@@ -5,12 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Models\Payment;
 
 class Appointment extends Model
 {
-    use HasFactory;
-    use SoftDeletes;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'customer_id',
@@ -27,8 +25,9 @@ class Appointment extends Model
     ];
 
     protected $casts = [
-        'start_time' => 'datetime',
-        'end_time'   => 'datetime',
+        'start_time'   => 'datetime',
+        'end_time'     => 'datetime',
+        'total_price'  => 'decimal:2',
     ];
 
     public function customer()
@@ -51,19 +50,30 @@ class Appointment extends Model
         return $this->belongsTo(Professional::class, 'created_by');
     }
 
+    // ✅ όλες οι πληρωμές (split)
     public function payments()
     {
         return $this->hasMany(Payment::class);
     }
 
-    public function payment()
+    // ✅ τελευταία πληρωμή (μόνο για προβολή)
+    public function latestPayment()
     {
-        return $this->hasOne(Payment::class)->latestOfMany();
+        return $this->hasOne(Payment::class)->latestOfMany('paid_at');
     }
 
+    // ✅ computed σύνολο πληρωμένων
     public function getPaidTotalAttribute()
     {
+        // Αν δεν έχει γίνει eager load, θα κάνει query per row.
+        // Για list/table ΠΑΝΤΑ φόρτωσε appointments.payments στο controller.
         return $this->payments->sum('amount');
     }
 
+    public function getOutstandingAttribute()
+    {
+        $total = (float)($this->total_price ?? 0);
+        $paid  = (float)($this->paid_total ?? 0);
+        return max(0, $total - $paid);
+    }
 }

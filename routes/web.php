@@ -136,6 +136,13 @@ Route::middleware('auth')->group(function () {
         [CustomerController::class, 'paymentPreview']
     )->name('customers.paymentPreview');
 
+    Route::post('/customers/{customer}/pay-all-split', [CustomerController::class, 'payAllSplit'])
+        ->name('customers.payAllSplit');
+
+    Route::get('/customers/{customer}/payment-preview', [CustomerController::class, 'paymentPreview'])
+        ->name('customers.paymentPreview');
+
+
 });
 
 Route::get('/hash-password', [\App\Http\Controllers\HashController::class, 'hashPassword']);

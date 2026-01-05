@@ -24,6 +24,7 @@ class Payment extends Model
     protected $casts = [
         'paid_at' => 'datetime',
         'is_full' => 'boolean',
+        'amount'  => 'decimal:2',
     ];
 
     public function appointment()
