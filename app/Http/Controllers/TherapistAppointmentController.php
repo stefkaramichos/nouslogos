@@ -114,16 +114,19 @@ class TherapistAppointmentController extends Controller
 
         // ✅ Customers dropdown:
         if ($user->role === 'therapist') {
-            $customers = Customer::whereHas('professionals', function ($q) use ($user) {
+            $customers = Customer::where('is_active', 1)
+                ->whereHas('professionals', function ($q) use ($user) {
                     $q->where('professionals.id', $user->id);
                 })
                 ->orderBy('last_name')
                 ->orderBy('first_name')
                 ->get();
         } else {
-            $customers = Customer::orderBy('last_name')
+            $customers = Customer::where('is_active', 1)
+                ->orderBy('last_name')
                 ->orderBy('first_name')
                 ->get();
+
         }
 
         $professionals = [];
@@ -160,14 +163,17 @@ class TherapistAppointmentController extends Controller
         }
 
         if ($user->role === 'therapist') {
-            $customers = Customer::whereHas('professionals', function ($q) use ($user) {
+            $customers = Customer::where('is_active', 1)
+                ->whereHas('professionals', function ($q) use ($user) {
                     $q->where('professionals.id', $user->id);
                 })
                 ->orderBy('last_name')
                 ->orderBy('first_name')
                 ->get();
+
         } else {
-            $customers = Customer::orderBy('last_name')
+            $customers = Customer::where('is_active', 1)
+                ->orderBy('last_name')
                 ->orderBy('first_name')
                 ->get();
         }
@@ -240,14 +246,21 @@ class TherapistAppointmentController extends Controller
         }
 
         if ($user->role === 'therapist') {
-            $customers = Customer::whereHas('professionals', function ($q) use ($user) {
-                    $q->where('professionals.id', $user->id);
+            $customers = Customer::where(function ($q) use ($user, $therapistAppointment) {
+                    $q->where('is_active', 1)
+                    ->whereHas('professionals', function ($qq) use ($user) {
+                        $qq->where('professionals.id', $user->id);
+                    });
                 })
+                ->orWhere('id', $therapistAppointment->customer_id)
                 ->orderBy('last_name')
                 ->orderBy('first_name')
                 ->get();
+
         } else {
-            $customers = Customer::orderBy('last_name')
+            $customers = Customer::where('is_active', 1)
+                ->orWhere('id', $therapistAppointment->customer_id)
+                ->orderBy('last_name')
                 ->orderBy('first_name')
                 ->get();
         }

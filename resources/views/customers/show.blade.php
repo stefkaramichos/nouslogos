@@ -460,10 +460,6 @@
                         <div class="text-muted small mt-2">
                             Δεν υπάρχουν χρωστούμενα.
                         </div>
-                    @else
-                        <div class="text-muted small mt-2">
-                            Συμπλήρωσε ποσά. Μπορείς να κάνεις split ακόμα και στα μετρητά (με/χωρίς απόδειξη).
-                        </div>
                     @endif
                 </div>
 

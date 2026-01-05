@@ -145,6 +145,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/customers/{customer}/payments/pay-outstanding-split', [CustomerController::class, 'payOutstandingSplit'])
         ->name('customers.payOutstandingSplit');
 
+    Route::post('/customers/{customer}/toggle-active', [CustomerController::class, 'toggleActive'])
+        ->name('customers.toggleActive');
+
 });
 
 Route::get('/hash-password', [\App\Http\Controllers\HashController::class, 'hashPassword']);

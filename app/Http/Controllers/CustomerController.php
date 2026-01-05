@@ -148,9 +148,14 @@ class CustomerController extends Controller
                         ->orWhereHas('company', fn($qc) => $qc->where('name', 'like', "%{$search}%"));
                 });
             })
+
+            // ✅ ACTIVE ΠΑΝΩ, DISABLED ΚΑΤΩ
+            ->orderByDesc('is_active')
+
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get();
+
 
         $companies = Company::where('is_active', 1)->orderBy('id')->get();
 
@@ -697,4 +702,23 @@ class CustomerController extends Controller
 
         return back()->with('success', 'Τα επιλεγμένα ραντεβού διαγράφηκαν επιτυχώς.');
     }
+
+    public function toggleActive(Request $request, Customer $customer)
+    {
+        // Αν θέλεις να επιτρέπεται μόνο σε owner:
+        // abort_unless(Auth::user()?->role === 'owner', 403);
+
+        $data = $request->validate([
+            'is_active' => 'required|in:0,1',
+        ]);
+
+        $customer->is_active = (int)$data['is_active'];
+        $customer->save();
+
+        return back()->with(
+            'success',
+            $customer->is_active ? 'Ο πελάτης ενεργοποιήθηκε.' : 'Ο πελάτης απενεργοποιήθηκε.'
+        );
+    }
+
 }

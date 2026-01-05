@@ -144,7 +144,11 @@ class AppointmentController extends Controller
 
     public function create()
     {
-        $customers     = Customer::orderBy('last_name')->get();
+        $customers = Customer::where('is_active', 1)
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+
         $professionals = Professional::whereIn('role', ['owner', 'therapist'])
             ->orderBy('last_name')
             ->get();
@@ -273,14 +277,21 @@ class AppointmentController extends Controller
     {
         $appointment->load(['customer', 'professional', 'company']);
 
-        $customers     = Customer::orderBy('last_name')->get();
+        $customers = Customer::where('is_active', 1)
+            ->orWhere('id', $appointment->customer_id) // ✅ κρατάει selectable τον υπάρχοντα
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+
         $professionals = Professional::whereIn('role', ['owner', 'therapist'])
             ->orderBy('last_name')
             ->get();
-        $companies     = Company::all();
+
+        $companies = Company::all();
 
         return view('appointments.edit', compact('appointment', 'customers', 'professionals', 'companies'));
     }
+
 
     public function update(Request $request, Appointment $appointment)
     {

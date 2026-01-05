@@ -24,7 +24,6 @@
                 {{-- keep company filter while searching --}}
                 <input type="hidden" name="company_id" value="{{ $selectedCompany }}">
 
-
                 <div class="input-group">
                     <input type="text"
                            name="search"
@@ -46,15 +45,13 @@
 
             {{-- Quick search buttons by company --}}
             <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">
-             
                 <a href="{{ route('customers.index', [
                         'search' => request('search'),
                         'clear_company' => 1,
                     ]) }}"
-                class="btn btn-sm {{ empty($selectedCompany) ? 'btn-primary' : 'btn-outline-primary' }}">
+                   class="btn btn-sm {{ empty($selectedCompany) ? 'btn-primary' : 'btn-outline-primary' }}">
                     Όλοι
                 </a>
-
 
                 {{-- Companies --}}
                 @foreach(($companies ?? collect()) as $company)
@@ -67,7 +64,6 @@
                     </a>
                 @endforeach
             </div>
-
         </div>
 
         <div class="card-body p-0">
@@ -80,13 +76,21 @@
                         <th>Τηλέφωνο</th>
                         <th>Θεραπευτές</th>
                         <th>Πληροφορίες</th>
+
+                        {{-- ✅ ΝΕΟ --}}
+                        <th class="text-center">Κατάσταση</th>
+
                         <th class="text-end">Ενέργειες</th>
                     </tr>
                     </thead>
 
                     <tbody>
                     @forelse($customers as $customer)
-                        <tr>
+                        @php
+                            $isActive = (int)($customer->is_active ?? 1) === 1;
+                        @endphp
+
+                        <tr @if(!$isActive) class="text-muted" style="opacity:0.65;" @endif>
                             <td>{{ $customer->company->name ?? '-' }}</td>
 
                             <td>
@@ -94,6 +98,9 @@
                                    style="text-decoration: none; color: inherit;">
                                     {{ $customer->last_name }} {{ $customer->first_name }}
                                 </a>
+                                @if(!$isActive)
+                                    <div class="small text-danger">Απενεργοποιημένος</div>
+                                @endif
                             </td>
 
                             <td>{{ $customer->phone ?? '-' }}</td>
@@ -106,23 +113,49 @@
                                 @if($pros->isEmpty())
                                     <span class="text-muted">-</span>
                                 @else
-                                    {{-- show as comma separated --}}
                                     {{ $pros->map(fn($p) => trim(($p->last_name ?? '').' '.($p->first_name ?? '')))->implode(', ') }}
                                 @endif
                             </td>
 
                             <td>
                                 @if($customer->informations)
-                                    <span
-                                        title="{{ $customer->informations }}"
-                                        style="cursor: help;"
-                                    >
+                                    <span title="{{ $customer->informations }}" style="cursor: help;">
                                         {{ Str::limit($customer->informations, 30) }}
                                     </span>
                                 @else
                                     <span class="text-muted">-</span>
                                 @endif
                             </td>
+
+                            {{-- ✅ SWITCH enable/disable --}}
+                            <td class="text-center">
+                                <form method="POST"
+                                      action="{{ route('customers.toggleActive', $customer) }}"
+                                      class="d-inline"
+                                      onsubmit="return true;">
+                                    @csrf
+
+                                    <div class="form-check form-switch d-inline-flex align-items-center justify-content-center m-0">
+                                        <input class="form-check-input customer-active-switch"
+                                               type="checkbox"
+                                               role="switch"
+                                               id="cust_active_{{ $customer->id }}"
+                                               {{ $isActive ? 'checked' : '' }}
+                                               onchange="
+                                                   if(!this.checked){
+                                                       if(!confirm('Σίγουρα θέλετε να απενεργοποιήσετε τον πελάτη;')){
+                                                           this.checked = true;
+                                                           return;
+                                                       }
+                                                   }
+                                                   this.form.querySelector('input[name=is_active]').value = this.checked ? 1 : 0;
+                                                   this.form.submit();
+                                               ">
+                                        <input type="hidden" name="is_active" value="{{ $isActive ? 1 : 0 }}">
+                                    </div>
+                                </form>
+                            </td>
+
                             <td class="text-end">
                                 {{-- Add Appointment --}}
                                 <a href="{{ route('appointments.create', ['customer_id' => $customer->id, 'redirect' => request()->fullUrl()]) }}"
@@ -138,7 +171,7 @@
                                     <i class="bi bi-pencil-square"></i>
                                 </a>
 
-                                {{-- Delete (disabled as in your original) --}}
+                                {{-- Delete (still disabled as you had) --}}
                                 {{--
                                 <form action="{{ route('customers.destroy', $customer) }}"
                                       method="POST"
@@ -155,7 +188,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-4">
+                            <td colspan="7" class="text-center text-muted py-4">
                                 Δεν υπάρχουν πελάτες για εμφάνιση.
                             </td>
                         </tr>
