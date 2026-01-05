@@ -25,9 +25,8 @@ class Appointment extends Model
     ];
 
     protected $casts = [
-        'start_time'   => 'datetime',
-        'end_time'     => 'datetime',
-        'total_price'  => 'decimal:2',
+        'start_time' => 'datetime',
+        'end_time'   => 'datetime',
     ];
 
     public function customer()
@@ -50,30 +49,30 @@ class Appointment extends Model
         return $this->belongsTo(Professional::class, 'created_by');
     }
 
-    // ✅ όλες οι πληρωμές (split)
+    // ✅ Split payments (πολλά payments ανά ραντεβού)
     public function payments()
     {
         return $this->hasMany(Payment::class);
     }
 
-    // ✅ τελευταία πληρωμή (μόνο για προβολή)
-    public function latestPayment()
+    // ✅ Helpers για να μη σκάει τίποτα στα blades/controllers
+    public function getPaidTotalAttribute(): float
     {
-        return $this->hasOne(Payment::class)->latestOfMany('paid_at');
+        // αν έχει γίνει eager-load, δεν χτυπάει DB
+        return (float) $this->payments->sum('amount');
     }
 
-    // ✅ computed σύνολο πληρωμένων
-    public function getPaidTotalAttribute()
+    public function getIsFullyPaidAttribute(): bool
     {
-        // Αν δεν έχει γίνει eager load, θα κάνει query per row.
-        // Για list/table ΠΑΝΤΑ φόρτωσε appointments.payments στο controller.
-        return $this->payments->sum('amount');
+        $total = (float) ($this->total_price ?? 0);
+        if ($total <= 0) return true;
+
+        return $this->paid_total >= $total;
     }
 
-    public function getOutstandingAttribute()
+    public function getOutstandingAttribute(): float
     {
-        $total = (float)($this->total_price ?? 0);
-        $paid  = (float)($this->paid_total ?? 0);
-        return max(0, $total - $paid);
+        $total = (float) ($this->total_price ?? 0);
+        return max(0, $total - $this->paid_total);
     }
 }
