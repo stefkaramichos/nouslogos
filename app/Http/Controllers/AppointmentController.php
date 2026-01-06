@@ -15,22 +15,100 @@ use Carbon\Carbon;
 
 class AppointmentController extends Controller
 {
-   public function index(Request $request)
+    public function index(Request $request)
     {
         // dropdown lists
         $customers     = Customer::orderBy('last_name')->get();
         $professionals = Professional::orderBy('last_name')->get();
         $companies     = Company::orderBy('name')->get();
 
-        // filters
-        $from = $request->input('from');
-        $to   = $request->input('to');
+        // -----------------------------
+        // NEW: Period filter (range/day/month/all) + prev/next
+        // -----------------------------
+        $range = $request->input('range', 'month'); // day/month/all
+        $nav   = $request->input('nav');
+        $day   = $request->input('day');
+        $month = $request->input('month');
 
-        if (!$request->hasAny(['from','to','customer_id','professional_id','company_id','status','payment_status','payment_method'])) {
-            $from = now()->toDateString();
-            $to   = now()->toDateString();
+        // Αν δεν έχει σταλεί τίποτα (ούτε φίλτρα), default = ΣΗΜΕΡΑ (day)
+        if (!$request->hasAny([
+            'range','day','month','nav',
+            'customer_id','professional_id','company_id','status','payment_status','payment_method',
+            'from','to' // για backward compatibility
+        ])) {
+            $range = 'month';
+            $month = now()->format('Y-m');
+            $month = null;
         }
 
+        // Αν έρθουν τα παλιά from/to, τα μετατρέπουμε σε day range για συμβατότητα
+        // (ώστε να μην χαλάσουν παλιά links / bookmarks)
+        $legacyFrom = $request->input('from');
+        $legacyTo   = $request->input('to');
+        if ($legacyFrom && $legacyTo && !$request->hasAny(['range','day','month'])) {
+            // αν είναι ίδια μέρα -> day, αλλιώς all (ή μπορούμε month αλλά είναι πιο tricky)
+            if ($legacyFrom === $legacyTo) {
+                $range = 'day';
+                $day   = $legacyFrom;
+            } else {
+                // κρατάμε range=all και αφήνουμε from/to να δουλέψουν όπως πριν
+                $range = 'all';
+            }
+        }
+
+        // Normalization
+        if ($range === 'day') {
+            $day = $day ?: now()->toDateString();
+            $month = null;
+        } elseif ($range === 'month') {
+            $month = $month ?: now()->format('Y-m');
+            $day = null;
+        } else {
+            $day = null;
+            $month = null;
+        }
+
+        // Prev/Next navigation
+        if ($nav === 'prev' || $nav === 'next') {
+            if ($range === 'day') {
+                $base = Carbon::parse($day ?: now()->toDateString());
+                $base = $nav === 'prev' ? $base->subDay() : $base->addDay();
+                $day  = $base->toDateString();
+            } elseif ($range === 'month') {
+                $base = Carbon::createFromFormat('Y-m', $month ?: now()->format('Y-m'))->startOfMonth();
+                $base = $nav === 'prev' ? $base->subMonth() : $base->addMonth();
+                $month = $base->format('Y-m');
+            }
+        }
+
+        // Υπολογίζουμε from/to από range
+        $from = null;
+        $to   = null;
+
+        if ($range === 'day' && $day) {
+            $from = Carbon::parse($day)->toDateString();
+            $to   = Carbon::parse($day)->toDateString();
+        } elseif ($range === 'month' && $month) {
+            $m    = Carbon::createFromFormat('Y-m', $month);
+            $from = $m->copy()->startOfMonth()->toDateString();
+            $to   = $m->copy()->endOfMonth()->toDateString();
+        } else {
+            // range === 'all' -> αφήνουμε from/to null (εκτός αν ήρθαν legacy)
+            if ($legacyFrom) $from = $legacyFrom;
+            if ($legacyTo)   $to   = $legacyTo;
+        }
+
+        // Label
+        $selectedLabel = 'Όλα';
+        if ($range === 'day' && $day) {
+            $selectedLabel = Carbon::parse($day)->locale('el')->translatedFormat('D d/m/Y');
+        } elseif ($range === 'month' && $month) {
+            $selectedLabel = Carbon::createFromFormat('Y-m', $month)->locale('el')->translatedFormat('F Y');
+        }
+
+        // -----------------------------
+        // Other filters
+        // -----------------------------
         $customerId     = $request->input('customer_id');
         $professionalId = $request->input('professional_id');
         $companyId      = $request->input('company_id');
@@ -93,9 +171,39 @@ class AppointmentController extends Controller
             ]
         );
 
+        // Prev/Next URLs (κρατάμε όλα τα query params)
+        $prevUrl = null;
+        $nextUrl = null;
+
+        if ($range !== 'all') {
+            $baseQuery = $request->query();
+            unset($baseQuery['nav']);
+            unset($baseQuery['from'], $baseQuery['to']); // από εδώ και πέρα οδηγούμε με range/day/month
+
+            if ($range === 'day') {
+                $baseQuery['range'] = 'day';
+                $baseQuery['day']   = $day ?: now()->toDateString();
+                unset($baseQuery['month']);
+            } elseif ($range === 'month') {
+                $baseQuery['range'] = 'month';
+                $baseQuery['month'] = $month ?: now()->format('Y-m');
+                unset($baseQuery['day']);
+            }
+
+            $prevUrl = $request->url() . '?' . http_build_query(array_merge($baseQuery, ['nav' => 'prev']));
+            $nextUrl = $request->url() . '?' . http_build_query(array_merge($baseQuery, ['nav' => 'next']));
+        }
+
         $filters = [
-            'from'            => $from,
-            'to'              => $to,
+            // NEW
+            'range'          => $range,
+            'day'            => $day,
+            'month'          => $month,
+
+            // OLD (still useful)
+            'from'           => $from,
+            'to'             => $to,
+
             'customer_id'     => $customerId,
             'professional_id' => $professionalId,
             'company_id'      => $companyId,
@@ -109,9 +217,13 @@ class AppointmentController extends Controller
             'filters',
             'customers',
             'professionals',
-            'companies'
+            'companies',
+            'prevUrl',
+            'nextUrl',
+            'selectedLabel'
         ));
     }
+
 
 
     public function getLastForCustomer(Request $request)

@@ -15,21 +15,23 @@
 
     <div class="card-body">
 
+        @php
+            $range = $filters['range'] ?? 'month';
+            $day   = $filters['day'] ?? now()->format('Y-m-d');
+            $month = $filters['month'] ?? now()->format('Y-m');
+        @endphp
+
         {{-- ===================== FILTERS ===================== --}}
         <form method="GET" action="{{ route('appointments.index') }}">
+            {{-- keep range in the filters submit --}}
+            <input type="hidden" name="range" value="{{ $range }}">
+            @if($range === 'day')
+                <input type="hidden" name="day" value="{{ $day }}">
+            @elseif($range === 'month')
+                <input type="hidden" name="month" value="{{ $month }}">
+            @endif
+
             <div class="row g-2">
-                <div class="col-md-3">
-                    <label class="form-label">Από Ημερομηνία</label>
-                    <input type="date" name="from" class="form-control"
-                           value="{{ $filters['from'] ?? '' }}">
-                </div>
-
-                <div class="col-md-3">
-                    <label class="form-label">Έως Ημερομηνία</label>
-                    <input type="date" name="to" class="form-control"
-                           value="{{ $filters['to'] ?? '' }}">
-                </div>
-
                 <div class="col-md-3">
                     <label class="form-label">Πελάτης</label>
                     <select name="customer_id" class="form-select">
@@ -55,9 +57,7 @@
                         @endforeach
                     </select>
                 </div>
-            </div>
 
-            <div class="row g-2 mt-2">
                 <div class="col-md-3">
                     <label class="form-label">Εταιρεία</label>
                     <select name="company_id" class="form-select">
@@ -83,7 +83,9 @@
                         <option value="eidikos" @selected($st === 'eidikos')>Ειδικός παιδαγωγός</option>
                     </select>
                 </div>
+            </div>
 
+            <div class="row g-2 mt-2">
                 <div class="col-md-3">
                     <label class="form-label">Κατάσταση Πληρωμής</label>
                     @php $ps = $filters['payment_status'] ?? 'all'; @endphp
@@ -104,10 +106,8 @@
                         <option value="card" @selected($pm === 'card')>Κάρτα</option>
                     </select>
                 </div>
-            </div>
 
-            <div class="row g-2 mt-3">
-                <div class="col-md-12 d-flex justify-content-end">
+                <div class="col-md-6 d-flex justify-content-end align-items-end">
                     <button class="btn btn-outline-primary me-2">
                         Εφαρμογή Φίλτρων
                     </button>
@@ -119,9 +119,54 @@
         </form>
 
         {{-- ===================== TABLE ===================== --}}
+         {{-- ===================== PERIOD FILTER (month/day/all + prev/next) ===================== --}}
+        <form method="GET" action="{{ route('appointments.index') }}" class="mb-2">
+           
+            {{-- keep other filters --}}
+            <input type="hidden" name="customer_id" value="{{ $filters['customer_id'] ?? '' }}">
+            <input type="hidden" name="professional_id" value="{{ $filters['professional_id'] ?? '' }}">
+            <input type="hidden" name="company_id" value="{{ $filters['company_id'] ?? '' }}">
+            <input type="hidden" name="status" value="{{ $filters['status'] ?? 'all' }}">
+            <input type="hidden" name="payment_status" value="{{ $filters['payment_status'] ?? 'all' }}">
+            <input type="hidden" name="payment_method" value="{{ $filters['payment_method'] ?? 'all' }}">
+
+            <div class="row g-2 align-items-end mt-3">
+                <hr>
+                <div class="col-md-3">
+                    <label class="form-label">Περίοδος</label>
+                    <select name="range" class="form-select" onchange="this.form.submit()">
+                        <option value="month" @selected($range === 'month')>Μήνας</option>
+                        <option value="day"   @selected($range === 'day')>Ημέρα</option>
+                        <option value="all"   @selected($range === 'all')>Όλα</option>
+                    </select>
+                </div>
+
+                <div class="col-md-9">
+                    @if($range === 'day')
+                        <input type="date" hidden name="day" class="form-control" value="{{ $day }}">
+                    @elseif($range === 'month')
+                        <input type="month" hidden name="month" class="form-control" value="{{ $month }}">
+                    @else
+                        <input type="text" class="form-control" value="Όλα" disabled>
+                    @endif
+                </div>
+
+                <div class="col-md-6 d-flex gap-2 justify-content-start">
+                    @if($range !== 'all')
+                        <a href="{{ $prevUrl }}" class="btn btn-outline-secondary">← Προηγούμενο</a>
+                        <a href="{{ $nextUrl }}" class="btn btn-outline-secondary">Επόμενο →</a>
+                    @endif
+                </div>
+            </div>
+        </form>
+
+        <div class="mb-3">
+            <span class="text-muted">Έχετε επιλέξει:</span>
+            <span class="badge bg-dark">{{ $selectedLabel ?? 'Όλα' }}</span>
+        </div>
+
         <div class="table-responsive mt-3">
-            {{-- Αν έχεις include για επιλεγμένες ημερομηνίες, κράτα το --}}
-            @includeIf('../includes/selected_dates')
+            {{-- @includeIf('../includes/selected_dates') --}}
 
             <table class="table table-striped mb-0 align-middle">
                 <thead>
@@ -141,7 +186,6 @@
                 <tbody>
                 @forelse($appointments as $appointment)
                     @php
-                        // ✅ Split-safe totals
                         $total     = (float) ($appointment->total_price ?? 0);
                         $paidTotal = (float) $appointment->payments->sum('amount');
                         $cashPaid  = (float) $appointment->payments->where('method','cash')->sum('amount');
@@ -151,7 +195,6 @@
                     <tr>
                         <td>{{ $appointment->start_time?->format('d/m/Y H:i') }}</td>
 
-                        {{-- Customer --}}
                         <td>
                             @if($appointment->customer)
                                 <a href="{{ route('customers.show', $appointment->customer) }}">
@@ -164,7 +207,6 @@
                             @endif
                         </td>
 
-                        {{-- Professional --}}
                         <td>
                             @if($appointment->professional)
                                 <a href="{{ route('professionals.show', $appointment->professional) }}">
@@ -177,10 +219,8 @@
                             @endif
                         </td>
 
-                        {{-- Company --}}
                         <td>{{ $appointment->company->name ?? '-' }}</td>
 
-                        {{-- Status / service --}}
                         <td>
                             <span class="badge
                                 @if($appointment->status === 'completed') bg-success
@@ -192,10 +232,8 @@
                             </span>
                         </td>
 
-                        {{-- Total --}}
                         <td>{{ number_format($total, 2, ',', '.') }}</td>
 
-                        {{-- Payment (split friendly) --}}
                         <td>
                             @if($paidTotal <= 0)
                                 <span class="badge bg-danger">Απλήρωτο</span>
@@ -218,12 +256,10 @@
                             @endif
                         </td>
 
-                        {{-- Notes --}}
                         <td title="{{ $appointment->notes }}">
                             {{ $appointment->notes ? \Illuminate\Support\Str::limit($appointment->notes, 30) : '-' }}
                         </td>
 
-                        {{-- Actions --}}
                         <td>
                             <a href="{{ route('appointments.edit', $appointment) }}"
                                class="btn btn-sm btn-secondary mb-1"
