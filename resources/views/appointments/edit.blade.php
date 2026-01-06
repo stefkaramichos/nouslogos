@@ -135,7 +135,8 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // flatpickr init
+
+    // flatpickr
     flatpickr("#start_time", {
         enableTime: true,
         time_24hr: true,
@@ -147,22 +148,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // select2 (αν έχεις ήδη global init, δεν πειράζει)
-    if (window.$ && $.fn.select2) {
-        $('.select2').select2({ width: '100%' });
-    }
-
     function toggleProfessionalAmount() {
-        const select  = document.getElementById('professional_select');
-        const group   = document.getElementById('professional_amount_group');
-        const input   = document.querySelector('input[name="professional_amount"]');
+        const select = document.getElementById('professional_select');
+        const group  = document.getElementById('professional_amount_group');
+        const input  = document.querySelector('input[name="professional_amount"]');
 
         if (!select || !group) return;
 
         const selectedOption = select.options[select.selectedIndex];
         const role = selectedOption ? selectedOption.getAttribute('data-role') : null;
+        const professionalId = selectedOption ? parseInt(selectedOption.value, 10) : null;
 
-        if (role === 'owner') {
+        if (role === 'owner' || professionalId === 17) {
             group.style.display = '';
         } else {
             group.style.display = 'none';
@@ -170,12 +167,35 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    const professionalSelect = document.getElementById('professional_select');
-    if (professionalSelect) {
-        professionalSelect.addEventListener('change', toggleProfessionalAmount);
+    // ✅ Select2 init + event binding (σωστό για select2)
+    if (window.$ && $.fn.select2) {
+        const $prof = $('#professional_select');
+
+        // init (αν δεν έχει ήδη γίνει)
+        if (!$prof.hasClass('select2-hidden-accessible')) {
+            $prof.select2({ width: '100%' });
+        }
+
+        // ✅ bind change για select2
+        $prof.on('change.select2', function () {
+            toggleProfessionalAmount();
+        });
+
+        // (optional) όταν καθαρίζει selection
+        $prof.on('select2:clear', function () {
+            toggleProfessionalAmount();
+        });
+    } else {
+        // fallback χωρίς select2
+        const professionalSelect = document.getElementById('professional_select');
+        if (professionalSelect) {
+            professionalSelect.addEventListener('change', toggleProfessionalAmount);
+        }
     }
 
+    // αρχική κατάσταση
     toggleProfessionalAmount();
 });
 </script>
+
 @endpush
