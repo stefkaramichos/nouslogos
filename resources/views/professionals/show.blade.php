@@ -1,3 +1,5 @@
+{{-- resources/views/professionals/show.blade.php --}}
+
 @extends('layouts.app')
 
 @section('title', 'Επαγγελματίας: '.$professional->last_name.' '.$professional->first_name)
@@ -55,6 +57,18 @@
                         {{ number_format($professionalTotalCut, 2, ',', '.') }} €
                     </span>
                 </p>
+
+                {{-- (optional) έξτρα --}}
+                {{--
+                <p class="mb-0">
+                    <strong>Εισπράξεις:</strong>
+                    <span class="badge bg-dark fs-6">{{ number_format($paidTotal, 2, ',', '.') }} €</span>
+                </p>
+                <p class="mb-0">
+                    <strong>Υπόλοιπο:</strong>
+                    <span class="badge bg-warning text-dark fs-6">{{ number_format($outstandingTotal, 2, ',', '.') }} €</span>
+                </p>
+                --}}
             </div>
         </div>
     </div>
@@ -67,34 +81,80 @@
 
         <div class="card-body">
 
-            {{-- Φίλτρα --}}
+            @php
+                $range = $filters['range'] ?? 'month';
+                $day   = $filters['day'] ?? now()->format('Y-m-d');
+                $month = $filters['month'] ?? now()->format('Y-m');
+            @endphp
+
+            {{-- ===================== PERIOD FILTER (month/day/all + prev/next) ===================== --}}
+            <form method="GET" action="{{ route('professionals.show', $professional) }}" class="mb-2">
+
+                {{-- keep customer search --}}
+                <input type="hidden" name="customer" value="{{ $filters['customer'] ?? '' }}">
+
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label">Περίοδος</label>
+                        <select name="range" class="form-select" onchange="this.form.submit()">
+                            <option value="month" @selected($range === 'month')>Μήνας</option>
+                            <option value="day"   @selected($range === 'day')>Ημέρα</option>
+                            <option value="all"   @selected($range === 'all')>Όλα</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        @if($range === 'day')
+                            <input type="date" name="day" hidden class="form-control" value="{{ $day }}">
+                        @elseif($range === 'month')
+                            <input type="month" name="month" hidden class="form-control" value="{{ $month }}">
+                        @else
+                            <input type="text" hidden class="form-control" value="Όλα" disabled>
+                        @endif
+                    </div>
+
+                    <div class="col-md-9 d-flex gap-2 justify-content-start">
+                        @if($range !== 'all')
+                            <a href="{{ $prevUrl }}" class="btn btn-outline-secondary">← Προηγούμενο</a>
+                            <a href="{{ $nextUrl }}" class="btn btn-outline-secondary">Επόμενο →</a>
+                        @endif
+                    </div>
+                </div>
+            </form>
+
+            <div class="mb-3">
+                <span class="text-muted">Έχετε επιλέξει:</span>
+                <span class="badge bg-dark">{{ $selectedLabel ?? 'Όλα' }}</span>
+            </div>
+
+            {{-- ===================== CUSTOMER FILTER (text) ===================== --}}
             <form method="GET" action="{{ route('professionals.show', $professional) }}" class="mb-3">
+                {{-- keep range fields --}}
+                <input type="hidden" name="range" value="{{ $range }}">
+                @if($range === 'day')
+                    <input type="hidden" name="day" value="{{ $day }}">
+                @elseif($range === 'month')
+                    <input type="hidden" name="month" value="{{ $month }}">
+                @endif
+
                 <div class="row g-2">
-                    <div class="col-md-3">
-                        <label class="form-label">Από Ημερομηνία</label>
-                        <input type="date" name="from" class="form-control"
-                               value="{{ $filters['from'] ?? '' }}">
-                    </div>
-
-                    <div class="col-md-3">
-                        <label class="form-label">Έως Ημερομηνία</label>
-                        <input type="date" name="to" class="form-control"
-                               value="{{ $filters['to'] ?? '' }}">
-                    </div>
-
-                    <div class="col-md-3">
+                    <div class="col-md-6">
                         <label class="form-label">Πελάτης</label>
                         <input type="text" name="customer" class="form-control"
                                placeholder="Όνομα ή επώνυμο..."
                                value="{{ $filters['customer'] ?? '' }}">
                     </div>
 
-                    <div class="col-md-3 d-flex align-items-end justify-content-end">
+                    <div class="col-md-6 d-flex align-items-end justify-content-end">
                         <button class="btn btn-outline-primary me-2">
-                            Εφαρμογή Φίλτρων
+                            Εφαρμογή
                         </button>
 
-                        <a href="{{ route('professionals.show', $professional) }}" class="btn btn-outline-secondary">
+                        {{-- reset to current month (not all) --}}
+                        <a href="{{ route('professionals.show', $professional, [
+                            'range' => 'month',
+                            'month' => now()->format('Y-m'),
+                        ]) }}" class="btn btn-outline-secondary">
                             Καθαρισμός
                         </a>
                     </div>
@@ -102,7 +162,8 @@
             </form>
 
             <div class="table-responsive">
-                @include('../includes/selected_dates')
+                {{-- @include('../includes/selected_dates') --}}
+                {{-- το αντικαταστήσαμε με month/day/all επάνω --}}
 
                 <table class="table table-striped mb-0 align-middle">
                     <thead>
@@ -134,6 +195,7 @@
                         @endphp
 
                         <tr>
+                            {{-- Σημάδι therapist_appointments --}}
                             <td class="text-center">
                                 @if(isset($therapistMatches[$matchKey]))
                                     <span class="badge bg-info" title="Υπάρχει αντίστοιχο ραντεβού από τον θεραπευτή">
@@ -170,6 +232,7 @@
                             <td>
                                 @if($paidTotal <= 0)
                                     <span class="badge bg-danger">Απλήρωτο</span>
+
                                 @elseif($paidTotal < $total)
                                     <span class="badge bg-warning text-dark">
                                         Μερική πληρωμή {{ number_format($paidTotal, 2, ',', '.') }} €
@@ -180,6 +243,7 @@
                                             @if($cardPaid > 0) Κάρτα: {{ number_format($cardPaid, 2, ',', '.') }} € @endif
                                         </small>
                                     </span>
+
                                 @else
                                     <span class="badge bg-success">
                                         Πλήρως πληρωμένο {{ number_format($paidTotal, 2, ',', '.') }} €
@@ -227,10 +291,10 @@
                 </table>
 
                 <div class="d-flex justify-content-center mt-3">
-                    {{ $appointments->links() }}
+                    {{ $appointments->withQueryString()->links() }}
                 </div>
 
-                {{-- Therapist-only appointments --}}
+                {{-- Ραντεβού που υπάρχουν ΜΟΝΟ στον πίνακα therapist_appointments --}}
                 @if(!empty($therapistMissing) && count($therapistMissing) > 0)
                     <hr>
 
