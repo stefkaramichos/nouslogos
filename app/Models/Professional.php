@@ -79,4 +79,9 @@ class Professional extends Authenticatable
         ->using(CustomerProfessional::class)
         ->withTimestamps();
     }
+    public function documents()
+    {
+        return $this->hasMany(\App\Models\Document::class);
+    }
+
 }

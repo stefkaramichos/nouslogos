@@ -13,6 +13,7 @@ use App\Http\Controllers\TherapistAppointmentController;
 use App\Http\Controllers\SettlementController;
 use App\Http\Controllers\AppointmentTrashController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\DocumentController;
 
 // 🔹 Login routes (χωρίς auth)
 Route::get('/login', [AuthController::class, 'showLoginForm'])
@@ -147,6 +148,14 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/customers/{customer}/toggle-active', [CustomerController::class, 'toggleActive'])
         ->name('customers.toggleActive');
+
+          Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');
+    Route::get('/documents/create', [DocumentController::class, 'create'])->name('documents.create');
+    Route::post('/documents', [DocumentController::class, 'store'])->name('documents.store');
+
+    Route::get('/documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
+    Route::get('/documents/{document}/view', [DocumentController::class, 'view'])->name('documents.view');
+    Route::delete('/documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
 
 });
 

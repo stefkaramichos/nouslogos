@@ -121,6 +121,10 @@
                         <i class="bi bi-trash"></i>
                     </a>
 
+                    <a href="{{ route('documents.index') }}" class="btn btn-outline-success" title="Αρχεία">
+                        <i class="bi bi-folder2-open"></i>
+                    </a>
+                    
                     <a href="{{ route('notifications.index') }}" class="btn btn-outline-primary" title="Ειδοποιήσεις">
                         <i class="bi bi-bell"></i>
                     </a>
@@ -200,6 +204,10 @@
                         @if($user && in_array($user->role, ['owner', 'grammatia']))
                             <a href="{{ route('appointments.recycle') }}" class="btn btn-outline-secondary" title="Recycle Ραντεβού">
                                 <i class="bi bi-trash"></i>
+                            </a>
+
+                            <a href="{{ route('documents.index') }}" class="btn btn-outline-success" title="Αρχεία">
+                                <i class="bi bi-folder2-open"></i>
                             </a>
 
                             <a href="{{ route('notifications.index') }}" class="btn btn-outline-primary" title="Ειδοποιήσεις">
