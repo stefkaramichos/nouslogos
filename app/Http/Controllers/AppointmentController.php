@@ -23,40 +23,34 @@ class AppointmentController extends Controller
         $companies     = Company::orderBy('name')->get();
 
         // -----------------------------
-        // NEW: Period filter (range/day/month/all) + prev/next
+        // Period filter (range/day/month/all) + prev/next
         // -----------------------------
-        $range = $request->input('range', 'month'); // day/month/all
+        $range = $request->input('range', 'month');
         $nav   = $request->input('nav');
         $day   = $request->input('day');
         $month = $request->input('month');
 
-        // Αν δεν έχει σταλεί τίποτα (ούτε φίλτρα), default = ΣΗΜΕΡΑ (day)
         if (!$request->hasAny([
             'range','day','month','nav',
             'customer_id','professional_id','company_id','status','payment_status','payment_method',
-            'from','to' // για backward compatibility
+            'from','to'
         ])) {
             $range = 'month';
             $month = now()->format('Y-m');
             $month = null;
         }
 
-        // Αν έρθουν τα παλιά from/to, τα μετατρέπουμε σε day range για συμβατότητα
-        // (ώστε να μην χαλάσουν παλιά links / bookmarks)
         $legacyFrom = $request->input('from');
         $legacyTo   = $request->input('to');
         if ($legacyFrom && $legacyTo && !$request->hasAny(['range','day','month'])) {
-            // αν είναι ίδια μέρα -> day, αλλιώς all (ή μπορούμε month αλλά είναι πιο tricky)
             if ($legacyFrom === $legacyTo) {
                 $range = 'day';
                 $day   = $legacyFrom;
             } else {
-                // κρατάμε range=all και αφήνουμε from/to να δουλέψουν όπως πριν
                 $range = 'all';
             }
         }
 
-        // Normalization
         if ($range === 'day') {
             $day = $day ?: now()->toDateString();
             $month = null;
@@ -68,7 +62,6 @@ class AppointmentController extends Controller
             $month = null;
         }
 
-        // Prev/Next navigation
         if ($nav === 'prev' || $nav === 'next') {
             if ($range === 'day') {
                 $base = Carbon::parse($day ?: now()->toDateString());
@@ -81,7 +74,6 @@ class AppointmentController extends Controller
             }
         }
 
-        // Υπολογίζουμε from/to από range
         $from = null;
         $to   = null;
 
@@ -93,12 +85,10 @@ class AppointmentController extends Controller
             $from = $m->copy()->startOfMonth()->toDateString();
             $to   = $m->copy()->endOfMonth()->toDateString();
         } else {
-            // range === 'all' -> αφήνουμε from/to null (εκτός αν ήρθαν legacy)
             if ($legacyFrom) $from = $legacyFrom;
             if ($legacyTo)   $to   = $legacyTo;
         }
 
-        // Label
         $selectedLabel = 'Όλα';
         if ($range === 'day' && $day) {
             $selectedLabel = Carbon::parse($day)->locale('el')->translatedFormat('D d/m/Y');
@@ -112,11 +102,10 @@ class AppointmentController extends Controller
         $customerId     = $request->input('customer_id');
         $professionalId = $request->input('professional_id');
         $companyId      = $request->input('company_id');
-        $status         = $request->input('status');
+        $status         = $request->input('status'); // εδώ έρχεται ΠΛΕΟΝ σαν single filter string από UI του index
         $paymentStatus  = $request->input('payment_status');
         $paymentMethod  = $request->input('payment_method');
 
-        // ✅ base query (payments όχι payment)
         $query = Appointment::with(['customer', 'professional', 'company', 'payments'])
             ->orderBy('start_time', 'desc');
 
@@ -127,13 +116,19 @@ class AppointmentController extends Controller
         if ($professionalId) $query->where('professional_id', $professionalId);
         if ($companyId)      $query->where('company_id', $companyId);
 
+        // ✅ status filter (token μέσα σε comma-separated string)
         if ($status && $status !== 'all') {
-            $query->where('status', $status);
+            $query->where(function ($q) use ($status) {
+                $q->where('status', $status)
+                  ->orWhere('status', 'like', $status . ',%')
+                  ->orWhere('status', 'like', '%,' . $status . ',%')
+                  ->orWhere('status', 'like', '%,' . $status);
+            });
         }
 
         $appointments = $query->get();
 
-        // ✅ payment_status filter (με βάση paid_total)
+        // payment_status filter
         if ($paymentStatus && $paymentStatus !== 'all') {
             $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
                 $total = (float) ($a->total_price ?? 0);
@@ -147,14 +142,14 @@ class AppointmentController extends Controller
             });
         }
 
-        // ✅ payment_method filter (υπάρχει έστω μία πληρωμή με method)
+        // payment_method filter
         if ($paymentMethod && $paymentMethod !== 'all') {
             $appointments = $appointments->filter(function ($a) use ($paymentMethod) {
                 return $a->payments->where('method', $paymentMethod)->sum('amount') > 0;
             });
         }
 
-        // manual pagination (25 per page)
+        // manual pagination
         $perPage = 25;
         $currentPage = Paginator::resolveCurrentPage() ?: 1;
 
@@ -171,14 +166,14 @@ class AppointmentController extends Controller
             ]
         );
 
-        // Prev/Next URLs (κρατάμε όλα τα query params)
+        // Prev/Next URLs
         $prevUrl = null;
         $nextUrl = null;
 
         if ($range !== 'all') {
             $baseQuery = $request->query();
             unset($baseQuery['nav']);
-            unset($baseQuery['from'], $baseQuery['to']); // από εδώ και πέρα οδηγούμε με range/day/month
+            unset($baseQuery['from'], $baseQuery['to']);
 
             if ($range === 'day') {
                 $baseQuery['range'] = 'day';
@@ -195,12 +190,10 @@ class AppointmentController extends Controller
         }
 
         $filters = [
-            // NEW
             'range'          => $range,
             'day'            => $day,
             'month'          => $month,
 
-            // OLD (still useful)
             'from'           => $from,
             'to'             => $to,
 
@@ -224,8 +217,6 @@ class AppointmentController extends Controller
         ));
     }
 
-
-
     public function getLastForCustomer(Request $request)
     {
         $customerId = $request->query('customer_id');
@@ -247,7 +238,7 @@ class AppointmentController extends Controller
             'found'               => true,
             'professional_id'     => $appointment->professional_id,
             'company_id'          => $appointment->company_id,
-            'status'              => $appointment->status,
+            'status'              => $appointment->status, // μπορεί να είναι "a,b"
             'total_price'         => $appointment->total_price,
             'professional_amount' => $appointment->professional_amount,
             'notes'               => $appointment->notes,
@@ -264,7 +255,8 @@ class AppointmentController extends Controller
         $professionals = Professional::whereIn('role', ['owner', 'therapist'])
             ->orderBy('last_name')
             ->get();
-        $companies     = Company::all();
+
+        $companies = Company::all();
 
         return view('appointments.create', compact('customers', 'professionals', 'companies'));
     }
@@ -278,14 +270,16 @@ class AppointmentController extends Controller
                 'company_id'            => 'required|exists:companies,id',
                 'start_time'            => 'required|date',
                 'end_time'              => 'nullable|date|after_or_equal:start_time',
-                'status'                => 'nullable|string',
+
+                // ✅ MULTI STATUS
+                'status'                => 'nullable|array',
+                'status.*'              => 'in:logotherapia,psixotherapia,ergotherapia,omadiki,eidikos,aksiologisi',
+
                 'total_price'           => 'nullable|numeric|min:0',
                 'notes'                 => 'nullable|string',
                 'mark_as_paid'          => 'nullable|boolean',
                 'payment_amount'        => 'nullable|numeric|min:0',
-                // ΝΕΟ πεδίο: ειδικό ποσό επαγγελματία για αυτό το ραντεβού (override)
                 'professional_amount'   => 'nullable|numeric|min:0',
-                // ΝΕΟ πεδίο: πόσες εβδομάδες να δημιουργηθεί (1–52)
                 'weeks'                 => 'nullable|integer|min:1|max:52',
             ],
             [
@@ -296,27 +290,26 @@ class AppointmentController extends Controller
             ]
         );
 
-        // Πόσες εβδομάδες επανάληψη; default 1
+        // ✅ status[] -> "a,b,c"
+        $data['status'] = isset($data['status'])
+            ? implode(',', array_values(array_filter($data['status'])))
+            : null;
+
         $weeks = (int)($data['weeks'] ?? 1);
-        unset($data['weeks']); // δεν υπάρχει στο table
+        unset($data['weeks']);
 
         $professional = Professional::findOrFail($data['professional_id']);
 
-        // Αν δεν δώσεις total_price, παίρνουμε τη χρέωση του επαγγελματία
         $total = $data['total_price'] ?? $professional->service_fee;
 
-        // Βάση: ποσό ανά ραντεβού από το profile του επαγγελματία
-        $baseProfessionalAmount = $professional->percentage_cut; // ΠΟΣΟ, όχι ποσοστό %
+        $baseProfessionalAmount = $professional->percentage_cut;
 
-        // Default ποσό επαγγελματία = αυτό
         $professionalAmount = $baseProfessionalAmount;
 
-        // Αν συμπλήρωσες ειδικό ποσό στο ραντεβού, κάνουμε override
         if (array_key_exists('professional_amount', $data) && $data['professional_amount'] !== null) {
             $professionalAmount = $data['professional_amount'];
         }
 
-        // Δεν αφήνουμε ποτέ ο επαγγελματίας να πάρει παραπάνω από total
         if ($professionalAmount > $total) {
             $professionalAmount = $total;
         }
@@ -328,7 +321,6 @@ class AppointmentController extends Controller
         $data['company_amount']      = $companyAmount;
         $data['created_by']          = Auth::id();
 
-        // Διαχείριση ημερομηνιών για επαναλαμβανόμενα ραντεβού
         $startTime = Carbon::parse($data['start_time']);
         $endTime   = isset($data['end_time']) ? Carbon::parse($data['end_time']) : null;
 
@@ -346,7 +338,6 @@ class AppointmentController extends Controller
             $appointment = Appointment::create($currentData);
             $createdAppointments[] = $appointment;
 
-            // Πληρωμή μόνο για το πρώτο ραντεβού
             if ($i === 0 && $request->boolean('mark_as_paid')) {
                 $paymentAmount = $data['payment_amount'] ?? $total;
 
@@ -368,20 +359,16 @@ class AppointmentController extends Controller
             ? 'Το ραντεβού δημιουργήθηκε επιτυχώς!'
             : 'Δημιουργήθηκαν ' . count($createdAppointments) . ' εβδομαδιαία ραντεβού επιτυχώς!';
 
-        // ---- Χειρισμός redirect ----
         if ($request->filled('redirect_to')) {
-            return redirect($request->input('redirect_to'))
-                ->with('success', $message);
+            return redirect($request->input('redirect_to'))->with('success', $message);
         }
 
-        return redirect()->route('appointments.index')
-            ->with('success', $message);
+        return redirect()->route('appointments.index')->with('success', $message);
     }
 
     public function show(Appointment $appointment)
     {
         $appointment->load(['customer', 'professional', 'company', 'payment']);
-
         return view('appointments.show', compact('appointment'));
     }
 
@@ -390,7 +377,7 @@ class AppointmentController extends Controller
         $appointment->load(['customer', 'professional', 'company']);
 
         $customers = Customer::where('is_active', 1)
-            ->orWhere('id', $appointment->customer_id) // ✅ κρατάει selectable τον υπάρχοντα
+            ->orWhere('id', $appointment->customer_id)
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get();
@@ -404,7 +391,6 @@ class AppointmentController extends Controller
         return view('appointments.edit', compact('appointment', 'customers', 'professionals', 'companies'));
     }
 
-
     public function update(Request $request, Appointment $appointment)
     {
         $data = $request->validate(
@@ -414,10 +400,13 @@ class AppointmentController extends Controller
                 'company_id'            => 'required|exists:companies,id',
                 'start_time'            => 'required|date',
                 'end_time'              => 'nullable|date|after_or_equal:start_time',
-                'status'                => 'nullable|string',
+
+                // ✅ MULTI STATUS
+                'status'                => 'nullable|array',
+                'status.*'              => 'in:logotherapia,psixotherapia,ergotherapia,omadiki,eidikos,aksiologisi',
+
                 'total_price'           => 'nullable|numeric|min:0',
                 'notes'                 => 'nullable|string',
-                // το ίδιο override πεδίο και εδώ
                 'professional_amount'   => 'nullable|numeric|min:0',
             ],
             [
@@ -428,12 +417,15 @@ class AppointmentController extends Controller
             ]
         );
 
-        // Ξαναυπολογίζουμε οικονομικά με βάση τον επαγγελματία
+        // ✅ status[] -> "a,b,c"
+        $data['status'] = isset($data['status'])
+            ? implode(',', array_values(array_filter($data['status'])))
+            : null;
+
         $professional = Professional::findOrFail($data['professional_id']);
 
         $total = $data['total_price'] ?? $professional->service_fee;
 
-        // Βάση = ποσό ανά ραντεβού από τον επαγγελματία
         $baseProfessionalAmount = $professional->percentage_cut;
 
         $professionalAmount = $baseProfessionalAmount;
@@ -457,13 +449,10 @@ class AppointmentController extends Controller
         $redirectTo = $request->input('redirect_to');
 
         if ($redirectTo) {
-            return redirect($redirectTo)
-                ->with('success', 'Το ραντεβού ενημερώθηκε επιτυχώς.');
+            return redirect($redirectTo)->with('success', 'Το ραντεβού ενημερώθηκε επιτυχώς.');
         }
 
-        return redirect()
-            ->route('appointments.index')
-            ->with('success', 'Το ραντεβού ενημερώθηκε επιτυχώς.');
+        return redirect()->route('appointments.index')->with('success', 'Το ραντεβού ενημερώθηκε επιτυχώς.');
     }
 
     public function updatePrice(Request $request, Appointment $appointment)
@@ -484,20 +473,14 @@ class AppointmentController extends Controller
 
     public function destroy(Request $request, Appointment $appointment)
     {
-        $appointment->delete(); // Soft delete
+        $appointment->delete();
 
         $redirectTo = $request->input('redirect_to');
 
-        // If we have a stored redirect URL → go back there
         if ($redirectTo) {
-            return redirect($redirectTo)
-                ->with('success', 'Το ραντεβού διαγράφηκε επιτυχώς.');
+            return redirect($redirectTo)->with('success', 'Το ραντεβού διαγράφηκε επιτυχώς.');
         }
 
-        // Fallback
-        return redirect()
-            ->route('appointments.index')
-            ->with('success', 'Το ραντεβού διαγράφηκε επιτυχώς.');
+        return redirect()->route('appointments.index')->with('success', 'Το ραντεβού διαγράφηκε επιτυχώς.');
     }
-
 }

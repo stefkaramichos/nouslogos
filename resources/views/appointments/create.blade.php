@@ -12,7 +12,7 @@
                 @csrf
 
                 {{-- ΠΕΛΑΤΗΣ --}}
-               <div class="mb-3">
+                <div class="mb-3">
                     <label class="form-label">Πελάτης</label>
                     <select name="customer_id" id="customer_select" class="form-select select2" required>
                         <option value="">-- Επιλέξτε πελάτη --</option>
@@ -25,7 +25,7 @@
                     </select>
                 </div>
 
-              {{-- ΕΠΑΓΓΕΛΜΑΤΙΑΣ --}}
+                {{-- ΕΠΑΓΓΕΛΜΑΤΙΑΣ --}}
                 <div class="mb-3">
                     <label class="form-label">Θεραπευτής</label>
                     <select name="professional_id" id="professional_select" class="form-select select2" required>
@@ -42,11 +42,10 @@
                     </select>
                 </div>
 
-
                 {{-- ΕΤΑΙΡΕΙΑ --}}
                 <div class="mb-3">
                     <label class="form-label">Εταιρεία</label>
-                    <select name="company_id" id="company_select" class="form-select" required>
+                    <select name="company_id" id="company_select" class="form-select select2" required>
                         <option value="">-- Επιλέξτε εταιρεία --</option>
                         @foreach($companies as $company)
                             <option value="{{ $company->id }}" @selected(old('company_id') == $company->id)>
@@ -62,6 +61,7 @@
                     <input id="start_time" type="text" name="start_time" class="form-control"
                            value="{{ old('start_time') }}" required>
                 </div>
+
                 <input type="hidden" name="redirect_to" value="{{ request('redirect') }}">
 
                 {{-- ΠΟΣΕΣ ΕΒΔΟΜΑΔΕΣ (ΕΠΑΝΑΛΗΨΗ) --}}
@@ -75,22 +75,27 @@
                         @endfor
                     </select>
                     <small class="text-muted">
-                        Πόσες εβδομάδες να δημιουργηθεί το ίδιο ραντεβού (ανά 7 ημέρες). Προεπιλογή: 1 εβδομάδα (μόνο αυτό το ραντεβού).
+                        Πόσες εβδομάδες να δημιουργηθεί το ίδιο ραντεβού (ανά 7 ημέρες). Προεπιλογή: 1 εβδομάδα.
                     </small>
                 </div>
 
-                {{-- ΥΠΗΡΕΣΙΑ (status) --}}
+                {{-- ΥΠΗΡΕΣΙΑ (status) - ΠΟΛΛΑΠΛΟ --}}
+                @php
+                    $oldStatuses = old('status', []); // array
+                @endphp
                 <div class="mb-3">
                     <label class="form-label">Υπηρεσία</label>
-                    @php $oldStatus = old('status', 'logotherapia'); @endphp
-                    <select name="status" id="status_select" class="form-select">
-                        <option value="logotherapia"  @selected($oldStatus === 'logotherapia')>Λογοθεραπεία</option>
-                        <option value="psixotherapia" @selected($oldStatus === 'psixotherapia')>Ψυχοθεραπεία</option>
-                        <option value="ergotherapia"  @selected($oldStatus === 'ergotherapia')>Εργοθεραπεία</option>
-                        <option value="omadiki"       @selected($oldStatus === 'omadiki')>Ομαδική</option>
-                        <option value="eidikos"       @selected($oldStatus === 'eidikos')>Ειδικός παιδαγωγός</option>
-                        <option value="aksiologisi"   @selected($oldStatus === 'aksiologisi')>Αξιολόγηση</option>
+                    <select name="status[]" id="status_select" class="form-select select2" multiple>
+                        <option value="logotherapia"  @selected(in_array('logotherapia', $oldStatuses))>Λογοθεραπεία</option>
+                        <option value="psixotherapia" @selected(in_array('psixotherapia', $oldStatuses))>Ψυχοθεραπεία</option>
+                        <option value="ergotherapia"  @selected(in_array('ergotherapia', $oldStatuses))>Εργοθεραπεία</option>
+                        <option value="omadiki"       @selected(in_array('omadiki', $oldStatuses))>Ομαδική</option>
+                        <option value="eidikos"       @selected(in_array('eidikos', $oldStatuses))>Ειδικός παιδαγωγός</option>
+                        <option value="aksiologisi"   @selected(in_array('aksiologisi', $oldStatuses))>Αξιολόγηση</option>
                     </select>
+                    <small class="text-muted">
+                        Μπορείς να επιλέξεις πάνω από μία υπηρεσίες.
+                    </small>
                 </div>
 
                 {{-- ΧΡΕΩΣΗ ΡΑΝΤΕΒΟΥ --}}
@@ -117,9 +122,6 @@
                         class="form-control"
                         value="{{ old('professional_amount') }}"
                     >
-                    <small class="text-muted">
-                        {{-- Αν μείνει κενό, θα χρησιμοποιηθεί το ποσό από το προφίλ του επαγγελματία (ή ο αυτόματος υπολογισμός). --}}
-                    </small>
                 </div>
 
                 {{-- ΣΗΜΕΙΩΣΕΙΣ --}}
@@ -135,18 +137,19 @@
     </div>
 @endsection
 
-
 @push('scripts')
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-
 <script>
 $(function () {
-    // flatpickr για ημερομηνία/ώρα
+    // flatpickr
     flatpickr("#start_time", {
         enableTime: true,
-        dateFormat: "Y-m-d H:i",
-        minuteIncrement: 15
+        time_24hr: true,
+        dateFormat: "d-m-Y H:i",
+        minuteIncrement: 15,
+        locale: {
+            ...flatpickr.l10ns.el,
+            firstDayOfWeek: 1
+        }
     });
 
     // Select2 init
@@ -167,21 +170,17 @@ $(function () {
             $('#professional_amount_group').show();
         } else {
             $('#professional_amount_group').hide();
-            // Optional: καθάρισε το πεδίο όταν δεν είναι owner
             $('#professional_amount_input').val('');
         }
     }
 
-    // Bind change event
     $('#professional_select').on('change', function () {
         toggleProfessionalAmount();
-        // (κρατάς και τα δικά σου υπάρχοντα actions εδώ)
     });
 
-    // Αρχική κατάσταση όταν φορτώνει η σελίδα
     toggleProfessionalAmount();
 
-    // === ΕΠΑΓΓΕΛΜΑΤΙΑΣ change -> φέρε εταιρεία ===
+    // ΕΠΑΓΓΕΛΜΑΤΙΑΣ -> εταιρεία
     $('#professional_select').on('change', function () {
         const profId = $(this).val();
 
@@ -201,43 +200,33 @@ $(function () {
             });
     });
 
-    // === ΠΕΛΑΤΗΣ change -> φέρε στοιχεία τελευταίου ραντεβού ===
+    // ΠΕΛΑΤΗΣ -> τελευταία στοιχεία
     $('#customer_select').on('change', function () {
         const customerId = $(this).val();
-
-        if (!customerId) {
-            return;
-        }
+        if (!customerId) return;
 
         $.getJSON(lastAppointmentUrl, { customer_id: customerId })
             .done(function (data) {
-                if (!data.found) {
-                    return;
-                }
+                if (!data.found) return;
 
-                // Επαγγελματίας (και αυτόματα εταιρεία μέσω change)
                 if (data.professional_id) {
-                    $('#professional_select')
-                        .val(data.professional_id)
-                        .trigger('change'); // θα πυροδοτήσει και το event του επαγγελματία
+                    $('#professional_select').val(data.professional_id).trigger('change');
                 }
 
-                // Υπηρεσία (status)
+                // status (σε νέο multi select): αν το API γυρνά string, το κάνουμε array
                 if (data.status) {
-                    $('#status_select').val(data.status).trigger('change');
+                    const arr = String(data.status).split(',').filter(Boolean);
+                    $('#status_select').val(arr).trigger('change');
                 }
 
-                // Χρέωση ραντεβού
                 if (typeof data.total_price !== 'undefined') {
                     $('#total_price_input').val(data.total_price);
                 }
 
-                // Ποσό επαγγελματία
                 if (typeof data.professional_amount !== 'undefined') {
                     $('#professional_amount_input').val(data.professional_amount);
                 }
 
-                // Σημειώσεις (μόνο αν είναι άδειο το πεδίο)
                 if (data.notes && !$('#notes_textarea').val()) {
                     $('#notes_textarea').val(data.notes);
                 }
@@ -247,8 +236,6 @@ $(function () {
             });
     });
 
-    // Αν ήρθες με ήδη επιλεγμένο πελάτη (customer_id στο URL κλπ),
-    // κάνε αυτόματα load τα στοιχεία
     if ($('#customer_select').val()) {
         $('#customer_select').trigger('change');
     }
