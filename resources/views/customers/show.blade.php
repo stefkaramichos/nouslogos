@@ -271,8 +271,8 @@
                         @elseif($range === 'month')
                             <input type="month" hidden name="month" class="form-control" value="{{ $month }}">
                         @else
-                            <label class="form-label">Περίοδος</label>
-                            <input type="text" class="form-control" value="Όλα" disabled>
+                            <label class="form-label" hidden>Περίοδος</label>
+                            <input type="text" hidden class="form-control" value="Όλα" disabled>
                         @endif
                     </div>
 
