@@ -165,8 +165,9 @@ $(function () {
     function toggleProfessionalAmount() {
         const selectedOption = $('#professional_select').find('option:selected');
         const role = selectedOption.data('role');
+        const professionalId = parseInt(selectedOption.val(), 10);
 
-        if (role === 'owner') {
+        if (role === 'owner' || professionalId === 17) {
             $('#professional_amount_group').show();
         } else {
             $('#professional_amount_group').hide();
