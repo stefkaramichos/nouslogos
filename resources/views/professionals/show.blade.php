@@ -228,9 +228,17 @@
                                 </span>
                             </td>
 
-                            {{-- ✅ Πληρωμή (split) --}}
+                           {{-- ✅ Πληρωμή (κανόνας: total_price <= 0 => ΠΛΗΡΩΜΕΝΟ) --}}
                             <td>
-                                @if($paidTotal <= 0)
+                                @php
+                                    $isZeroPrice = $total <= 0;
+                                @endphp
+
+                                @if($isZeroPrice)
+                                    <span class="badge bg-success">Πλήρως πληρωμένο</span>
+                                    <small class="text-muted d-block">Μηδενική χρέωση</small>
+
+                                @elseif($paidTotal <= 0)
                                     <span class="badge bg-danger">Απλήρωτο</span>
 
                                 @elseif($paidTotal < $total)
@@ -256,6 +264,7 @@
                                     </span>
                                 @endif
                             </td>
+
 
                             <td>
                                 {{ $appointment->notes ? Str::limit($appointment->notes, 50) : '-' }}

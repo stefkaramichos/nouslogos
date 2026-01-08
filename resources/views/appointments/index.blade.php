@@ -235,18 +235,32 @@
                         <td>{{ number_format($total, 2, ',', '.') }}</td>
 
                         <td>
-                            @if($paidTotal <= 0)
+                            @php
+                                $isZeroPrice = $total <= 0;
+                            @endphp
+
+                            @if($isZeroPrice)
+                                <span class="badge bg-success">Πλήρως πληρωμένο</span>
+                                <small class="text-muted d-block">Μηδενική χρέωση</small>
+
+                            @elseif($paidTotal <= 0)
                                 <span class="badge bg-danger">Απλήρωτο</span>
+
+                            @elseif($paidTotal < $total)
+                                <span class="badge bg-warning text-dark d-block mb-1">
+                                    Μερική πληρωμή {{ number_format($paidTotal, 2, ',', '.') }} €
+                                </span>
+
+                                <small class="text-muted d-block">
+                                    @if($cashPaid > 0) Μετρητά: {{ number_format($cashPaid, 2, ',', '.') }} € @endif
+                                    @if($cashPaid > 0 && $cardPaid > 0) · @endif
+                                    @if($cardPaid > 0) Κάρτα: {{ number_format($cardPaid, 2, ',', '.') }} € @endif
+                                </small>
+
                             @else
-                                @if($paidTotal < $total)
-                                    <span class="badge bg-warning text-dark d-block mb-1">
-                                        Μερική πληρωμή {{ number_format($paidTotal, 2, ',', '.') }} €
-                                    </span>
-                                @else
-                                    <span class="badge bg-success d-block mb-1">
-                                        Πλήρως πληρωμένο {{ number_format($paidTotal, 2, ',', '.') }} €
-                                    </span>
-                                @endif
+                                <span class="badge bg-success d-block mb-1">
+                                    Πλήρως πληρωμένο {{ number_format($paidTotal, 2, ',', '.') }} €
+                                </span>
 
                                 <small class="text-muted d-block">
                                     @if($cashPaid > 0) Μετρητά: {{ number_format($cashPaid, 2, ',', '.') }} € @endif
@@ -255,6 +269,7 @@
                                 </small>
                             @endif
                         </td>
+
 
                         <td title="{{ $appointment->notes }}">
                             {{ $appointment->notes ? \Illuminate\Support\Str::limit($appointment->notes, 30) : '-' }}

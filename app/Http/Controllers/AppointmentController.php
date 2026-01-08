@@ -15,6 +15,36 @@ use Carbon\Carbon;
 
 class AppointmentController extends Controller
 {
+    /**
+     * ✅ Αν total_price <= 0 (ή null), θεωρούμε το ραντεβού "paid"
+     * και (προαιρετικά) δημιουργούμε Payment 0€ για να υπάρχει ίχνος.
+     */
+    private function ensureZeroPricePaid(Appointment $appointment): void
+    {
+        $total = (float) ($appointment->total_price ?? 0);
+
+        if ($total <= 0) {
+            // Αν δεν υπάρχει καμία πληρωμή, δημιουργούμε μία 0€
+            if (!$appointment->payments()->exists()) {
+                Payment::create([
+                    'appointment_id' => $appointment->id,
+                    'customer_id'    => $appointment->customer_id,
+                    'amount'         => 0,
+                    'is_full'        => 1,
+                    'paid_at'        => now(),
+                    'method'         => null,
+                    'notes'          => '[AUTO_ZERO] Μηδενική χρέωση - αυτόματη εξόφληση.',
+                ]);
+            }
+        } else {
+            // Αν από 0 έγινε >0, σβήνουμε τυχόν auto-zero payment για να μην "μπερδεύει"
+            $appointment->payments()
+                ->where('amount', 0)
+                ->where('notes', 'like', '[AUTO_ZERO]%')
+                ->delete();
+        }
+    }
+
     public function index(Request $request)
     {
         // dropdown lists
@@ -37,7 +67,7 @@ class AppointmentController extends Controller
         ])) {
             $range = 'month';
             $month = now()->format('Y-m');
-            $month = null;
+            $month = null; // (κρατάω όπως το είχες)
         }
 
         $legacyFrom = $request->input('from');
@@ -102,7 +132,7 @@ class AppointmentController extends Controller
         $customerId     = $request->input('customer_id');
         $professionalId = $request->input('professional_id');
         $companyId      = $request->input('company_id');
-        $status         = $request->input('status'); // εδώ έρχεται ΠΛΕΟΝ σαν single filter string από UI του index
+        $status         = $request->input('status');
         $paymentStatus  = $request->input('payment_status');
         $paymentMethod  = $request->input('payment_method');
 
@@ -112,8 +142,6 @@ class AppointmentController extends Controller
             ->orderBy('appointments.start_time', 'desc')
             ->orderBy('customers.last_name', 'asc')
             ->select('appointments.*'); // important to avoid column conflicts
-
-
 
         if ($from) $query->whereDate('start_time', '>=', $from);
         if ($to)   $query->whereDate('start_time', '<=', $to);
@@ -134,15 +162,21 @@ class AppointmentController extends Controller
 
         $appointments = $query->get();
 
-        // payment_status filter
+        // ✅ payment_status filter (με κανόνα: total_price <= 0 => FULL PAID)
         if ($paymentStatus && $paymentStatus !== 'all') {
             $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
                 $total = (float) ($a->total_price ?? 0);
+
+                // ✅ Μηδενική/κενή χρέωση => θεωρείται εξοφλημένο
+                if ($total <= 0) {
+                    return $paymentStatus === 'full';
+                }
+
                 $paid  = (float) $a->payments->sum('amount');
 
                 if ($paymentStatus === 'unpaid')  return $paid <= 0;
                 if ($paymentStatus === 'partial') return $paid > 0 && $paid < $total;
-                if ($paymentStatus === 'full')    return $total > 0 && $paid >= $total;
+                if ($paymentStatus === 'full')    return $paid >= $total;
 
                 return true;
             });
@@ -196,13 +230,11 @@ class AppointmentController extends Controller
         }
 
         $filters = [
-            'range'          => $range,
-            'day'            => $day,
-            'month'          => $month,
-
-            'from'           => $from,
-            'to'             => $to,
-
+            'range'           => $range,
+            'day'             => $day,
+            'month'           => $month,
+            'from'            => $from,
+            'to'              => $to,
             'customer_id'     => $customerId,
             'professional_id' => $professionalId,
             'company_id'      => $companyId,
@@ -306,19 +338,19 @@ class AppointmentController extends Controller
 
         $professional = Professional::findOrFail($data['professional_id']);
 
+        // Αν total_price δεν δοθεί, χρησιμοποίησε service_fee
         $total = $data['total_price'] ?? $professional->service_fee;
 
         $baseProfessionalAmount = $professional->percentage_cut;
-
         $professionalAmount = $baseProfessionalAmount;
 
         if (array_key_exists('professional_amount', $data) && $data['professional_amount'] !== null) {
             $professionalAmount = $data['professional_amount'];
         }
 
-        if ($professionalAmount > $total) {
-            $professionalAmount = $total;
-        }
+        // if ($professionalAmount > $total) {
+        //     $professionalAmount = $total;
+        // }
 
         $companyAmount = $total - $professionalAmount;
 
@@ -344,19 +376,28 @@ class AppointmentController extends Controller
             $appointment = Appointment::create($currentData);
             $createdAppointments[] = $appointment;
 
-            if ($i === 0 && $request->boolean('mark_as_paid')) {
-                $paymentAmount = $data['payment_amount'] ?? $total;
+            // ✅ Αν χρέωση 0/null => auto paid (Payment 0€)
+            $this->ensureZeroPricePaid($appointment);
 
-                if ($paymentAmount > 0) {
-                    Payment::create([
-                        'appointment_id' => $appointment->id,
-                        'customer_id'    => $appointment->customer_id,
-                        'amount'         => $paymentAmount,
-                        'is_full'        => $paymentAmount >= $total,
-                        'paid_at'        => now(),
-                        'method'         => null,
-                        'notes'          => 'Καταχώρηση από τη φόρμα δημιουργίας ραντεβού.',
-                    ]);
+            // Μόνο στο πρώτο ραντεβού: αν ο χρήστης τσέκαρε mark_as_paid (και δεν είναι 0€)
+            if ($i === 0 && $request->boolean('mark_as_paid')) {
+                $appointment->load('payments');
+                $apptTotal = (float)($appointment->total_price ?? 0);
+
+                if ($apptTotal > 0) {
+                    $paymentAmount = $data['payment_amount'] ?? $apptTotal;
+
+                    if ($paymentAmount > 0) {
+                        Payment::create([
+                            'appointment_id' => $appointment->id,
+                            'customer_id'    => $appointment->customer_id,
+                            'amount'         => $paymentAmount,
+                            'is_full'        => $paymentAmount >= $apptTotal,
+                            'paid_at'        => now(),
+                            'method'         => null,
+                            'notes'          => 'Καταχώρηση από τη φόρμα δημιουργίας ραντεβού.',
+                        ]);
+                    }
                 }
             }
         }
@@ -374,7 +415,8 @@ class AppointmentController extends Controller
 
     public function show(Appointment $appointment)
     {
-        $appointment->load(['customer', 'professional', 'company', 'payment']);
+        // ✅ διόρθωση: payments (όχι payment)
+        $appointment->load(['customer', 'professional', 'company', 'payments']);
         return view('appointments.show', compact('appointment'));
     }
 
@@ -433,16 +475,15 @@ class AppointmentController extends Controller
         $total = $data['total_price'] ?? $professional->service_fee;
 
         $baseProfessionalAmount = $professional->percentage_cut;
-
         $professionalAmount = $baseProfessionalAmount;
 
         if (array_key_exists('professional_amount', $data) && $data['professional_amount'] !== null) {
             $professionalAmount = $data['professional_amount'];
         }
 
-        if ($professionalAmount > $total) {
-            $professionalAmount = $total;
-        }
+        // if ($professionalAmount > $total) {
+        //     $professionalAmount = $total;
+        // }
 
         $companyAmount = $total - $professionalAmount;
 
@@ -451,6 +492,9 @@ class AppointmentController extends Controller
         $data['company_amount']      = $companyAmount;
 
         $appointment->update($data);
+
+        // ✅ Αν total_price <= 0 => auto paid (Payment 0€). Αν >0, καθάρισε auto-zero
+        $this->ensureZeroPricePaid($appointment);
 
         $redirectTo = $request->input('redirect_to');
 
@@ -471,9 +515,12 @@ class AppointmentController extends Controller
             'total_price' => $request->total_price
         ]);
 
+        // ✅ Αν μηδενίστηκε -> auto paid, αν πήγε >0 -> καθάρισε auto-zero
+        $this->ensureZeroPricePaid($appointment);
+
         return response()->json([
             'success' => true,
-            'new_price' => number_format($appointment->total_price, 2, ',', '.')
+            'new_price' => number_format((float)$appointment->total_price, 2, ',', '.')
         ]);
     }
 

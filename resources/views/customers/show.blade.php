@@ -385,27 +385,38 @@
                             </td>
 
                             {{-- Πληρωμή (ΣΩΣΤΟ για split) --}}
+                           {{-- Πληρωμή (με κανόνα: total_price <= 0 => ΠΛΗΡΩΜΕΝΟ) --}}
                             <td>
-                                @if($paidTotal <= 0)
-                                    <span class="badge bg-danger">Απλήρωτο</span>
-                                @else
-                                    @if($paidTotal < $total)
-                                        <span class="badge bg-warning text-dark d-block mb-1">
-                                            Μερική πληρωμή {{ number_format($paidTotal, 2, ',', '.') }} €
-                                        </span>
-                                    @else
-                                        <span class="badge bg-success d-block mb-1">
-                                            Πλήρως πληρωμένο {{ number_format($paidTotal, 2, ',', '.') }} €
-                                        </span>
-                                    @endif
+                                @php
+                                    $isZeroPrice = $total <= 0; // $total ήδη είναι (float)($appointment->total_price ?? 0)
+                                @endphp
 
-                                    <small class="text-muted d-block">
-                                        @if($cashPaid > 0) Μετρητά: {{ number_format($cashPaid, 2, ',', '.') }} € @endif
-                                        @if($cashPaid > 0 && $cardPaid > 0) · @endif
-                                        @if($cardPaid > 0) Κάρτα: {{ number_format($cardPaid, 2, ',', '.') }} € @endif
-                                    </small>
+                                @if($isZeroPrice)
+                                    <span class="badge bg-success">Πλήρως πληρωμένο</span>
+                                    <small class="text-muted d-block">Μηδενική χρέωση</small>
+                                @else
+                                    @if($paidTotal <= 0)
+                                        <span class="badge bg-danger">Απλήρωτο</span>
+                                    @else
+                                        @if($paidTotal < $total)
+                                            <span class="badge bg-warning text-dark d-block mb-1">
+                                                Μερική πληρωμή {{ number_format($paidTotal, 2, ',', '.') }} €
+                                            </span>
+                                        @else
+                                            <span class="badge bg-success d-block mb-1">
+                                                Πλήρως πληρωμένο {{ number_format($paidTotal, 2, ',', '.') }} €
+                                            </span>
+                                        @endif
+
+                                        <small class="text-muted d-block">
+                                            @if($cashPaid > 0) Μετρητά: {{ number_format($cashPaid, 2, ',', '.') }} € @endif
+                                            @if($cashPaid > 0 && $cardPaid > 0) · @endif
+                                            @if($cardPaid > 0) Κάρτα: {{ number_format($cardPaid, 2, ',', '.') }} € @endif
+                                        </small>
+                                    @endif
                                 @endif
                             </td>
+
 
                             <td style="white-space: pre-wrap;">
                                 {{ \Illuminate\Support\Str::limit($appointment->notes ?? '-', 50) }}
