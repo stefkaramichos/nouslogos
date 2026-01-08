@@ -83,7 +83,8 @@
                     >
                 </div> 
                 {{-- Μισθός --}}
-                {{-- <div class="mb-3">
+                @if(auth()->user()->role === 'owner')
+                <div class="mb-3">
                     <label class="form-label">Μισθός (€/μήνα)</label>
                     <input
                         type="number"
@@ -93,7 +94,8 @@
                         class="form-control"
                         value="{{ old('salary', $professional->salary) }}"
                     >
-                </div> --}}
+                </div>
+                @endif
 
                 <div class="mb-3">
                     <label class="form-label">Γραφείο</label>

@@ -78,8 +78,10 @@
                         <th>Ονοματεπώνυμο</th>
                         <th>Ειδικότητα</th>
                         {{-- <th>Τηλέφωνο</th>
-                        <th>Email</th>
-                        <th>Μισθός</th> --}}
+                        <th>Email</th> --}}
+                        @if(auth()->user()->role === 'owner')
+                            <th>Μισθός</th>
+                        @endif
                         <th>Γραφείο</th>
                         {{-- <th>Χρέωση (€)</th>
                         <th>Ποσό Επαγγελματία</th> --}}
@@ -113,6 +115,16 @@
                             <td>
                                 {{ $professional->eidikotita }}
                             </td>
+
+                            @if(auth()->user()->role === 'owner')
+                            <td>
+                                @if(!is_null($professional->salary))
+                                    {{ number_format($professional->salary, 2, ',', '.') }} €
+                                @else
+                                    -
+                                @endif
+                            </td>
+                            @endif
 
                             <td>
                                 @forelse($professional->companies as $company)

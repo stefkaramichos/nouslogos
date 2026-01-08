@@ -114,6 +114,10 @@ class ProfessionalController extends Controller
             ]
         );
 
+        if (Auth::user()->role !== 'owner') {
+            unset($data['salary']);
+        }
+
         $data['password'] = Hash::make($request->password);
 
         if ($request->hasFile('profile_image')) {
@@ -203,6 +207,10 @@ class ProfessionalController extends Controller
 
         if (Auth::user()->role === 'owner') {
             $rules['password'] = 'nullable|string|min:6|confirmed';
+        }
+
+        if (Auth::user()->role !== 'owner') {
+            unset($data['salary']);
         }
 
         $messages = [
