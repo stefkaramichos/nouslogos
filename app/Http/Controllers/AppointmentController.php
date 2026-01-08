@@ -106,8 +106,14 @@ class AppointmentController extends Controller
         $paymentStatus  = $request->input('payment_status');
         $paymentMethod  = $request->input('payment_method');
 
-        $query = Appointment::with(['customer', 'professional', 'company', 'payments'])
-            ->orderBy('start_time', 'desc');
+        $query = Appointment::query()
+            ->with(['customer', 'professional', 'company', 'payments'])
+            ->leftJoin('customers', 'customers.id', '=', 'appointments.customer_id')
+            ->orderBy('appointments.start_time', 'desc')
+            ->orderBy('customers.last_name', 'asc')
+            ->select('appointments.*'); // important to avoid column conflicts
+
+
 
         if ($from) $query->whereDate('start_time', '>=', $from);
         if ($to)   $query->whereDate('start_time', '<=', $to);
