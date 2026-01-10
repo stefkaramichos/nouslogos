@@ -83,10 +83,8 @@ class SettlementController extends Controller
             'partner2Total' => round((float) $partner2Total, 2),
         ];
 
-        // tolerance για floating
         $eps = 0.01;
 
-        // ✅ Αν ΔΕΝ υπάρχουν settlements για το range => not settled
         $isSettled = $settlements->count() > 0
             && abs($liveTotals['cashToBank'] - $savedTotals['cashToBank']) < $eps
             && abs($liveTotals['partner1Total'] - $savedTotals['partner1Total']) < $eps
@@ -167,9 +165,6 @@ class SettlementController extends Controller
         ));
     }
 
-    /**
-     * POST: Πατάς "Εκκαθάριση" -> αποθηκεύει (ή ενημερώνει) settlement για ΚΑΘΕ μήνα του range.
-     */
     public function store(Request $request)
     {
         $professional = Auth::user();
@@ -219,7 +214,7 @@ class SettlementController extends Controller
                     'cash_to_bank'   => $monthCalc['cashToBank'],
                     'partner1_total' => $monthCalc['partner1Total'],
                     'partner2_total' => $monthCalc['partner2Total'],
-                    'created_by'     => $professional->id, // professional id
+                    'created_by'     => $professional->id,
                 ]
             );
 
@@ -235,7 +230,19 @@ class SettlementController extends Controller
     }
 
     /**
-     * Υπολογισμός για όλο το range: [start, endExclusive)
+     * ΚΑΝΟΝΕΣ (με βάση αυτά που ζήτησες):
+     * 1) Tax=N (Χωρίς απόδειξη):
+     *    - sharedPoolRaw += FULL amount (ακόμα κι αν partner)
+     *    - partner personal = professional_amount (ακόμα κι αν amount=0 και method είναι "-")
+     *    - sharedPool = sharedPoolRaw - (partner1Personal+partner2Personal) - partnerCardPersonal
+     *
+     * 2) Tax=Y (Με απόδειξη) & cash:
+     *    - cashToBank += FULL amount  ✅ (εσύ το ζήτησες αυτό)
+     *    - partner personal με CLAMP (ώστε να μην πάρει > amount)
+     *
+     * 3) Card:
+     *    - cardTotal += amount
+     *    - partnerCardPersonal += personal (ώστε να αφαιρεθεί από sharedPool)
      */
     private function calculateForRange(Carbon $rangeStart, Carbon $rangeEndExclusive): array
     {
@@ -247,18 +254,18 @@ class SettlementController extends Controller
             })
             ->get();
 
-        $totalAmount = 0;
+        $totalAmount = 0.0;
 
-        $cashToBank   = 0;
-        $cashNoTax    = 0;
-        $cashWithTax  = 0;
-        $cardTotal    = 0;
+        $cashToBank   = 0.0;
+        $cashNoTax    = 0.0;
+        $cashWithTax  = 0.0;
+        $cardTotal    = 0.0;
 
-        $partner1Personal = 0;
-        $partner2Personal = 0;
+        $partner1Personal = 0.0;
+        $partner2Personal = 0.0;
 
-        $sharedPoolRaw = 0;
-        $partnerCardPersonal = 0;
+        $sharedPoolRaw = 0.0;
+        $partnerCardPersonal = 0.0;
 
         $daily = [];
 
@@ -267,68 +274,94 @@ class SettlementController extends Controller
             if (!$appointment) continue;
 
             $dateKey = $appointment->start_time->toDateString();
-
             if (!isset($daily[$dateKey])) {
-                $daily[$dateKey] = ['giannis' => 0, 'eleni' => 0];
+                $daily[$dateKey] = ['giannis' => 0.0, 'eleni' => 0.0];
             }
 
-            $amount          = (float) $payment->amount;
-            $method          = $payment->method;
+            $amount          = (float) ($payment->amount ?? 0);
             $tax             = $payment->tax ?? 'N';
+            $methodRaw       = $payment->method ?? null;
+
+            // ✅ normalize "-" / null / unknown => cash
+            $method = in_array($methodRaw, ['cash', 'card'], true) ? $methodRaw : 'cash';
+
             $professionalAmt = (float) ($appointment->professional_amount ?? 0);
-            $professionalId  = $appointment->professional_id;
+            $professionalId  = (int) ($appointment->professional_id ?? 0);
 
             $totalAmount += $amount;
 
             $isPartner = in_array($professionalId, $this->partnerProfessionals, true);
 
-            if ($isPartner && $professionalAmt > 0) {
+            // helper: add partner personal
+            $addPartnerPersonal = function (float $value) use (
+                $professionalId, $dateKey, &$partner1Personal, &$partner2Personal, &$daily
+            ) {
+                if ($value == 0.0) return;
+
                 if ($professionalId === $this->partnerProfessionals['partner1']) {
-                    $partner1Personal += $professionalAmt;
-                    $daily[$dateKey]['giannis'] += $professionalAmt;
+                    $partner1Personal += $value;
+                    $daily[$dateKey]['giannis'] += $value;
+                } elseif ($professionalId === $this->partnerProfessionals['partner2']) {
+                    $partner2Personal += $value;
+                    $daily[$dateKey]['eleni'] += $value;
                 }
-                if ($professionalId === $this->partnerProfessionals['partner2']) {
-                    $partner2Personal += $professionalAmt;
-                    $daily[$dateKey]['eleni'] += $professionalAmt;
-                }
-            }
+            };
 
-            if ($method === 'cash') {
-                if ($tax === 'Y') {
-                    $cashWithTax += $amount;
-
-                    if ($isPartner) {
-                        $cashToBank += max($amount - $professionalAmt, 0);
-                    } else {
-                        $cashToBank += $amount;
-                    }
-                    continue;
-                }
-
+            // =========================
+            // TAX = N (ΧΩΡΙΣ ΑΠΟΔΕΙΞΗ)
+            // =========================
+            if ($tax !== 'Y') {
                 $cashNoTax += $amount;
 
-                if ($isPartner) {
-                    $sharedPoolRaw += max($amount - $professionalAmt, 0);
-                } else {
-                    $sharedPoolRaw += $amount;
-                }
-                continue;
-            }
+                // ✅ full amount goes to shared pool
+                $sharedPoolRaw += $amount;
 
-            if ($method === 'card') {
-                $cardTotal += $amount;
-
+                // ✅ partner personal counts even if amount=0
                 if ($isPartner && $professionalAmt > 0) {
-                    $partnerCardPersonal += $professionalAmt;
+                    $addPartnerPersonal($professionalAmt);
+
+                    // if card, we track partner card personal to subtract from pool
+                    if ($method === 'card') {
+                        $partnerCardPersonal += $professionalAmt;
+                    }
                 }
+
+                // if card, add to cardTotal (bank)
+                if ($method === 'card') {
+                    $cardTotal += $amount;
+                }
+
                 continue;
             }
 
+            // =========================
+            // TAX = Y (ΜΕ ΑΠΟΔΕΙΞΗ)
+            // =========================
             $cashWithTax += $amount;
-            $cashToBank  += $amount;
+
+            // clamp personal so it never exceeds the paid amount
+            $effectiveProfessionalAmt = 0.0;
+            if ($isPartner && $professionalAmt != 0.0 && $amount != 0.0) {
+                $cap = min(abs($professionalAmt), abs($amount));
+                $effectiveProfessionalAmt = ($amount > 0) ? $cap : -$cap;
+            }
+
+            if ($isPartner && $effectiveProfessionalAmt != 0.0) {
+                $addPartnerPersonal($effectiveProfessionalAmt);
+            }
+
+            // ✅ IMPORTANT: taxed cash goes FULL to bank (no subtraction)
+            if ($method === 'cash') {
+                $cashToBank += $amount;
+            } elseif ($method === 'card') {
+                $cardTotal += $amount;
+            } else {
+                $cashToBank += $amount;
+            }
         }
 
-        $sharedPool = max($sharedPoolRaw - $partnerCardPersonal, 0);
+        // shared pool = raw pool - all partner personal - card personal
+        $sharedPool = $sharedPoolRaw - ($partner1Personal + $partner2Personal) - $partnerCardPersonal;
 
         $partner1Total = $partner1Personal + ($sharedPool / 2);
         $partner2Total = $partner2Personal + ($sharedPool / 2);
