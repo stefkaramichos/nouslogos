@@ -721,4 +721,90 @@ class CustomerController extends Controller
         );
     }
 
+    public function taxFixOldestCashNoReceipt(Request $request, Customer $customer)
+    {
+        $data = $request->validate([
+            'fix_amount' => ['required','integer','min:5', function ($attr, $value, $fail) {
+                if ($value % 5 !== 0) $fail('Το ποσό πρέπει να είναι πολλαπλάσιο του 5 (5,10,15...).');
+            }],
+        ]);
+
+        $x = (int) ($data['fix_amount'] / 5);
+        if ($x <= 0) {
+            return back()->with('error', 'Μη έγκυρη τιμή.');
+        }
+
+        // 🔎 Πρώτος έλεγχος: υπάρχει ΤΟΥΛΑΧΙΣΤΟΝ 1 payment που να πληροί τα criteria;
+        $baseQuery = \App\Models\Payment::where('customer_id', $customer->id)
+            ->where('method', 'cash')
+            ->where('tax', 'N');
+
+        if (! $baseQuery->exists()) {
+            return back()->with('error', 'Δεν βρέθηκε κανένα ραντεβού με πληρωμή μετρητών χωρίς απόδειξη.');
+        }
+
+        $changedPayments = 0;
+        $changedAppointments = 0;
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($customer, $x, &$changedPayments, &$changedAppointments) {
+
+            // X πιο παλιές πληρωμές
+            $payments = \App\Models\Payment::where('customer_id', $customer->id)
+                ->where('method', 'cash')
+                ->where('tax', 'N')
+                ->orderByRaw('paid_at IS NULL DESC')
+                ->orderBy('paid_at', 'asc')
+                ->orderBy('id', 'asc')
+                ->limit($x)
+                ->lockForUpdate()
+                ->get();
+
+            if ($payments->isEmpty()) {
+                return;
+            }
+
+            $paymentIds = $payments->pluck('id')->all();
+            $appointmentIds = $payments
+                ->pluck('appointment_id')
+                ->filter()                 // πετάμε NULL
+                ->unique()
+                ->values()
+                ->all();
+
+            // 1) Update payments
+            $changedPayments = \App\Models\Payment::whereIn('id', $paymentIds)->update([
+                'amount' => 35.00,
+                'tax' => 'Y',
+                'is_tax_fixed' => 1,
+                'tax_fixed_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // 2) Update appointments ΜΟΝΟ αν υπάρχουν
+            if (!empty($appointmentIds)) {
+                $changedAppointments = \App\Models\Appointment::whereIn('id', $appointmentIds)->update([
+                    'total_price' => 35.00,
+                    'updated_at' => now(),
+                ]);
+            }
+        });
+
+        // 🧾 Τελικά μηνύματα
+        if ($changedPayments === 0) {
+            return back()->with('error', 'Δεν βρέθηκαν πληρωμές για διόρθωση.');
+        }
+
+        if ($changedAppointments === 0) {
+            return back()->with('warning', 'Οι πληρωμές διορθώθηκαν, αλλά δεν βρέθηκε κανένα συνδεδεμένο ραντεβού για ενημέρωση ποσού.');
+        }
+
+        return back()->with(
+            'success',
+            "Ολοκληρώθηκε: διορθώθηκαν {$changedPayments} πληρωμές και ενημερώθηκαν {$changedAppointments} ραντεβού (ποσό 35€)."
+        );
+    }
+
+
+
+
 }

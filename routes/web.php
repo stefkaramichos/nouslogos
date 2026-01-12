@@ -156,6 +156,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
     Route::get('/documents/{document}/view', [DocumentController::class, 'view'])->name('documents.view');
     Route::delete('/documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
+    Route::post('/customers/{customer}/payments/tax-fix-oldest', [\App\Http\Controllers\CustomerController::class, 'taxFixOldestCashNoReceipt'])
+    ->name('customers.payments.taxFixOldest');
+
 
 });
 

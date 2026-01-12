@@ -85,13 +85,14 @@
 
                                 @foreach($dayPayments as $payment)
                                     <div class="text-muted" style="font-size: 0.75rem;">
-                                        {{ number_format($payment->amount, 2, ',', '.') }} €
-                                        ·
-                                        {{ $payment->method === 'cash' ? 'Μετρητά' : ($payment->method === 'card' ? 'Κάρτα' : 'Άλλο') }}
-                                        ·
-                                        {{ $payment->tax === 'Y' ? 'Με απόδειξη' : 'Χωρίς απόδειξη' }}
-                                        ·
-                                        {{ $payment->is_full ? 'Πλήρης' : 'Μερική' }}
+                                        <span class="{{ $payment->is_tax_fixed ? 'fw-bold text-warning' : '' }}">
+                                            {{ number_format($payment->amount, 2, ',', '.') }} €
+                                        </span>
+                                        · {{ $payment->method === 'cash' ? 'Μετρητά' : ($payment->method === 'card' ? 'Κάρτα' : 'Άλλο') }}
+                                        · {{ $payment->tax === 'Y' ? 'Με απόδειξη' : 'Χωρίς απόδειξη' }}
+                                        @if($payment->is_tax_fixed)
+                                            · <span class="badge bg-warning text-dark">Διορθώθηκε</span>
+                                        @endif
                                     </div>
                                 @endforeach
                             </div>
@@ -234,6 +235,7 @@
             </div>
         </div>
     </div>
+ 
 
     {{-- ===================== ΡΑΝΤΕΒΟΥ ===================== --}}
     <div class="card">
@@ -334,13 +336,14 @@
                     <tbody>
                     @forelse($appointments as $appointment)
                         @php
+                            $hasFixed = $appointment->payments->contains(fn($p) => (int)($p->is_tax_fixed ?? 0) === 1);
                             $total     = (float) ($appointment->total_price ?? 0);
                             $paidTotal = (float) $appointment->payments->sum('amount');
                             $cashPaid  = (float) $appointment->payments->where('method','cash')->sum('amount');
                             $cardPaid  = (float) $appointment->payments->where('method','card')->sum('amount');
                         @endphp
 
-                        <tr>
+                        <tr class="{{ $hasFixed ? 'table-warning' : '' }}">
                             <td class="text-center">
                                 <input type="checkbox" class="appointment-checkbox" value="{{ $appointment->id }}">
                             </td>
@@ -535,6 +538,30 @@
             </div>
             {{-- ===================== /OUTSTANDING SPLIT PAYMENT ===================== --}}
 
+
+
+            <div class="border rounded p-3 mb-3" style="background:#fff3cd">
+                <h6 class="mb-2">🧾 Διόρθωση παλαιότερων πληρωμών (Μετρητά Χωρίς Απόδειξη ➜ Με Απόδειξη)</h6>
+
+                <form method="POST" action="{{ route('customers.payments.taxFixOldest', $customer) }}"
+                        onsubmit="return confirm('Σίγουρα; Θα αλλάξουν οι X παλαιότερες πληρωμές cash χωρίς απόδειξη σε 35€ με απόδειξη.');">
+                    @csrf
+                    <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+
+                        <input type="number" name="fix_amount" min="5" step="5" class="form-control" placeholder="π.χ. 5,10,15..." required>
+                       
+                        @error('fix_amount')
+                        <div class="text-danger small mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="col-md-3">
+                        <button class="btn btn-warning w-100" type="submit">Εκτέλεση Διόρθωσης</button>
+                    </div>
+                    </div>
+                </form>
+                </div>
 
         </div>
     </div>
