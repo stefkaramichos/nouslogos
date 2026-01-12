@@ -280,7 +280,8 @@ class CustomerController extends Controller
         ]);
 
         /**
-         * 🔹 Ιστορικό πληρωμών (ομαδοποίηση ανά ημερομηνία paid_at)
+         * 🔹 Ιστορικό πληρωμών (ομαδοποίηση ανά paid_at)
+         * (μένει όπως ήταν: αφορά ΟΛΕΣ τις πληρωμές του πελάτη)
          */
         $payments = Payment::where('customer_id', $customer->id)
             ->orderByDesc('paid_at')
@@ -293,11 +294,10 @@ class CustomerController extends Controller
         });
 
         /**
-         * 🔹 Date filter για ραντεβού λίστας (μένει όπως το είχες)
+         * 🔹 Date filter για ραντεβού λίστας
          */
         $range = $request->input('range', 'month'); // month/day/all
         $nav   = $request->input('nav');
-
         $day   = $request->input('day');   // Y-m-d
         $month = $request->input('month'); // Y-m
 
@@ -316,7 +316,7 @@ class CustomerController extends Controller
             if ($range === 'day') {
                 $base = Carbon::parse($day ?: now()->toDateString());
                 $base = $nav === 'prev' ? $base->subDay() : $base->addDay();
-                $day  = $base->toDateString();
+                $day = $base->toDateString();
             } elseif ($range === 'month') {
                 $base = Carbon::createFromFormat('Y-m', $month ?: now()->format('Y-m'))->startOfMonth();
                 $base = $nav === 'prev' ? $base->subMonth() : $base->addMonth();
@@ -325,13 +325,13 @@ class CustomerController extends Controller
         }
 
         $from = null;
-        $to   = null;
+        $to = null;
 
         if ($range === 'day' && $day) {
             $from = Carbon::parse($day)->toDateString();
             $to   = Carbon::parse($day)->toDateString();
         } elseif ($range === 'month' && $month) {
-            $m    = Carbon::createFromFormat('Y-m', $month);
+            $m = Carbon::createFromFormat('Y-m', $month);
             $from = $m->copy()->startOfMonth()->toDateString();
             $to   = $m->copy()->endOfMonth()->toDateString();
         }
@@ -348,7 +348,7 @@ class CustomerController extends Controller
 
         $filteredAppointments = $appointmentsCollection;
 
-        // Date range for list
+        // ✅ Date range filter
         if ($from && $to) {
             $filteredAppointments = $filteredAppointments->filter(function ($a) use ($from, $to) {
                 if (!$a->start_time) return false;
@@ -357,22 +357,22 @@ class CustomerController extends Controller
             });
         }
 
-        // Payment status based on payments sum
+        // ✅ Payment status filter based on payments sum
         if ($paymentStatus && $paymentStatus !== 'all') {
             $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentStatus) {
                 $total = (float)($a->total_price ?? 0);
                 $paid  = (float)$a->payments->sum('amount');
 
                 return match ($paymentStatus) {
-                    'unpaid'  => $paid <= 0,
-                    'partial' => $paid > 0 && $paid < $total,
-                    'full'    => $total > 0 && $paid >= $total,
-                    default   => true,
+                    'unpaid'   => $paid <= 0,
+                    'partial'  => $paid > 0 && $paid < $total,
+                    'full'     => $total > 0 && $paid >= $total,
+                    default    => true,
                 };
             });
         }
 
-        // method filter (cash/card): true αν υπάρχει έστω μία πληρωμή με method
+        // ✅ Method filter (cash/card): true αν υπάρχει έστω μία πληρωμή με method
         if ($paymentMethod && $paymentMethod !== 'all') {
             $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentMethod) {
                 return $a->payments->contains(fn($p) => $p->method === $paymentMethod);
@@ -382,24 +382,25 @@ class CustomerController extends Controller
         $filteredAppointments = $filteredAppointments->values();
 
         /**
-         * 🔹 GLOBAL totals (χωρίς φίλτρα)
+         * ✅ ΕΔΩ Η ΑΛΛΑΓΗ ΠΟΥ ΖΗΤΗΣΕΣ:
+         * Τα badges να δείχνουν totals από ΦΙΛΤΡΑΡΙΣΜΕΝΑ ραντεβού (όχι όλα)
          */
-        $allAppointments = $appointmentsCollection;
+        $appointments = $filteredAppointments; // αυτά θα δείξεις στο table
 
-        $globalAppointmentsCount = $allAppointments->count();
-        $globalTotalAmount = $allAppointments->sum(fn($a) => (float)($a->total_price ?? 0));
-        $globalPaidTotal   = $allAppointments->sum(fn($a) => (float)$a->payments->sum('amount'));
+        $globalAppointmentsCount = $appointments->count();
+
+        $globalTotalAmount = $appointments->sum(fn($a) => (float)($a->total_price ?? 0));
+        $globalPaidTotal   = $appointments->sum(fn($a) => (float)$a->payments->sum('amount'));
         $globalOutstandingTotal = max($globalTotalAmount - $globalPaidTotal, 0);
 
-        /**
-         * 🔹 Totals filtered (αν θες)
-         */
-        $appointmentsCount = $filteredAppointments->count();
-        $cashTotal = $filteredAppointments->sum(fn($a) => (float)$a->payments->where('method', 'cash')->sum('amount'));
-        $cardTotal = $filteredAppointments->sum(fn($a) => (float)$a->payments->where('method', 'card')->sum('amount'));
+        // 🔹 Totals filtered (cash/card) - πάνω στο filtered
+        $appointmentsCount = $appointments->count();
+        $cashTotal = $appointments->sum(fn($a) => (float)$a->payments->where('method', 'cash')->sum('amount'));
+        $cardTotal = $appointments->sum(fn($a) => (float)$a->payments->where('method', 'card')->sum('amount'));
 
         /**
          * ✅ OUTSTANDING PREVIEW (ΟΛΑ τα χρωστούμενα, χωρίς ημερομηνίες)
+         * (μένει global όπως το είχες)
          */
         [$outstandingCount, $outstandingAmount] = $this->calcOutstandingForCustomer($customer->id);
 
@@ -407,9 +408,9 @@ class CustomerController extends Controller
          * 🔹 Prev/Next URLs
          */
         $filters = [
-            'range'          => $range,
-            'day'            => $day,
-            'month'          => $month,
+            'range' => $range,
+            'day' => $day,
+            'month' => $month,
             'payment_status' => $paymentStatus ?? 'all',
             'payment_method' => $paymentMethod ?? 'all',
         ];
@@ -423,7 +424,7 @@ class CustomerController extends Controller
 
             if ($range === 'day') {
                 $baseQuery['range'] = 'day';
-                $baseQuery['day']   = $day ?: now()->toDateString();
+                $baseQuery['day'] = $day ?: now()->toDateString();
                 unset($baseQuery['month']);
             } elseif ($range === 'month') {
                 $baseQuery['range'] = 'month';
@@ -442,14 +443,12 @@ class CustomerController extends Controller
             $selectedLabel = Carbon::createFromFormat('Y-m', $month)->locale('el')->translatedFormat('F Y');
         }
 
-        // pass to view
-        $appointments = $filteredAppointments;
-
         return view('customers.show', compact(
             'customer',
             'appointments',
             'appointmentsCount',
 
+            // ✅ Αυτά πλέον είναι FILTERED totals (όπως ζήτησες)
             'globalAppointmentsCount',
             'globalTotalAmount',
             'globalPaidTotal',
@@ -457,18 +456,16 @@ class CustomerController extends Controller
 
             'cashTotal',
             'cardTotal',
-
             'filters',
             'paymentsByDate',
-
             'prevUrl',
             'nextUrl',
             'selectedLabel',
-
             'outstandingCount',
             'outstandingAmount'
         ));
     }
+
 
     /**
      * ✅ helper: outstanding για ΟΛΑ τα ραντεβού (total - sum(payments))
