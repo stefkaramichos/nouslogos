@@ -146,9 +146,10 @@ class AppointmentController extends Controller
         if ($from) $query->whereDate('start_time', '>=', $from);
         if ($to)   $query->whereDate('start_time', '<=', $to);
 
-        if ($customerId)     $query->where('customer_id', $customerId);
-        if ($professionalId) $query->where('professional_id', $professionalId);
-        if ($companyId)      $query->where('company_id', $companyId);
+        if ($customerId)     $query->where('appointments.customer_id', $customerId);
+        if ($professionalId) $query->where('appointments.professional_id', $professionalId);
+        if ($companyId)      $query->where('appointments.company_id', $companyId);
+
 
         // ✅ status filter (token μέσα σε comma-separated string)
         if ($status && $status !== 'all') {
