@@ -12,6 +12,7 @@ class TherapistAppointment extends Model
     protected $fillable = [
         'professional_id',
         'customer_id',
+        'with_professional_id',
         'start_time',
         'notes',
     ];
@@ -22,11 +23,17 @@ class TherapistAppointment extends Model
 
     public function professional()
     {
-        return $this->belongsTo(Professional::class);
+        return $this->belongsTo(Professional::class, 'professional_id');
     }
 
     public function customer()
     {
-        return $this->belongsTo(Customer::class);
+        return $this->belongsTo(Customer::class, 'customer_id');
+    }
+
+    // The "other professional" you book with
+    public function withProfessional()
+    {
+        return $this->belongsTo(Professional::class, 'with_professional_id');
     }
 }

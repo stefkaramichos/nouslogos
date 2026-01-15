@@ -49,9 +49,13 @@
             </a>
         </div>
 
+        @php
+            $partyType = $partyType ?? request('party_type');
+            $partyId   = $partyId ?? request('party_id');
+        @endphp
+
         {{-- Filters (desktop inline) --}}
         <form method="GET" class="row g-3 mb-3 d-none d-md-flex" id="filtersFormDesktop">
-            {{-- κρατάμε το quick στο query όταν ο χρήστης αλλάζει άλλα φίλτρα --}}
             <input type="hidden" name="quick" value="{{ $quick ?? request('quick') }}">
 
             <div class="col-md-3">
@@ -64,20 +68,37 @@
                 <input type="date" name="to" value="{{ $to }}" class="form-control">
             </div>
 
-            <div class="col-md-3">
-                <label class="form-label">Πελάτης</label>
-                <select name="customer_id" class="form-select js-customer-select">
-                    <option value="">Όλοι οι πελάτες</option>
-                    @foreach($customers as $c)
-                        <option value="{{ $c->id }}"
-                            {{ (string)$c->id === (string)($customerId ?? request('customer_id')) ? 'selected' : '' }}>
-                            {{ $c->last_name }} {{ $c->first_name }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
+            @if($user_role === 'owner')
+                {{-- OWNER: unified party filter --}}
+                <div class="col-md-3">
+                    <label class="form-label">Με (Πελάτης / Επαγγελματίας)</label>
 
-            @if($user->role === 'owner')
+                    <input type="hidden" name="party_type" id="party_type_desktop" value="{{ $partyType }}">
+                    <select name="party_id" id="party_select_desktop" class="form-select js-party-select">
+                        <option value="">Όλοι</option>
+
+                        <optgroup label="Πελάτες">
+                            @foreach($customers as $c)
+                                <option value="{{ $c->id }}"
+                                    data-type="customer"
+                                    {{ ($partyType === 'customer' && (string)$partyId === (string)$c->id) ? 'selected' : '' }}>
+                                    {{ $c->last_name }} {{ $c->first_name }}
+                                </option>
+                            @endforeach
+                        </optgroup>
+
+                        <optgroup label="Επαγγελματίες">
+                            @foreach($allProfessionalsForParties as $p)
+                                <option value="{{ $p->id }}"
+                                    data-type="professional"
+                                    {{ ($partyType === 'professional' && (string)$partyId === (string)$p->id) ? 'selected' : '' }}>
+                                    {{ $p->last_name }} {{ $p->first_name }}
+                                </option>
+                            @endforeach
+                        </optgroup>
+                    </select>
+                </div>
+
                 <div class="col-md-3">
                     <label class="form-label">Επαγγελματίας</label>
                     <select name="professional_id" class="form-select js-professional-select">
@@ -86,6 +107,20 @@
                             <option value="{{ $p->id }}"
                                 {{ (string)$p->id === (string)($professionalId ?? request('professional_id')) ? 'selected' : '' }}>
                                 {{ $p->last_name }} {{ $p->first_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            @else
+                {{-- NON-OWNER: original customer-only filter --}}
+                <div class="col-md-3">
+                    <label class="form-label">Πελάτης</label>
+                    <select name="customer_id" class="form-select js-customer-select">
+                        <option value="">Όλοι οι πελάτες</option>
+                        @foreach($customers as $c)
+                            <option value="{{ $c->id }}"
+                                {{ (string)$c->id === (string)($customerId ?? request('customer_id')) ? 'selected' : '' }}>
+                                {{ $c->last_name }} {{ $c->first_name }}
                             </option>
                         @endforeach
                     </select>
@@ -106,7 +141,11 @@
                 <thead>
                 <tr>
                     <th>#</th>
-                    <th>Πελάτης</th>
+                    @if($user_role === 'owner')
+                        <th>Με</th>
+                    @else
+                        <th>Πελάτης</th>
+                    @endif
                     <th>Ημερομηνία & Ώρα</th>
                     <th>Σημειώσεις</th>
                     <th class="text-nowrap">Ενέργειες</th>
@@ -115,21 +154,43 @@
 
                 <tbody>
                 @forelse($appointments as $a)
+                    @php
+                        $displayName = '-';
+                        if ($a->customer) {
+                            $displayName = $a->customer->last_name . ' ' . $a->customer->first_name;
+                        } elseif ($user_role === 'owner' && $a->withProfessional) {
+                            $displayName = $a->withProfessional->last_name . ' ' . $a->withProfessional->first_name;
+                        }
+
+                        $modalWith = $displayName;
+                        if ($user_role === 'owner') {
+                            if ($a->customer) $modalWith .= ' (Πελάτης)';
+                            elseif ($a->withProfessional) $modalWith .= ' (Επαγγελματίας)';
+                        }
+                    @endphp
+
                     <tr class="js-appointment-row"
                         data-id="{{ $a->id }}"
-                        data-customer="{{ $a->customer->last_name }} {{ $a->customer->first_name }}"
+                        data-with="{{ $modalWith }}"
                         data-datetime="{{ \Carbon\Carbon::parse($a->start_time)->format('d/m/Y H:i') }}"
                         data-notes="{{ $a->notes }}">
-                        {{-- αν θέλεις running number αντί για id, βάλε: $appointments->firstItem() + $loop->index --}}
                         <td>{{ $a->id }}</td>
 
                         <td>
-                            @if($user_role === 'owner')
-                                <a href="{{ route('customers.show', $a->customer) }}">
+                            @if($a->customer)
+                                @if($user_role === 'owner')
+                                    <a href="{{ route('customers.show', $a->customer) }}">
+                                        {{ $a->customer->last_name }} {{ $a->customer->first_name }}
+                                    </a>
+                                @else
                                     {{ $a->customer->last_name }} {{ $a->customer->first_name }}
-                                </a>
+                                @endif
                             @else
-                                {{ $a->customer->last_name }} {{ $a->customer->first_name }}
+                                @if($user_role === 'owner' && $a->withProfessional)
+                                    {{ $a->withProfessional->last_name }} {{ $a->withProfessional->first_name }}
+                                @else
+                                    -
+                                @endif
                             @endif
                         </td>
 
@@ -187,8 +248,8 @@
                         <dt class="col-sm-3">Κωδικός</dt>
                         <dd class="col-sm-9" id="modalAppointmentId"></dd>
 
-                        <dt class="col-sm-3">Πελάτης</dt>
-                        <dd class="col-sm-9" id="modalAppointmentCustomer"></dd>
+                        <dt class="col-sm-3">{{ $user_role === 'owner' ? 'Με' : 'Πελάτης' }}</dt>
+                        <dd class="col-sm-9" id="modalAppointmentWith"></dd>
 
                         <dt class="col-sm-3">Ημερομηνία & Ώρα</dt>
                         <dd class="col-sm-9" id="modalAppointmentDatetime"></dd>
@@ -258,20 +319,36 @@
                             <input type="date" name="to" value="{{ $to }}" class="form-control">
                         </div>
 
-                        <div class="col-12">
-                            <label class="form-label">Πελάτης</label>
-                            <select name="customer_id" class="form-select js-customer-select-modal">
-                                <option value="">Όλοι οι πελάτες</option>
-                                @foreach($customers as $c)
-                                    <option value="{{ $c->id }}"
-                                        {{ (string)$c->id === (string)($customerId ?? request('customer_id')) ? 'selected' : '' }}>
-                                        {{ $c->last_name }} {{ $c->first_name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
+                        @if($user_role === 'owner')
+                            <input type="hidden" name="party_type" id="party_type_mobile" value="{{ $partyType }}">
 
-                        @if($user->role === 'owner')
+                            <div class="col-12">
+                                <label class="form-label">Με (Πελάτης / Επαγγελματίας)</label>
+                                <select name="party_id" id="party_select_mobile" class="form-select js-party-select-modal">
+                                    <option value="">Όλοι</option>
+
+                                    <optgroup label="Πελάτες">
+                                        @foreach($customers as $c)
+                                            <option value="{{ $c->id }}"
+                                                data-type="customer"
+                                                {{ ($partyType === 'customer' && (string)$partyId === (string)$c->id) ? 'selected' : '' }}>
+                                                {{ $c->last_name }} {{ $c->first_name }}
+                                            </option>
+                                        @endforeach
+                                    </optgroup>
+
+                                    <optgroup label="Επαγγελματίες">
+                                        @foreach($allProfessionalsForParties as $p)
+                                            <option value="{{ $p->id }}"
+                                                data-type="professional"
+                                                {{ ($partyType === 'professional' && (string)$partyId === (string)$p->id) ? 'selected' : '' }}>
+                                                {{ $p->last_name }} {{ $p->first_name }}
+                                            </option>
+                                        @endforeach
+                                    </optgroup>
+                                </select>
+                            </div>
+
                             <div class="col-12">
                                 <label class="form-label">Επαγγελματίας</label>
                                 <select name="professional_id" class="form-select js-professional-select-modal">
@@ -280,6 +357,19 @@
                                         <option value="{{ $p->id }}"
                                             {{ (string)$p->id === (string)($professionalId ?? request('professional_id')) ? 'selected' : '' }}>
                                             {{ $p->last_name }} {{ $p->first_name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @else
+                            <div class="col-12">
+                                <label class="form-label">Πελάτης</label>
+                                <select name="customer_id" class="form-select js-customer-select-modal">
+                                    <option value="">Όλοι οι πελάτες</option>
+                                    @foreach($customers as $c)
+                                        <option value="{{ $c->id }}"
+                                            {{ (string)$c->id === (string)($customerId ?? request('customer_id')) ? 'selected' : '' }}>
+                                            {{ $c->last_name }} {{ $c->first_name }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -300,45 +390,58 @@
 @endsection
 
 @push('scripts')
-    <!-- jQuery (απαραίτητο για Select2) -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
-    <!-- Select2 JS -->
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    $(function () {
 
-    <script>
-        $(function () {
-            // Desktop Select2
-            $('.js-customer-select').select2({
-                placeholder: 'Όλοι οι πελάτες',
+        const isOwner = @json($user_role === 'owner');
+
+        function syncPartyType(selectEl, hiddenTypeEl) {
+            const opt = $(selectEl).find('option:selected');
+            const t = opt.data('type') || '';
+            $(hiddenTypeEl).val(t);
+        }
+
+        if (isOwner) {
+            // Desktop: party
+            $('.js-party-select').select2({
+                placeholder: 'Όλοι',
                 allowClear: true,
                 width: '100%',
-                language: {
-                    noResults: function () { return 'Δεν βρέθηκαν αποτελέσματα'; }
-                }
+                language: { noResults: function () { return 'Δεν βρέθηκαν αποτελέσματα'; } }
+            }).on('change', function () {
+                syncPartyType('#party_select_desktop', '#party_type_desktop');
             });
 
+            // Owner professional filter
             $('.js-professional-select').select2({
                 placeholder: 'Όλοι οι επαγγελματίες',
                 allowClear: true,
                 width: '100%',
-                language: {
-                    noResults: function () { return 'Δεν βρέθηκαν αποτελέσματα'; }
-                }
+                language: { noResults: function () { return 'Δεν βρέθηκαν αποτελέσματα'; } }
             });
+        } else {
+            // Non-owner: customer only
+            $('.js-customer-select').select2({
+                placeholder: 'Όλοι οι πελάτες',
+                allowClear: true,
+                width: '100%',
+                language: { noResults: function () { return 'Δεν βρέθηκαν αποτελέσματα'; } }
+            });
+        }
 
-            // Modal Select2 (dropdownParent για να μην "κόβεται" μέσα στο modal)
-            const filtersModalEl = document.getElementById('filtersModal');
-
-            $('#filtersModal').on('shown.bs.modal', function () {
-                $('.js-customer-select-modal').select2({
-                    placeholder: 'Όλοι οι πελάτες',
+        $('#filtersModal').on('shown.bs.modal', function () {
+            if (isOwner) {
+                $('.js-party-select-modal').select2({
+                    placeholder: 'Όλοι',
                     allowClear: true,
                     width: '100%',
                     dropdownParent: $('#filtersModal'),
-                    language: {
-                        noResults: function () { return 'Δεν βρέθηκαν αποτελέσματα'; }
-                    }
+                    language: { noResults: function () { return 'Δεν βρέθηκαν αποτελέσματα'; } }
+                }).on('change', function () {
+                    syncPartyType('#party_select_mobile', '#party_type_mobile');
                 });
 
                 $('.js-professional-select-modal').select2({
@@ -346,38 +449,51 @@
                     allowClear: true,
                     width: '100%',
                     dropdownParent: $('#filtersModal'),
-                    language: {
-                        noResults: function () { return 'Δεν βρέθηκαν αποτελέσματα'; }
-                    }
+                    language: { noResults: function () { return 'Δεν βρέθηκαν αποτελέσματα'; } }
                 });
-            });
 
-            // Apply mobile filters
-            $('#applyMobileFiltersBtn').on('click', function () {
-                $('#filtersFormMobile').submit();
-            });
-
-            // 👉 Click σε όλη τη γραμμή για προβολή λεπτομερειών
-            $('.js-appointment-row').on('click', function (e) {
-                // Αν έγινε κλικ σε κουμπί / link μέσα στη γραμμή, μην ανοίγεις modal
-                if ($(e.target).closest('a, button, i, form').length) {
-                    return;
-                }
-
-                const id       = $(this).data('id');
-                const customer = $(this).data('customer');
-                const datetime = $(this).data('datetime');
-                const notes    = $(this).data('notes') || '-';
-
-                $('#modalAppointmentId').text(id);
-                $('#modalAppointmentCustomer').text(customer);
-                $('#modalAppointmentDatetime').text(datetime);
-                $('#modalAppointmentNotes').text(notes);
-
-                const modalEl = document.getElementById('appointmentModal');
-                const modal   = new bootstrap.Modal(modalEl);
-                modal.show();
-            });
+            } else {
+                $('.js-customer-select-modal').select2({
+                    placeholder: 'Όλοι οι πελάτες',
+                    allowClear: true,
+                    width: '100%',
+                    dropdownParent: $('#filtersModal'),
+                    language: { noResults: function () { return 'Δεν βρέθηκαν αποτελέσματα'; } }
+                });
+            }
         });
-    </script>
+
+        // Apply mobile filters
+        $('#applyMobileFiltersBtn').on('click', function () {
+            $('#filtersFormMobile').submit();
+        });
+
+        // Row click: details modal
+        $('.js-appointment-row').on('click', function (e) {
+            if ($(e.target).closest('a, button, i, form').length) {
+                return;
+            }
+
+            const id       = $(this).data('id');
+            const withName = $(this).data('with');
+            const datetime = $(this).data('datetime');
+            const notes    = $(this).data('notes') || '-';
+
+            $('#modalAppointmentId').text(id);
+            $('#modalAppointmentWith').text(withName);
+            $('#modalAppointmentDatetime').text(datetime);
+            $('#modalAppointmentNotes').text(notes);
+
+            const modalEl = document.getElementById('appointmentModal');
+            const modal   = new bootstrap.Modal(modalEl);
+            modal.show();
+        });
+
+        // Initial sync on load
+        if (isOwner) {
+            syncPartyType('#party_select_desktop', '#party_type_desktop');
+            syncPartyType('#party_select_mobile', '#party_type_mobile');
+        }
+    });
+</script>
 @endpush
