@@ -91,6 +91,12 @@
                             </a>
                         </li>
                     @endif
+                        <li class="nav-item mb-1">
+                            <a class="nav-link @if(request()->routeIs('price_items.*')) active @endif"
+                            href="{{ route('price_items.index') }}">
+                                🏷️ Τιμοκατάλογος
+                            </a>
+                        </li>
                 @endif
 
                 @if($user && $user->role === 'therapist')
@@ -187,6 +193,12 @@
                                    href="{{ route('therapist_appointments.index') }}">🗓 Ραντεβού θεραπευτών</a>
                             </li>
                         @endif
+                         <li class="nav-item mb-1">
+                            <a class="nav-link @if(request()->routeIs('price_items.*')) active @endif"
+                            href="{{ route('price_items.index') }}">
+                                🏷️ Τιμοκατάλογος
+                            </a>
+                        </li>
                     </ul>
                 </div>
 

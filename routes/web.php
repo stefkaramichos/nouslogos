@@ -14,6 +14,8 @@ use App\Http\Controllers\SettlementController;
 use App\Http\Controllers\AppointmentTrashController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\PriceItemController;
+
 
 // 🔹 Login routes (χωρίς auth)
 Route::get('/login', [AuthController::class, 'showLoginForm'])
@@ -42,7 +44,7 @@ Route::middleware('auth')->group(function () {
         return redirect()->route('customers.index'); // owner, grammatia, etc
     })->name('dashboard');
 
-
+    Route::resource('price_items', PriceItemController::class);
     Route::get('/professionals/company', [\App\Http\Controllers\ProfessionalController::class, 'getCompany'])
     ->name('professionals.getCompany');
 
