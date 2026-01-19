@@ -12,28 +12,28 @@ class NotificationController extends Controller
 {
     private function currentProfessional(): Professional
     {
-        // επειδή κάνεις Auth::attempt() από professionals
         return Professional::with('companies')->findOrFail(auth()->id());
     }
 
     /**
      * Επιστρέφει query για ειδοποιήσεις που επιτρέπεται να βλέπει ο χρήστης.
-     * - grammatia: βλέπει ειδοποιήσεις από επαγγελματίες που μοιράζονται τουλάχιστον ένα ίδιο γραφείο (company).
-     * - όλοι οι άλλοι: βλέπουν μόνο τις δικές τους.
+     * + ONLY FUTURE notifications
+     * + ORDER BY notify_at ASC
      */
     private function visibleNotificationsQuery(Professional $me): Builder
     {
-        $q = Notification::query()->orderByDesc('notify_at');
+        // ✅ ONLY FUTURE + ASC
+        $q = Notification::query()
+            ->where('notify_at', '>=', now())
+            ->orderBy('notify_at', 'asc');
 
         if ($me->role === 'grammatia') {
             $companyIds = $me->companies->pluck('id');
 
-            // αν δεν έχει γραφείο, μην δείχνεις τίποτα
             if ($companyIds->isEmpty()) {
                 return $q->whereRaw('1=0');
             }
 
-            // χρειάζεται Notification::professional() relation (belongsTo Professional)
             return $q->whereHas('professional', function ($p) use ($companyIds) {
                 $p->whereHas('companies', function ($c) use ($companyIds) {
                     $c->whereIn('companies.id', $companyIds);
@@ -54,6 +54,7 @@ class NotificationController extends Controller
 
         $q = $this->visibleNotificationsQuery($me);
 
+        // (optional) extra filters
         if ($from) {
             $q->whereDate('notify_at', '>=', $from);
         }
@@ -80,7 +81,7 @@ class NotificationController extends Controller
 
         $data = $request->validate([
             'note'      => ['required', 'string', 'max:5000'],
-            'notify_at' => ['required', 'date'], // expects "YYYY-MM-DDTHH:MM" from datetime-local too
+            'notify_at' => ['required', 'date'],
         ]);
 
         Notification::create([
@@ -124,16 +125,30 @@ class NotificationController extends Controller
     }
 
     /**
-     * Endpoint που καλεί το JS για “due notifications”
+     * Endpoint για “due notifications” (ΑΥΤΟ δείχνει τα ληγμένα/τρέχοντα popups)
+     * Εδώ σωστά είναι <= now()
      */
     public function due()
     {
         $me = $this->currentProfessional();
 
-        $due = $this->visibleNotificationsQuery($me)
+        $due = Notification::query()
+            ->when($me->role === 'grammatia', function ($q) use ($me) {
+                $companyIds = $me->companies->pluck('id');
+                if ($companyIds->isEmpty()) {
+                    return $q->whereRaw('1=0');
+                }
+                return $q->whereHas('professional', function ($p) use ($companyIds) {
+                    $p->whereHas('companies', function ($c) use ($companyIds) {
+                        $c->whereIn('companies.id', $companyIds);
+                    });
+                });
+            }, function ($q) use ($me) {
+                return $q->where('professional_id', $me->id);
+            })
             ->where('is_read', false)
             ->where('notify_at', '<=', now())
-            ->orderBy('notify_at')
+            ->orderBy('notify_at', 'asc')
             ->limit(10)
             ->get();
 
@@ -141,17 +156,12 @@ class NotificationController extends Controller
             $due->map(fn ($n) => [
                 'id' => $n->id,
                 'note' => $n->note,
-                // ✅ στείλε string (όχι Carbon) για να ΜΗΝ γίνει UTC conversion
                 'notify_at' => optional($n->notify_at)->format('Y-m-d H:i:s'),
-                // ✅ έτοιμο 24ωρο για εμφάνιση
                 'notify_at_text' => optional($n->notify_at)->format('d/m/Y H:i'),
             ])->values()
         );
     }
 
-    /**
-     * Mark as read (για να μην ξαναπετάει popup)
-     */
     public function markRead(Notification $notification)
     {
         $this->authorizeVisible($notification);
@@ -168,12 +178,10 @@ class NotificationController extends Controller
     {
         $me = $this->currentProfessional();
 
-        // ο δημιουργός πάντα έχει πρόσβαση
         if ((int) $notification->professional_id === (int) $me->id) {
             return;
         }
 
-        // grammatia: πρόσβαση αν ο ιδιοκτήτης της ειδοποίησης είναι σε κοινό γραφείο
         if ($me->role === 'grammatia') {
             $myCompanyIds = $me->companies->pluck('id');
 
