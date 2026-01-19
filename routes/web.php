@@ -77,6 +77,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/api/customers/last-appointment', [AppointmentController::class, 'getLastForCustomer'])
     ->name('customers.lastAppointment');
+    Route::post('/appointments/store-multiple', [AppointmentController::class, 'storeMultiple'])
+    ->name('appointments.storeMultiple');
+
 
  
     Route::get('/settlements', [SettlementController::class, 'index'])

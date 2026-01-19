@@ -293,126 +293,111 @@ class AppointmentController extends Controller
 
         $professionals = Professional::whereIn('role', ['owner', 'therapist'])
             ->orderBy('last_name')
+            ->orderBy('first_name')
             ->get();
 
-        $companies = Company::all();
+        $companies = Company::orderBy('name')->get();
 
         return view('appointments.create', compact('customers', 'professionals', 'companies'));
     }
+
 
     public function store(Request $request)
     {
         $data = $request->validate(
             [
-                'customer_id'           => 'required|exists:customers,id',
-                'professional_id'       => 'required|exists:professionals,id',
-                'company_id'            => 'required|exists:companies,id',
-                'start_time'            => 'required|date',
-                'end_time'              => 'nullable|date|after_or_equal:start_time',
+                'customer_id' => 'required|exists:customers,id',
+                'redirect_to' => 'nullable|string',
+
+                // ✅ MULTI appointments rows
+                'appointments' => 'required|array|min:1',
+
+                'appointments.*.professional_id' => 'required|exists:professionals,id',
+                'appointments.*.company_id'      => 'required|exists:companies,id',
+                'appointments.*.start_time'      => 'required|date',
+
+                'appointments.*.weeks' => 'nullable|integer|min:1|max:52',
 
                 // ✅ MULTI STATUS
-                'status'                => 'nullable|array',
-                'status.*'              => 'in:logotherapia,psixotherapia,ergotherapia,omadiki,eidikos,aksiologisi',
+                'appointments.*.status'   => 'nullable|array',
+                'appointments.*.status.*' => 'in:logotherapia,psixotherapia,ergotherapia,omadiki,eidikos,aksiologisi',
 
-                'total_price'           => 'nullable|numeric|min:0',
-                'notes'                 => 'nullable|string',
-                'mark_as_paid'          => 'nullable|boolean',
-                'payment_amount'        => 'nullable|numeric|min:0',
-                'professional_amount'   => 'nullable|numeric|min:0',
-                'weeks'                 => 'nullable|integer|min:1|max:52',
+                'appointments.*.total_price'         => 'nullable|numeric|min:0',
+                'appointments.*.professional_amount' => 'nullable|numeric|min:0',
+                'appointments.*.notes'               => 'nullable|string|max:5000',
             ],
             [
-                'customer_id.required'     => 'Το περιστατικό είναι υποχρεωτικός.',
-                'professional_id.required' => 'Ο επαγγελματίας είναι υποχρεωτικός.',
-                'company_id.required'      => 'Η εταιρεία είναι υποχρεωτική.',
-                'start_time.required'      => 'Η ημερομηνία/ώρα είναι υποχρεωτική.',
+                'appointments.required' => 'Πρέπει να υπάρχει τουλάχιστον μία γραμμή ραντεβού.',
             ]
         );
 
-        // ✅ status[] -> "a,b,c"
-        $data['status'] = isset($data['status'])
-            ? implode(',', array_values(array_filter($data['status'])))
-            : null;
-
-        $weeks = (int)($data['weeks'] ?? 1);
-        unset($data['weeks']);
-
-        $professional = Professional::findOrFail($data['professional_id']);
-
-        // Αν total_price δεν δοθεί, χρησιμοποίησε service_fee
-        $total = $data['total_price'] ?? $professional->service_fee;
-
-        $baseProfessionalAmount = $professional->percentage_cut;
-        $professionalAmount = $baseProfessionalAmount;
-
-        if (array_key_exists('professional_amount', $data) && $data['professional_amount'] !== null) {
-            $professionalAmount = $data['professional_amount'];
-        }
-
-        // if ($professionalAmount > $total) {
-        //     $professionalAmount = $total;
-        // }
-
-        $companyAmount = $total - $professionalAmount;
-
-        $data['total_price']         = $total;
-        $data['professional_amount'] = $professionalAmount;
-        $data['company_amount']      = $companyAmount;
-        $data['created_by']          = Auth::id();
-
-        $startTime = Carbon::parse($data['start_time']);
-        $endTime   = isset($data['end_time']) ? Carbon::parse($data['end_time']) : null;
+        $customerId = (int)$data['customer_id'];
+        $rows = $data['appointments'];
 
         $createdAppointments = [];
 
-        for ($i = 0; $i < $weeks; $i++) {
-            $currentData = $data;
+        foreach ($rows as $row) {
+            $professional = Professional::findOrFail($row['professional_id']);
 
-            $currentData['start_time'] = $startTime->copy()->addWeeks($i);
+            // status[] -> "a,b,c"
+            $statusCsv = isset($row['status'])
+                ? implode(',', array_values(array_filter($row['status'])))
+                : null;
 
-            if ($endTime) {
-                $currentData['end_time'] = $endTime->copy()->addWeeks($i);
+            $weeks = (int)($row['weeks'] ?? 1);
+
+            // Αν total_price δεν δοθεί, πάρε από service_fee
+            $total = array_key_exists('total_price', $row) && $row['total_price'] !== null
+                ? (float)$row['total_price']
+                : (float)($professional->service_fee ?? 0);
+
+            // default professional amount από percentage_cut, εκτός αν ο χρήστης έδωσε
+            $professionalAmount = (float)($professional->percentage_cut ?? 0);
+            if (array_key_exists('professional_amount', $row) && $row['professional_amount'] !== null && $row['professional_amount'] !== '') {
+                $professionalAmount = (float)$row['professional_amount'];
             }
 
-            $appointment = Appointment::create($currentData);
-            $createdAppointments[] = $appointment;
+            $companyAmount = $total - $professionalAmount;
 
-            // ✅ Αν χρέωση 0/null => auto paid (Payment 0€)
-            $this->ensureZeroPricePaid($appointment);
+            $startTime = Carbon::parse($row['start_time']);
 
-            // Μόνο στο πρώτο ραντεβού: αν ο χρήστης τσέκαρε mark_as_paid (και δεν είναι 0€)
-            if ($i === 0 && $request->boolean('mark_as_paid')) {
-                $appointment->load('payments');
-                $apptTotal = (float)($appointment->total_price ?? 0);
+            for ($i = 0; $i < $weeks; $i++) {
+                $appointment = Appointment::create([
+                    'customer_id'         => $customerId,
+                    'professional_id'     => (int)$row['professional_id'],
+                    'company_id'          => (int)$row['company_id'],
+                    'start_time'          => $startTime->copy()->addWeeks($i),
+                    'end_time'            => null,
 
-                if ($apptTotal > 0) {
-                    $paymentAmount = $data['payment_amount'] ?? $apptTotal;
+                    'status'              => $statusCsv,
+                    'total_price'         => $total,
 
-                    if ($paymentAmount > 0) {
-                        Payment::create([
-                            'appointment_id' => $appointment->id,
-                            'customer_id'    => $appointment->customer_id,
-                            'amount'         => $paymentAmount,
-                            'is_full'        => $paymentAmount >= $apptTotal,
-                            'paid_at'        => now(),
-                            'method'         => null,
-                            'notes'          => 'Καταχώρηση από τη φόρμα δημιουργίας ραντεβού.',
-                        ]);
-                    }
-                }
+                    'professional_amount' => $professionalAmount,
+                    'company_amount'      => $companyAmount,
+
+                    'notes'               => $row['notes'] ?? null,
+                    'created_by'          => Auth::id(),
+                ]);
+
+                $createdAppointments[] = $appointment;
+
+                // ✅ Αν χρέωση 0/null => auto paid (Payment 0€)
+                $this->ensureZeroPricePaid($appointment);
             }
         }
 
         $message = count($createdAppointments) === 1
             ? 'Το ραντεβού δημιουργήθηκε επιτυχώς!'
-            : 'Δημιουργήθηκαν ' . count($createdAppointments) . ' εβδομαδιαία ραντεβού επιτυχώς!';
+            : 'Δημιουργήθηκαν ' . count($createdAppointments) . ' ραντεβού επιτυχώς!';
 
-        if ($request->filled('redirect_to')) {
-            return redirect($request->input('redirect_to'))->with('success', $message);
+        if (!empty($data['redirect_to'])) {
+            return redirect($data['redirect_to'])->with('success', $message);
         }
 
         return redirect()->route('appointments.index')->with('success', $message);
     }
+
+
 
     public function show(Appointment $appointment)
     {
@@ -505,6 +490,86 @@ class AppointmentController extends Controller
 
         return redirect()->route('appointments.index')->with('success', 'Το ραντεβού ενημερώθηκε επιτυχώς.');
     }
+
+    public function storeMultiple(Request $request)
+    {
+        $data = $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'rows' => 'required|array|min:1',
+
+            'rows.*.professional_id' => 'required|exists:professionals,id',
+            'rows.*.company_id'      => 'required|exists:companies,id',
+            'rows.*.start_time'      => 'required|date',
+            'rows.*.weeks'           => 'nullable|integer|min:1|max:52',
+
+            'rows.*.status'   => 'nullable|array',
+            'rows.*.status.*' => 'in:logotherapia,psixotherapia,ergotherapia,omadiki,eidikos,aksiologisi',
+
+            'rows.*.total_price'         => 'nullable|numeric|min:0',
+            'rows.*.professional_amount' => 'nullable|numeric|min:0',
+            'rows.*.notes'               => 'nullable|string',
+        ]);
+
+        $customerId = $data['customer_id'];
+        $rows = $data['rows'];
+
+        $created = 0;
+
+        foreach ($rows as $row) {
+            $professional = Professional::findOrFail($row['professional_id']);
+
+            $weeks = (int)($row['weeks'] ?? 1);
+
+            $statusCsv = isset($row['status'])
+                ? implode(',', array_values(array_filter($row['status'])))
+                : null;
+
+            $total = $row['total_price'] ?? $professional->service_fee;
+
+            $professionalAmount = $professional->percentage_cut;
+            if (array_key_exists('professional_amount', $row) && $row['professional_amount'] !== null) {
+                $professionalAmount = $row['professional_amount'];
+            }
+
+            $companyAmount = $total - $professionalAmount;
+
+            $startTime = Carbon::parse($row['start_time']);
+
+            for ($i = 0; $i < $weeks; $i++) {
+                $appointment = Appointment::create([
+                    'customer_id'          => $customerId,
+                    'professional_id'      => $row['professional_id'],
+                    'company_id'           => $row['company_id'],
+                    'start_time'           => $startTime->copy()->addWeeks($i),
+
+                    'status'               => $statusCsv,
+                    'total_price'          => $total,
+                    'professional_amount'  => $professionalAmount,
+                    'company_amount'       => $companyAmount,
+                    'notes'                => $row['notes'] ?? null,
+                    'created_by'           => Auth::id(),
+                ]);
+
+                $this->ensureZeroPricePaid($appointment);
+                $created++;
+            }
+        }
+
+        $redirectTo = $request->input('redirect_to');
+
+        if ($redirectTo) {
+            // μικρή ασφάλεια να είναι δικό σου url
+            if (!str_starts_with($redirectTo, url('/'))) {
+                $redirectTo = null;
+            }
+        }
+
+        return $redirectTo
+            ? redirect()->to($redirectTo)->with('success', "Δημιουργήθηκαν {$created} ραντεβού επιτυχώς!")
+            : redirect()->route('appointments.index')->with('success', "Δημιουργήθηκαν {$created} ραντεβού επιτυχώς!");
+
+    }
+
 
     public function updatePrice(Request $request, Appointment $appointment)
     {
