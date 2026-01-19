@@ -46,8 +46,8 @@
     $dayAppointments = $appts->sortBy('start_time')->values();
 
     // hours (07:00 - 22:00)
-    $startHour = 7;
-    $endHour   = 22;
+    $startHour = 11;
+    $endHour   = 21;
 
     // keep query string (for view mode links)
     $qs = request()->query();
@@ -67,10 +67,10 @@
     .gc-head .gc-day:first-child { border-left: 0; }
     .gc-body { display: grid; grid-template-columns: 70px 1fr; }
     .gc-hours { background: #fff; border-right: 1px solid rgba(0,0,0,.08); }
-    .gc-hour { height: 56px; padding: .25rem .25rem; font-size: .75rem; color: #6c757d; border-bottom: 1px solid rgba(0,0,0,.06); }
+    .gc-hour { height: 136px; padding: .25rem .25rem; font-size: .75rem; color: #6c757d; border-bottom: 1px solid rgba(0,0,0,.06); }
     .gc-cells { display: grid; grid-template-columns: repeat(7, 1fr); }
     .gc-cell {
-        height: 56px;
+        height: 136px;
         border-bottom: 1px solid rgba(0,0,0,.06);
         border-left: 1px solid rgba(0,0,0,.06);
         position: relative;
@@ -97,6 +97,7 @@
     .gc-event.paid { border-color: rgba(25,135,84,.35); background: rgba(25,135,84,.10); }
     .gc-event.unpaid{ border-color: rgba(220,53,69,.35); background: rgba(220,53,69,.10); }
     .gc-event.partial{ border-color: rgba(255,193,7,.55); background: rgba(255,193,7,.12); }
+    
 </style>
 
 <div class="card">
