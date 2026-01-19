@@ -15,8 +15,6 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-    
-
 
     <style>
         body { min-height: 100vh; overflow-x: hidden; }
@@ -31,6 +29,23 @@
         /* small icon polish */
         .icon-actions .btn i { font-size: 1.1rem; }
         .icon-actions .btn:hover i { transform: scale(1.1); transition: 0.15s ease; }
+
+        /* notifications dropdown */
+        .notif-dropdown {
+            display:none;
+            position:fixed;
+            left: 30px;
+            bottom: 100px;
+            width:234px;
+            z-index:2000;
+        }
+        @media (max-width: 767.98px) {
+            .notif-dropdown { width: 320px; }
+        }
+        .notif-list {
+            max-height: 260px;
+            overflow: auto;
+        }
     </style>
 </head>
 <body>
@@ -91,12 +106,12 @@
                             </a>
                         </li>
                     @endif
-                        <li class="nav-item mb-1">
-                            <a class="nav-link @if(request()->routeIs('price_items.*')) active @endif"
-                            href="{{ route('price_items.index') }}">
-                                🏷️ Τιμοκατάλογος
-                            </a>
-                        </li>
+                    <li class="nav-item mb-1">
+                        <a class="nav-link @if(request()->routeIs('price_items.*')) active @endif"
+                           href="{{ route('price_items.index') }}">
+                            🏷️ Τιμοκατάλογος
+                        </a>
+                    </li>
                 @endif
 
                 @if($user && $user->role === 'therapist')
@@ -130,10 +145,31 @@
                     <a href="{{ route('documents.index') }}" class="btn btn-outline-success" title="Αρχεία">
                         <i class="bi bi-folder2-open"></i>
                     </a>
-                    
-                    <a href="{{ route('notifications.index') }}" class="btn btn-outline-primary" title="Ειδοποιήσεις">
-                        <i class="bi bi-bell"></i>
-                    </a>
+
+                    {{-- ✅ Notifications Bell with Badge + Dropdown --}}
+                    <div class="position-relative">
+                        <button type="button" id="notifBellBtnMobile" class="btn btn-outline-primary position-relative" title="Ειδοποιήσεις">
+                            <i class="bi bi-bell"></i>
+                            <span id="notifBadgeMobile"
+                                  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                                  style="display:none; font-size:.70rem;">
+                                0
+                            </span>
+                        </button>
+
+                        <div id="notifDropdownMobile" class="card shadow notif-dropdown">
+                            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                <strong>Ειδοποιήσεις</strong>
+                                <a class="small text-decoration-none" href="{{ route('notifications.index') }}">Όλες</a>
+                            </div>
+
+                            <div id="notifListMobile" class="list-group list-group-flush notif-list"></div>
+
+                            <div class="card-footer py-2 text-end">
+                                <button type="button" id="notifCloseMobile" class="btn btn-sm btn-outline-secondary">Κλείσιμο</button>
+                            </div>
+                        </div>
+                    </div>
                 @endif
 
                 <form action="{{ route('logout') }}" method="POST">
@@ -186,11 +222,11 @@
                                 </li>
                             @endif
                             <li class="nav-item mb-1">
-                               <a class="nav-link @if(request()->routeIs('price_items.*')) active @endif"
-                               href="{{ route('price_items.index') }}">
-                                   🏷️ Τιμοκατάλογος
-                               </a>
-                           </li>
+                                <a class="nav-link @if(request()->routeIs('price_items.*')) active @endif"
+                                   href="{{ route('price_items.index') }}">
+                                    🏷️ Τιμοκατάλογος
+                                </a>
+                            </li>
                         @endif
 
                         @if($user && $user->role === 'therapist')
@@ -222,9 +258,30 @@
                                 <i class="bi bi-folder2-open"></i>
                             </a>
 
-                            <a href="{{ route('notifications.index') }}" class="btn btn-outline-primary" title="Ειδοποιήσεις">
-                                <i class="bi bi-bell"></i>
-                            </a>
+                            {{-- ✅ Notifications Bell with Badge + Dropdown --}}
+                            <div class="position-relative">
+                                <button type="button" id="notifBellBtn" class="btn btn-outline-primary position-relative" title="Ειδοποιήσεις">
+                                    <i class="bi bi-bell"></i>
+                                    <span id="notifBadge"
+                                          class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                                          style="display:none; font-size:.70rem;">
+                                        0
+                                    </span>
+                                </button>
+
+                                <div id="notifDropdown" class="card shadow notif-dropdown">
+                                    <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                        <strong>Ειδοποιήσεις</strong>
+                                        <a class="small text-decoration-none" href="{{ route('notifications.index') }}">Όλες</a>
+                                    </div>
+
+                                    <div id="notifList" class="list-group list-group-flush notif-list"></div>
+
+                                    <div class="card-footer py-2 text-end">
+                                        <button type="button" id="notifClose" class="btn btn-sm btn-outline-secondary">Κλείσιμο</button>
+                                    </div>
+                                </div>
+                            </div>
                         @endif
 
                         <form action="{{ route('logout') }}" method="POST">
@@ -263,31 +320,21 @@
     </div>
 </div>
 
-{{-- ✅ Notifications Modal --}}
-@if(Auth::check())
-<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;">
-    <div id="notificationsToasts" class="d-grid gap-2"></div>
-</div>
-@endif
-
-
-{{-- ✅ 1) Bootstrap JS ΠΡΩΤΑ --}}
+{{-- ✅ Bootstrap JS --}}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- Flatpickr -->
+{{-- Flatpickr --}}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/el.js"></script>
 
-{{-- ✅ 2) Μετά φορτώνουμε scripts από views --}}
+{{-- View scripts --}}
 @stack('scripts')
 
-{{-- ✅ 3) Και ΤΕΛΟΣ το global notifications script (χωρίς push/stack για να μην μπερδεύεσαι) --}}
+{{-- ✅ Notifications Badge + Dropdown Script --}}
 @if(Auth::check())
 <script>
 (function () {
-    let shownIds = new Set();
-
     async function fetchDue() {
         try {
             const res = await fetch("{{ route('notifications.due') }}", {
@@ -311,82 +358,109 @@
     }
 
     function escapeHtml(str) {
-        return String(str ?? '').replace(/[&<>"']/g, function (m) {
-            return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]);
-        });
+        return String(str ?? '').replace(/[&<>"']/g, m => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+        }[m]));
     }
 
-    function renderToast(n) {
-        const container = document.getElementById('notificationsToasts');
-        if (!container) return;
+    function wireInstance(prefix) {
+        const bellBtn  = document.getElementById(prefix + 'BellBtn');
+        const badgeEl  = document.getElementById(prefix + 'Badge');
+        const dropdown = document.getElementById(prefix + 'Dropdown');
+        const listEl   = document.getElementById(prefix + 'List');
+        const closeBtn = document.getElementById(prefix + 'Close');
 
-        const toastEl = document.createElement('div');
-        toastEl.className = 'toast align-items-start';
-        toastEl.setAttribute('role', 'alert');
-        toastEl.setAttribute('aria-live', 'assertive');
-        toastEl.setAttribute('aria-atomic', 'true');
-        toastEl.setAttribute('style', 'background-color: #e9f5ff;');
+        if (!bellBtn || !badgeEl || !dropdown || !listEl || !closeBtn) return null;
 
-        const note = escapeHtml(n.note);
-        const when = escapeHtml(n.notify_at_text || n.notify_at || '');
+        function renderList(items) {
+            if (!items.length) {
+                listEl.innerHTML = `<div class="p-3 text-muted small">Δεν υπάρχουν ενεργές ειδοποιήσεις.</div>`;
+                return;
+            }
 
-        toastEl.innerHTML = `
-            <div class="toast-header">
-                <i class="bi bi-bell-fill me-2"></i>
-                <strong class="me-auto">Ειδοποίηση</strong>
-                <small class="text-muted">${when}</small>
-                <button type="button" class="btn-close ms-2" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-            <div class="toast-body">
-                <div>${note}</div>
-                <div class="mt-2 d-flex gap-2">
-                    <button class="btn btn-sm btn-primary js-ok">Μην εμφανιστεί ξανά</button>
-                </div>
-            </div>
-        `;
+            listEl.innerHTML = items.map(n => {
+                const note = escapeHtml(n.note);
+                const when = escapeHtml(n.notify_at_text || n.notify_at || '');
+                return `
+                    <button type="button" class="list-group-item list-group-item-action" data-id="${n.id}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="me-2" style="white-space:pre-wrap">${note}</div>
+                            <small class="text-muted">${when}</small>
+                        </div>
+                        <div class="mt-2 text-end">
+                            <span class="ms-2 text-primary small">Κλικ για να “διαβαστεί”</span>
+                        </div>
+                    </button>
+                `;
+            }).join('');
 
-        container.prepend(toastEl);
+            listEl.querySelectorAll('[data-id]').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.getAttribute('data-id');
+                    await markRead(id);
+                    await refreshAll();
+                });
+            });
+        }
 
-        const toast = new bootstrap.Toast(toastEl, {
-            autohide: false // να μένει μέχρι να πατήσει ΟΚ/close
+        function open() { dropdown.style.display = 'block'; }
+        function close() { dropdown.style.display = 'none'; }
+        function toggle() { dropdown.style.display = (dropdown.style.display === 'none' || !dropdown.style.display) ? 'block' : 'none'; }
+
+        bellBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            await refreshAll();
+            toggle();
         });
-        toast.show();
 
-        // Mark read on OK (και κλείσιμο)
-        toastEl.querySelector('.js-ok').addEventListener('click', async () => {
-            await markRead(n.id);
-            toast.hide();
+        closeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            close();
         });
 
-        // Mark read και αν το κλείσει με το X
-        toastEl.querySelector('.js-ok').addEventListener('click', async () => {
-            await markRead(n.id);
-            toast.hide();
-            toastEl.remove();
+        document.addEventListener('click', (e) => {
+            if (!dropdown.contains(e.target) && !bellBtn.contains(e.target)) {
+                close();
+            }
         });
+
+        return {
+            setBadge(count) {
+                if (count > 0) {
+                    badgeEl.textContent = count;
+                    badgeEl.style.display = 'inline-block';
+                } else {
+                    badgeEl.style.display = 'none';
+                }
+            },
+            renderList,
+            close
+        };
     }
 
-    async function checkAndShow() {
+    // map IDs to instances
+    const desktop = wireInstance('notif');
+    const mobile  = wireInstance('notifMobile');
+
+    async function refreshAll() {
         const due = await fetchDue();
-        if (!due.length) return;
+        const count = due.length;
 
-        const newOnes = due.filter(n => !shownIds.has(n.id));
-        if (!newOnes.length) return;
-
-        newOnes.forEach(n => {
-            shownIds.add(n.id);
-            renderToast(n);
-        });
+        if (desktop) {
+            desktop.setBadge(count);
+            desktop.renderList(due);
+        }
+        if (mobile) {
+            mobile.setBadge(count);
+            mobile.renderList(due);
+        }
     }
 
-    // run on load
-    checkAndShow();
-    // every 60 sec
-    setInterval(checkAndShow, 60000);
+    // initial + poll
+    refreshAll();
+    setInterval(refreshAll, 60000);
 })();
 </script>
 @endif
-
-
 </body>
 </html>
