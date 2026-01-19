@@ -155,6 +155,52 @@
                             <span class="text-muted">Δεν έχουν γίνει πληρωμές για αυτόν το Περιστατικό.</span>
                         @endforelse
                     </div>
+
+                    {{-- ✅ Προπληρωμή (εμφάνιση μόνο αν υπάρχει υπόλοιπο) --}}
+                    <div class="mt-2">
+                    @php
+                        $hasPrepay = isset($prepayment) && (
+                            (float)($prepayment->cash_y_balance ?? 0) > 0 ||
+                            (float)($prepayment->cash_n_balance ?? 0) > 0 ||
+                            (float)($prepayment->card_balance ?? 0) > 0
+                        );
+
+                        $prepayTotal =
+                            (float)($prepayment->cash_y_balance ?? 0) +
+                            (float)($prepayment->cash_n_balance ?? 0) +
+                            (float)($prepayment->card_balance ?? 0);
+                    @endphp
+
+                    @if($hasPrepay)
+                        <div class="border rounded p-2 mb-2"
+                            style="font-size:0.8rem; background:#f8f9fa;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong>Προπληρωμή</strong>
+                                <span class="badge bg-primary">
+                                    {{ number_format($prepayTotal, 2, ',', '.') }} €
+                                </span>
+                            </div>
+
+                            <div class="text-muted" style="font-size:0.75rem;">
+                                @if((float)($prepayment->cash_y_balance ?? 0) > 0)
+                                    Μετρητά (με απόδειξη): {{ number_format((float)$prepayment->cash_y_balance, 2, ',', '.') }} €
+                                    <br>
+                                @endif
+
+                                @if((float)($prepayment->cash_n_balance ?? 0) > 0)
+                                    Μετρητά (χωρίς απόδειξη): {{ number_format((float)$prepayment->cash_n_balance, 2, ',', '.') }} €
+                                    <br>
+                                @endif
+
+                                @if((float)($prepayment->card_balance ?? 0) > 0)
+                                    Κάρτα{{ $prepayment->card_bank ? ' · '.$prepayment->card_bank : '' }}:
+                                    {{ number_format((float)$prepayment->card_balance, 2, ',', '.') }} €
+                                @endif
+                            </div>
+
+                        </div>
+                    @endif
+                    </div>
                 </div>
             </div>
 

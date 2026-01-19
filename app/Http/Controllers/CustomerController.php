@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use App\Models\CustomerPrepayment;
 
 class CustomerController extends Controller
 {
@@ -486,6 +487,8 @@ class CustomerController extends Controller
             $nextUrl = $request->url() . '?' . http_build_query(array_merge($baseQuery, ['nav' => 'next']));
         }
 
+        $prepayment = \App\Models\CustomerPrepayment::where('customer_id', $customer->id)->first();
+
         $selectedLabel = 'Όλα';
         if ($range === 'day' && $day) {
             $selectedLabel = Carbon::parse($day)->locale('el')->translatedFormat('D d/m/Y');
@@ -515,7 +518,8 @@ class CustomerController extends Controller
             'outstandingAmount',
 
             // ✅ NEW for filter dropdown
-            'appointmentProfessionals'
+            'appointmentProfessionals',
+            'prepayment',
         ));
     }
 
@@ -924,26 +928,59 @@ class CustomerController extends Controller
         }
 
         if ($dueTotal <= 0.0001) {
-            return back()->with('error', 'Δεν υπάρχουν χρωστούμενα ραντεβού για αυτό το περιστατικό.');
+            // όλα γίνονται προπληρωμή
+            DB::transaction(function () use ($customer, $cashY, $cashN, $card, $data, $paidAt) {
+                $prepay = CustomerPrepayment::where('customer_id', $customer->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$prepay) {
+                    $prepay = CustomerPrepayment::create([
+                        'customer_id'     => $customer->id,
+                        'cash_y_balance'  => 0,
+                        'cash_n_balance'  => 0,
+                        'card_balance'    => 0,
+                        'card_bank'       => $data['card_bank'] ?? null,
+                        'last_paid_at'    => $paidAt,
+                        'created_by'      => Auth::id(),
+                        'notes'           => 'Χειροκίνητη προπληρωμή (χωρίς χρωστούμενα).',
+                    ]);
+                }
+
+                $prepay->cash_y_balance += (float)$cashY;
+                $prepay->cash_n_balance += (float)$cashN;
+                $prepay->card_balance   += (float)$card;
+
+                if (!empty($data['card_bank'])) {
+                    $prepay->card_bank = $data['card_bank'];
+                }
+
+                $prepay->last_paid_at = $paidAt;
+                $prepay->save();
+            });
+
+            $incoming = $cashY + $cashN + $card;
+            return back()->with('success', 'Καταχωρήθηκε προπληρωμή: ' . number_format($incoming, 2, ',', '.') . ' €');
         }
+
 
         $incoming = $cashY + $cashN + $card;
 
-        if ($incoming > $dueTotal + 0.0001) {
-            return back()->with('error', 'Το ποσό που δώσατε είναι μεγαλύτερο από το συνολικό υπόλοιπο.');
-        }
-
+    
         DB::transaction(function () use ($appointments, $customer, $cashY, $cashN, $card, $data, $paidAt) {
 
-            $allocate = function (float $amount, string $method, string $tax, ?string $bank = null)
-                use (&$appointments, $customer, $data, $paidAt) {
+            // helper allocate to due appointments (oldest first) returning leftover from bucket
+            $allocateToDue = function (float $amount, string $method, string $tax, ?string $bank = null)
+                use (&$appointments, $customer, $data, $paidAt) : float {
 
                 $remaining = $amount;
 
                 foreach ($appointments as $a) {
                     if ($remaining <= 0) break;
 
-                    $total = (float)$a->total_price;
+                    $total = (float)($a->total_price ?? 0);
+                    if ($total <= 0) continue;
+
                     $paid  = (float)$a->payments->sum('amount');
                     $due   = max(0, $total - $paid);
 
@@ -955,52 +992,93 @@ class CustomerController extends Controller
                         'appointment_id' => $a->id,
                         'customer_id'    => $customer->id,
                         'amount'         => $payNow,
-                        'is_full'        => false,
-                        'paid_at'        => $paidAt,              // ✅ ΟΧΙ now()
+                        'is_full'        => 0,
+                        'paid_at'        => $paidAt,
                         'method'         => $method,
                         'tax'            => $tax,
                         'bank'           => $bank,
                         'notes'          => $data['notes'] ?? 'Πληρωμή χρωστούμενων (split).',
-                        'created_by'     => Auth::id(),           // ✅ ποιος την πέρασε
+                        'created_by'     => Auth::id(),
                     ]);
 
-                    // update in-memory
                     $a->payments->push($payment);
-
                     $remaining -= $payNow;
                 }
 
-                return $remaining;
+                return $remaining; // ✅ leftover = προπληρωμή
             };
 
-            // σειρά:
-            if ($cashY > 0) $allocate($cashY, 'cash', 'Y', null);
-            if ($cashN > 0) $allocate($cashN, 'cash', 'N', null);
+            // 1) allocate to due (όσο υπάρχει due)
+            $leftCashY = $cashY > 0 ? $allocateToDue($cashY, 'cash', 'Y', null) : 0;
+            $leftCashN = $cashN > 0 ? $allocateToDue($cashN, 'cash', 'N', null) : 0;
 
+            $leftCard  = 0;
             if ($card > 0) {
                 $bank = $data['card_bank'] ?? null;
-                $allocate($card, 'card', 'Y', $bank);
+                $leftCard = $allocateToDue($card, 'card', 'Y', $bank);
             }
 
-            // is_full στο τελευταίο payment κάθε appointment αν καλύφθηκε
+            // 2) update is_full για όσα καλύφθηκαν
             foreach ($appointments as $a) {
-                $total = (float)$a->total_price;
-                $paid  = (float)$a->payments->sum('amount');
+                $total = (float)($a->total_price ?? 0);
+                if ($total <= 0) continue;
 
-                if ($total > 0 && $paid >= $total) {
+                $paid = (float)$a->payments->sum('amount');
+
+                Payment::where('appointment_id', $a->id)->update(['is_full' => 0]);
+
+                if ($paid >= $total) {
                     $last = Payment::where('appointment_id', $a->id)
                         ->orderByDesc('paid_at')
                         ->orderByDesc('id')
                         ->first();
 
                     if ($last) {
-                        $last->is_full = true;
+                        $last->is_full = 1;
                         $last->save();
                     }
                 }
             }
+
+            // 3) Αν περίσσεψε κάτι => προπληρωμή
+            $extraTotal = (float)$leftCashY + (float)$leftCashN + (float)$leftCard;
+
+            if ($extraTotal > 0.0001) {
+                $prepay = CustomerPrepayment::where('customer_id', $customer->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$prepay) {
+                    $prepay = CustomerPrepayment::create([
+                        'customer_id'     => $customer->id,
+                        'cash_y_balance'  => 0,
+                        'cash_n_balance'  => 0,
+                        'card_balance'    => 0,
+                        'card_bank'       => $data['card_bank'] ?? null,
+                        'last_paid_at'    => $paidAt,
+                        'created_by'      => Auth::id(),
+                        'notes'           => 'Αυτόματη προπληρωμή από φόρμα χρωστούμενων.',
+                    ]);
+                }
+
+                $prepay->cash_y_balance += (float)$leftCashY;
+                $prepay->cash_n_balance += (float)$leftCashN;
+                $prepay->card_balance   += (float)$leftCard;
+
+                if (!empty($data['card_bank'])) {
+                    $prepay->card_bank = $data['card_bank'];
+                }
+
+                $prepay->last_paid_at = $paidAt;
+                $prepay->updated_at = now();
+                $prepay->save();
+            }
         });
 
+        if ($incoming > $dueTotal + 0.0001) {
+            $extra = $incoming - $dueTotal;
+            return back()->with('success', 'Η πληρωμή καταχωρήθηκε. Προπληρωμή: ' . number_format($extra, 2, ',', '.') . ' €');
+        }
         return back()->with('success', 'Η πληρωμή καταχωρήθηκε επιτυχώς.');
     }
 

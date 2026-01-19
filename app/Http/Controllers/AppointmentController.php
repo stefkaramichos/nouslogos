@@ -7,11 +7,13 @@ use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Professional;
 use App\Models\Payment;
+use App\Models\CustomerPrepayment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class AppointmentController extends Controller
 {
@@ -24,7 +26,6 @@ class AppointmentController extends Controller
         $total = (float) ($appointment->total_price ?? 0);
 
         if ($total <= 0) {
-            // Αν δεν υπάρχει καμία πληρωμή, δημιουργούμε μία 0€
             if (!$appointment->payments()->exists()) {
                 Payment::create([
                     'appointment_id' => $appointment->id,
@@ -33,11 +34,13 @@ class AppointmentController extends Controller
                     'is_full'        => 1,
                     'paid_at'        => now(),
                     'method'         => null,
+                    'tax'            => null,
+                    'bank'           => null,
                     'notes'          => '[AUTO_ZERO] Μηδενική χρέωση - αυτόματη εξόφληση.',
+                    'created_by'     => Auth::id(),
                 ]);
             }
         } else {
-            // Αν από 0 έγινε >0, σβήνουμε τυχόν auto-zero payment για να μην "μπερδεύει"
             $appointment->payments()
                 ->where('amount', 0)
                 ->where('notes', 'like', '[AUTO_ZERO]%')
@@ -47,14 +50,10 @@ class AppointmentController extends Controller
 
     public function index(Request $request)
     {
-        // dropdown lists
         $customers     = Customer::orderBy('last_name')->get();
         $professionals = Professional::orderBy('last_name')->get();
         $companies     = Company::orderBy('name')->get();
 
-        // -----------------------------
-        // Period filter (range/day/month/all) + prev/next
-        // -----------------------------
         $range = $request->input('range', 'month');
         $nav   = $request->input('nav');
         $day   = $request->input('day');
@@ -67,7 +66,7 @@ class AppointmentController extends Controller
         ])) {
             $range = 'month';
             $month = now()->format('Y-m');
-            $month = null; // (κρατάω όπως το είχες)
+            $month = null; // όπως το είχες
         }
 
         $legacyFrom = $request->input('from');
@@ -126,9 +125,6 @@ class AppointmentController extends Controller
             $selectedLabel = Carbon::createFromFormat('Y-m', $month)->locale('el')->translatedFormat('F Y');
         }
 
-        // -----------------------------
-        // Other filters
-        // -----------------------------
         $customerId     = $request->input('customer_id');
         $professionalId = $request->input('professional_id');
         $companyId      = $request->input('company_id');
@@ -141,7 +137,7 @@ class AppointmentController extends Controller
             ->leftJoin('customers', 'customers.id', '=', 'appointments.customer_id')
             ->orderBy('appointments.start_time', 'desc')
             ->orderBy('customers.last_name', 'asc')
-            ->select('appointments.*'); // important to avoid column conflicts
+            ->select('appointments.*');
 
         if ($from) $query->whereDate('start_time', '>=', $from);
         if ($to)   $query->whereDate('start_time', '<=', $to);
@@ -150,8 +146,6 @@ class AppointmentController extends Controller
         if ($professionalId) $query->where('appointments.professional_id', $professionalId);
         if ($companyId)      $query->where('appointments.company_id', $companyId);
 
-
-        // ✅ status filter (token μέσα σε comma-separated string)
         if ($status && $status !== 'all') {
             $query->where(function ($q) use ($status) {
                 $q->where('status', $status)
@@ -163,12 +157,10 @@ class AppointmentController extends Controller
 
         $appointments = $query->get();
 
-        // ✅ payment_status filter (με κανόνα: total_price <= 0 => FULL PAID)
         if ($paymentStatus && $paymentStatus !== 'all') {
             $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
                 $total = (float) ($a->total_price ?? 0);
 
-                // ✅ Μηδενική/κενή χρέωση => θεωρείται εξοφλημένο
                 if ($total <= 0) {
                     return $paymentStatus === 'full';
                 }
@@ -183,14 +175,12 @@ class AppointmentController extends Controller
             });
         }
 
-        // payment_method filter
         if ($paymentMethod && $paymentMethod !== 'all') {
             $appointments = $appointments->filter(function ($a) use ($paymentMethod) {
                 return $a->payments->where('method', $paymentMethod)->sum('amount') > 0;
             });
         }
 
-        // manual pagination
         $perPage = 25;
         $currentPage = Paginator::resolveCurrentPage() ?: 1;
 
@@ -207,7 +197,6 @@ class AppointmentController extends Controller
             ]
         );
 
-        // Prev/Next URLs
         $prevUrl = null;
         $nextUrl = null;
 
@@ -277,7 +266,7 @@ class AppointmentController extends Controller
             'found'               => true,
             'professional_id'     => $appointment->professional_id,
             'company_id'          => $appointment->company_id,
-            'status'              => $appointment->status, // μπορεί να είναι "a,b"
+            'status'              => $appointment->status,
             'total_price'         => $appointment->total_price,
             'professional_amount' => $appointment->professional_amount,
             'notes'               => $appointment->notes,
@@ -301,7 +290,6 @@ class AppointmentController extends Controller
         return view('appointments.create', compact('customers', 'professionals', 'companies'));
     }
 
-
     public function store(Request $request)
     {
         $data = $request->validate(
@@ -309,7 +297,6 @@ class AppointmentController extends Controller
                 'customer_id' => 'required|exists:customers,id',
                 'redirect_to' => 'nullable|string',
 
-                // ✅ MULTI appointments rows
                 'appointments' => 'required|array|min:1',
 
                 'appointments.*.professional_id' => 'required|exists:professionals,id',
@@ -318,7 +305,6 @@ class AppointmentController extends Controller
 
                 'appointments.*.weeks' => 'nullable|integer|min:1|max:52',
 
-                // ✅ MULTI STATUS
                 'appointments.*.status'   => 'nullable|array',
                 'appointments.*.status.*' => 'in:logotherapia,psixotherapia,ergotherapia,omadiki,eidikos,aksiologisi',
 
@@ -339,19 +325,16 @@ class AppointmentController extends Controller
         foreach ($rows as $row) {
             $professional = Professional::findOrFail($row['professional_id']);
 
-            // status[] -> "a,b,c"
             $statusCsv = isset($row['status'])
                 ? implode(',', array_values(array_filter($row['status'])))
                 : null;
 
             $weeks = (int)($row['weeks'] ?? 1);
 
-            // Αν total_price δεν δοθεί, πάρε από service_fee
             $total = array_key_exists('total_price', $row) && $row['total_price'] !== null
                 ? (float)$row['total_price']
                 : (float)($professional->service_fee ?? 0);
 
-            // default professional amount από percentage_cut, εκτός αν ο χρήστης έδωσε
             $professionalAmount = (float)($professional->percentage_cut ?? 0);
             if (array_key_exists('professional_amount', $row) && $row['professional_amount'] !== null && $row['professional_amount'] !== '') {
                 $professionalAmount = (float)$row['professional_amount'];
@@ -368,21 +351,18 @@ class AppointmentController extends Controller
                     'company_id'          => (int)$row['company_id'],
                     'start_time'          => $startTime->copy()->addWeeks($i),
                     'end_time'            => null,
-
                     'status'              => $statusCsv,
                     'total_price'         => $total,
-
                     'professional_amount' => $professionalAmount,
                     'company_amount'      => $companyAmount,
-
                     'notes'               => $row['notes'] ?? null,
                     'created_by'          => Auth::id(),
                 ]);
 
                 $createdAppointments[] = $appointment;
 
-                // ✅ Αν χρέωση 0/null => auto paid (Payment 0€)
                 $this->ensureZeroPricePaid($appointment);
+                $this->applyPrepaymentToAppointment($appointment);
             }
         }
 
@@ -397,11 +377,8 @@ class AppointmentController extends Controller
         return redirect()->route('appointments.index')->with('success', $message);
     }
 
-
-
     public function show(Appointment $appointment)
     {
-        // ✅ διόρθωση: payments (όχι payment)
         $appointment->load(['customer', 'professional', 'company', 'payments']);
         return view('appointments.show', compact('appointment'));
     }
@@ -435,23 +412,15 @@ class AppointmentController extends Controller
                 'start_time'            => 'required|date',
                 'end_time'              => 'nullable|date|after_or_equal:start_time',
 
-                // ✅ MULTI STATUS
                 'status'                => 'nullable|array',
                 'status.*'              => 'in:logotherapia,psixotherapia,ergotherapia,omadiki,eidikos,aksiologisi',
 
                 'total_price'           => 'nullable|numeric|min:0',
                 'notes'                 => 'nullable|string',
                 'professional_amount'   => 'nullable|numeric|min:0',
-            ],
-            [
-                'customer_id.required'     => 'Το περιστατικό είναι υποχρεωτικός.',
-                'professional_id.required' => 'Ο επαγγελματίας είναι υποχρεωτικός.',
-                'company_id.required'      => 'Η εταιρεία είναι υποχρεωτική.',
-                'start_time.required'      => 'Η ημερομηνία/ώρα είναι υποχρεωτική.',
             ]
         );
 
-        // ✅ status[] -> "a,b,c"
         $data['status'] = isset($data['status'])
             ? implode(',', array_values(array_filter($data['status'])))
             : null;
@@ -460,16 +429,10 @@ class AppointmentController extends Controller
 
         $total = $data['total_price'] ?? $professional->service_fee;
 
-        $baseProfessionalAmount = $professional->percentage_cut;
-        $professionalAmount = $baseProfessionalAmount;
-
+        $professionalAmount = (float)($professional->percentage_cut ?? 0);
         if (array_key_exists('professional_amount', $data) && $data['professional_amount'] !== null) {
-            $professionalAmount = $data['professional_amount'];
+            $professionalAmount = (float)$data['professional_amount'];
         }
-
-        // if ($professionalAmount > $total) {
-        //     $professionalAmount = $total;
-        // }
 
         $companyAmount = $total - $professionalAmount;
 
@@ -479,7 +442,6 @@ class AppointmentController extends Controller
 
         $appointment->update($data);
 
-        // ✅ Αν total_price <= 0 => auto paid (Payment 0€). Αν >0, καθάρισε auto-zero
         $this->ensureZeroPricePaid($appointment);
 
         $redirectTo = $request->input('redirect_to');
@@ -510,7 +472,7 @@ class AppointmentController extends Controller
             'rows.*.notes'               => 'nullable|string',
         ]);
 
-        $customerId = $data['customer_id'];
+        $customerId = (int)$data['customer_id'];
         $rows = $data['rows'];
 
         $created = 0;
@@ -526,9 +488,9 @@ class AppointmentController extends Controller
 
             $total = $row['total_price'] ?? $professional->service_fee;
 
-            $professionalAmount = $professional->percentage_cut;
+            $professionalAmount = (float)($professional->percentage_cut ?? 0);
             if (array_key_exists('professional_amount', $row) && $row['professional_amount'] !== null) {
-                $professionalAmount = $row['professional_amount'];
+                $professionalAmount = (float)$row['professional_amount'];
             }
 
             $companyAmount = $total - $professionalAmount;
@@ -538,38 +500,32 @@ class AppointmentController extends Controller
             for ($i = 0; $i < $weeks; $i++) {
                 $appointment = Appointment::create([
                     'customer_id'          => $customerId,
-                    'professional_id'      => $row['professional_id'],
-                    'company_id'           => $row['company_id'],
+                    'professional_id'      => (int)$row['professional_id'],
+                    'company_id'           => (int)$row['company_id'],
                     'start_time'           => $startTime->copy()->addWeeks($i),
-
                     'status'               => $statusCsv,
-                    'total_price'          => $total,
-                    'professional_amount'  => $professionalAmount,
-                    'company_amount'       => $companyAmount,
+                    'total_price'          => (float)$total,
+                    'professional_amount'  => (float)$professionalAmount,
+                    'company_amount'       => (float)$companyAmount,
                     'notes'                => $row['notes'] ?? null,
                     'created_by'           => Auth::id(),
                 ]);
 
                 $this->ensureZeroPricePaid($appointment);
+                $this->applyPrepaymentToAppointment($appointment); // ✅ ΕΔΩ ΕΛΕΙΠΕ
                 $created++;
             }
         }
 
         $redirectTo = $request->input('redirect_to');
-
-        if ($redirectTo) {
-            // μικρή ασφάλεια να είναι δικό σου url
-            if (!str_starts_with($redirectTo, url('/'))) {
-                $redirectTo = null;
-            }
+        if ($redirectTo && !str_starts_with($redirectTo, url('/'))) {
+            $redirectTo = null;
         }
 
         return $redirectTo
             ? redirect()->to($redirectTo)->with('success', "Δημιουργήθηκαν {$created} ραντεβού επιτυχώς!")
             : redirect()->route('appointments.index')->with('success', "Δημιουργήθηκαν {$created} ραντεβού επιτυχώς!");
-
     }
-
 
     public function updatePrice(Request $request, Appointment $appointment)
     {
@@ -581,7 +537,6 @@ class AppointmentController extends Controller
             'total_price' => $request->total_price
         ]);
 
-        // ✅ Αν μηδενίστηκε -> auto paid, αν πήγε >0 -> καθάρισε auto-zero
         $this->ensureZeroPricePaid($appointment);
 
         return response()->json([
@@ -589,6 +544,148 @@ class AppointmentController extends Controller
             'new_price' => number_format((float)$appointment->total_price, 2, ',', '.')
         ]);
     }
+
+    /**
+     * ✅ APPLY PREPAYMENT BALANCES TO THIS APPOINTMENT (oldest: cashY -> cashN -> card)
+     * - δημιουργεί Payments
+     * - μειώνει balances
+     * - αν μηδενιστούν όλα -> σβήνει το prepayment record
+     */
+    private function applyPrepaymentToAppointment(Appointment $appointment): void
+    {
+        $total = (float)($appointment->total_price ?? 0);
+        if ($total <= 0) return;
+
+        DB::transaction(function () use ($appointment, $total) {
+
+            $appointment->load('payments');
+
+            $paid = (float)$appointment->payments->sum('amount');
+            $due  = max(0, $total - $paid);
+            if ($due <= 0.0001) return;
+
+            $prepay = CustomerPrepayment::where('customer_id', $appointment->customer_id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$prepay) return;
+
+            $paidAt = $prepay->last_paid_at ?? now();
+
+            // ✅ ΠΑΡΕ BALANCES ΣΕ LOCAL VARS (ΟΧΙ & σε model properties)
+            $cashY = (float)($prepay->cash_y_balance ?? 0);
+            $cashN = (float)($prepay->cash_n_balance ?? 0);
+            $card  = (float)($prepay->card_balance ?? 0);
+
+            $consume = function (float $available, float $need): float {
+                if ($available <= 0 || $need <= 0) return 0.0;
+                return min($available, $need);
+            };
+
+            // 1) cash Y
+            if ($due > 0.0001 && $cashY > 0.0001) {
+                $use = $consume($cashY, $due);
+                if ($use > 0.0001) {
+                    $payment = Payment::create([
+                        'appointment_id' => $appointment->id,
+                        'customer_id'    => $appointment->customer_id,
+                        'amount'         => $use,
+                        'is_full'        => 0,
+                        'paid_at'        => $paidAt,
+                        'method'         => 'cash',
+                        'tax'            => 'Y',
+                        'bank'           => null,
+                        'notes'          => '[PREPAY] Αυτόματη χρέωση από προπληρωμή.',
+                        'created_by'     => Auth::id(),
+                    ]);
+                    $appointment->payments->push($payment);
+
+                    $cashY -= $use;
+                    $due   -= $use;
+                }
+            }
+
+            // 2) cash N
+            if ($due > 0.0001 && $cashN > 0.0001) {
+                $use = $consume($cashN, $due);
+                if ($use > 0.0001) {
+                    $payment = Payment::create([
+                        'appointment_id' => $appointment->id,
+                        'customer_id'    => $appointment->customer_id,
+                        'amount'         => $use,
+                        'is_full'        => 0,
+                        'paid_at'        => $paidAt,
+                        'method'         => 'cash',
+                        'tax'            => 'N',
+                        'bank'           => null,
+                        'notes'          => '[PREPAY] Αυτόματη χρέωση από προπληρωμή.',
+                        'created_by'     => Auth::id(),
+                    ]);
+                    $appointment->payments->push($payment);
+
+                    $cashN -= $use;
+                    $due   -= $use;
+                }
+            }
+
+            // 3) card
+            if ($due > 0.0001 && $card > 0.0001) {
+                $use = $consume($card, $due);
+                if ($use > 0.0001) {
+                    $payment = Payment::create([
+                        'appointment_id' => $appointment->id,
+                        'customer_id'    => $appointment->customer_id,
+                        'amount'         => $use,
+                        'is_full'        => 0,
+                        'paid_at'        => $paidAt,
+                        'method'         => 'card',
+                        'tax'            => 'Y',
+                        'bank'           => $prepay->card_bank,
+                        'notes'          => '[PREPAY] Αυτόματη χρέωση από προπληρωμή.',
+                        'created_by'     => Auth::id(),
+                    ]);
+                    $appointment->payments->push($payment);
+
+                    $card -= $use;
+                    $due  -= $use;
+                }
+            }
+
+            // ✅ cleanup tiny negatives
+            if ($cashY < 0.0001) $cashY = 0;
+            if ($cashN < 0.0001) $cashN = 0;
+            if ($card  < 0.0001) $card  = 0;
+
+            // ✅ γράψε πίσω στο model
+            $prepay->cash_y_balance = $cashY;
+            $prepay->cash_n_balance = $cashN;
+            $prepay->card_balance   = $card;
+
+            // ✅ αν όλα μηδέν -> delete record
+            if ($cashY <= 0.0001 && $cashN <= 0.0001 && $card <= 0.0001) {
+                $prepay->delete();
+            } else {
+                $prepay->save();
+            }
+
+            // ✅ recalc is_full
+            $paidNow = (float)$appointment->payments->sum('amount');
+            Payment::where('appointment_id', $appointment->id)->update(['is_full' => 0]);
+
+            if ($total > 0 && $paidNow >= $total) {
+                $last = Payment::where('appointment_id', $appointment->id)
+                    ->orderByDesc('paid_at')
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($last) {
+                    $last->is_full = 1;
+                    $last->save();
+                }
+            }
+        });
+    }
+
 
     public function destroy(Request $request, Appointment $appointment)
     {
