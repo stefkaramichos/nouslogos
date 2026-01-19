@@ -161,6 +161,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/customers/{customer}/payments/tax-fix-oldest', [\App\Http\Controllers\CustomerController::class, 'taxFixOldestCashNoReceipt'])
     ->name('customers.payments.taxFixOldest');
 
+    Route::post('/inline-update', [CustomerController::class, 'inlineUpdate'])
+    ->name('inline.update');
 
 });
 

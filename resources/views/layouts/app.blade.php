@@ -48,7 +48,7 @@
             position:fixed;
             left: 30px;
             bottom: 100px;
-            width:334px;
+            width:380px;
             z-index:2000;
         }
         @media (max-width: 767.98px) {

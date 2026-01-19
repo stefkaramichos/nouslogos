@@ -242,9 +242,19 @@ class CustomerController extends Controller
         $customer->update($data);
         $customer->professionals()->sync($professionalIds);
 
-        if ($request->filled('redirect_to')) {
-            return redirect($request->input('redirect_to'))->with('success', 'Το περιστατικό ενημερώθηκε επιτυχώς.');
+        $redirect = $request->input('redirect') ?? $request->input('redirect_to');
+
+        if ($redirect) {
+            // optional safety
+            if (!str_starts_with($redirect, url('/'))) {
+                $redirect = null;
+            }
         }
+
+        if ($redirect) {
+            return redirect()->to($redirect)->with('success', 'Το περιστατικό ενημερώθηκε επιτυχώς.');
+        }
+
 
         return redirect()->route('customers.index')->with('success', 'Το περιστατικό ενημερώθηκε επιτυχώς.');
     }
@@ -325,7 +335,7 @@ class CustomerController extends Controller
         }
 
         $from = null;
-        $to = null;
+        $to   = null;
 
         if ($range === 'day' && $day) {
             $from = Carbon::parse($day)->toDateString();
@@ -336,14 +346,33 @@ class CustomerController extends Controller
             $to   = $m->copy()->endOfMonth()->toDateString();
         }
 
+        // ✅ Existing filters
         $paymentStatus = $request->input('payment_status'); // unpaid/partial/full/all
         $paymentMethod = $request->input('payment_method'); // cash/card/all
+
+        // ✅ NEW: Professional filter
+        $professionalId = $request->input('professional_id'); // id or "all"/null
+
+        if ($professionalId === '' || $professionalId === 'all' || $professionalId === null) {
+            $professionalId = null;
+        } else {
+            $professionalId = (int)$professionalId;
+            if ($professionalId <= 0) $professionalId = null;
+        }
 
         /**
          * 🔹 Collection appointments (όχι DB query)
          */
         $appointmentsCollection = $customer->appointments
             ->sortByDesc('start_time')
+            ->values();
+
+        // ✅ List professionals που υπάρχουν σε ραντεβού (για dropdown)
+        $appointmentProfessionals = $appointmentsCollection
+            ->map(fn($a) => $a->professional)
+            ->filter()
+            ->unique('id')
+            ->sortBy(fn($p) => mb_strtolower(($p->last_name ?? '') . ' ' . ($p->first_name ?? '')))
             ->values();
 
         $filteredAppointments = $appointmentsCollection;
@@ -354,6 +383,13 @@ class CustomerController extends Controller
                 if (!$a->start_time) return false;
                 $d = $a->start_time->toDateString();
                 return $d >= $from && $d <= $to;
+            });
+        }
+
+        // ✅ NEW: Professional filter
+        if ($professionalId) {
+            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($professionalId) {
+                return (int)($a->professional_id ?? 0) === (int)$professionalId;
             });
         }
 
@@ -382,10 +418,9 @@ class CustomerController extends Controller
         $filteredAppointments = $filteredAppointments->values();
 
         /**
-         * ✅ ΕΔΩ Η ΑΛΛΑΓΗ ΠΟΥ ΖΗΤΗΣΕΣ:
-         * Τα badges να δείχνουν totals από ΦΙΛΤΡΑΡΙΣΜΕΝΑ ραντεβού (όχι όλα)
+         * ✅ Τα badges & table δείχνουν totals από ΦΙΛΤΡΑΡΙΣΜΕΝΑ ραντεβού
          */
-        $appointments = $filteredAppointments; // αυτά θα δείξεις στο table
+        $appointments = $filteredAppointments;
 
         $globalAppointmentsCount = $appointments->count();
 
@@ -400,12 +435,11 @@ class CustomerController extends Controller
 
         /**
          * ✅ OUTSTANDING PREVIEW (ΟΛΑ τα χρωστούμενα, χωρίς ημερομηνίες)
-         * (μένει global όπως το είχες)
          */
         [$outstandingCount, $outstandingAmount] = $this->calcOutstandingForCustomer($customer->id);
 
         /**
-         * 🔹 Prev/Next URLs
+         * 🔹 Prev/Next URLs + Filters array (κρατάμε ΚΑΙ professional_id)
          */
         $filters = [
             'range' => $range,
@@ -413,6 +447,7 @@ class CustomerController extends Controller
             'month' => $month,
             'payment_status' => $paymentStatus ?? 'all',
             'payment_method' => $paymentMethod ?? 'all',
+            'professional_id' => $professionalId ?? 'all',
         ];
 
         $prevUrl = null;
@@ -421,6 +456,14 @@ class CustomerController extends Controller
         if ($range !== 'all') {
             $baseQuery = $request->query();
             unset($baseQuery['nav']);
+
+            // κράτα και το professional_id μέσα στα query strings
+            if ($professionalId) {
+                $baseQuery['professional_id'] = $professionalId;
+            } else {
+                // αν είναι all μην το βάζεις υποχρεωτικά
+                unset($baseQuery['professional_id']);
+            }
 
             if ($range === 'day') {
                 $baseQuery['range'] = 'day';
@@ -448,7 +491,7 @@ class CustomerController extends Controller
             'appointments',
             'appointmentsCount',
 
-            // ✅ Αυτά πλέον είναι FILTERED totals (όπως ζήτησες)
+            // ✅ FILTERED totals
             'globalAppointmentsCount',
             'globalTotalAmount',
             'globalPaidTotal',
@@ -462,9 +505,86 @@ class CustomerController extends Controller
             'nextUrl',
             'selectedLabel',
             'outstandingCount',
-            'outstandingAmount'
+            'outstandingAmount',
+
+            // ✅ NEW for filter dropdown
+            'appointmentProfessionals'
         ));
     }
+
+
+    public function inlineUpdate(Request $request)
+    {
+        $data = $request->validate([
+            'model' => 'required|in:customer,appointment',
+            'id'    => 'required|integer',
+            'field' => 'required|string',
+            'value' => 'nullable',
+        ]);
+
+        // allow-list fields (ΠΟΛΥ ΣΗΜΑΝΤΙΚΟ)
+        $allowed = [
+            'customer' => ['first_name','last_name','phone','email','tax_office','vat_number','informations'],
+            'appointment' => ['total_price','notes','status','start_time'],
+        ];
+
+        if (!in_array($data['field'], $allowed[$data['model']], true)) {
+            return response()->json(['success' => false, 'message' => 'Field not allowed'], 403);
+        }
+
+        if ($data['model'] === 'customer') {
+            $item = Customer::findOrFail($data['id']);
+
+            // basic rules per field (προαιρετικά αλλά καλό)
+            $rulesPerField = [
+                'first_name'   => 'nullable|string|max:100',
+                'last_name'    => 'nullable|string|max:100',
+                'phone'        => 'nullable|string|max:100',
+                'email'        => 'nullable|email|max:150',
+                'tax_office'   => 'nullable|string|max:100',
+                'vat_number'   => 'nullable|string|max:20',
+                'informations' => 'nullable|string',
+            ];
+            $request->validate(['value' => $rulesPerField[$data['field']] ?? 'nullable']);
+
+            $item->{$data['field']} = $data['value'];
+            $item->save();
+
+            return response()->json([
+                'success' => true,
+                'value'   => (string)($item->{$data['field']} ?? ''),
+            ]);
+        }
+
+        // appointment
+        $item = Appointment::findOrFail($data['id']);
+
+        $rulesPerField = [
+            'total_price' => 'nullable|numeric|min:0',
+            'notes'       => 'nullable|string|max:5000',
+            'status'      => 'nullable|in:completed,cancelled,no_show,pending',
+            'start_time'  => 'nullable|date',
+        ];
+        $request->validate(['value' => $rulesPerField[$data['field']] ?? 'nullable']);
+
+        $item->{$data['field']} = $data['value'];
+        $item->save();
+
+        // formatting για price
+        $val = $item->{$data['field']};
+        $formatted = match ($data['field']) {
+            'total_price' => number_format((float)$val, 2, ',', '.') . ' €',
+            'start_time'  => $val ? Carbon::parse($val)->format('d/m/Y H:i') : '-',
+            default       => (string)($val ?? ''),
+        };
+
+        return response()->json([
+            'success'   => true,
+            'value'     => (string)($val ?? ''),
+            'formatted' => $formatted,
+        ]);
+    }
+
 
 
     /**

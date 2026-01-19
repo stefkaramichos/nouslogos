@@ -14,12 +14,59 @@
         <div class="card-body">
             <div class="row mb-3">
                 <div class="col-md-4">
-                    <p><strong>Ονοματεπώνυμο:</strong> {{ $customer->last_name }} {{ $customer->first_name }}</p>
-                    <p><strong>Τηλέφωνο:</strong> {{ $customer->phone }}</p>
-                    <p><strong>Πληροφορίες:</strong> {!! $customer->informations ? nl2br(e($customer->informations)) : '-' !!}</p>
+                    <p>
+                        <strong>Επώνυμο:</strong>
+                        <span class="inline-edit"
+                            data-model="customer"
+                            data-id="{{ $customer->id }}"
+                            data-field="last_name"
+                            data-type="text">
+                            {{ $customer->last_name }}
+                        </span>
+                    </p>
+
+                    <p>
+                        <strong>Όνομα:</strong>
+                        <span class="inline-edit"
+                            data-model="customer"
+                            data-id="{{ $customer->id }}"
+                            data-field="first_name"
+                            data-type="text">
+                            {{ $customer->first_name }}
+                        </span>
+                    </p>
+
+                    <p>
+                        <strong>Τηλέφωνο:</strong>
+                        <span class="inline-edit"
+                            data-model="customer"
+                            data-id="{{ $customer->id }}"
+                            data-field="phone"
+                            data-type="text">
+                            {{ $customer->phone ?? '-' }}
+                        </span>
+                    </p>
+
+                    <p>
+                        <strong>Πληροφορίες:</strong><br>
+                        <span class="inline-edit"
+                            data-model="customer"
+                            data-id="{{ $customer->id }}"
+                            data-field="informations"
+                            data-type="textarea"
+                            style="white-space: pre-wrap; display:inline-block; width:100%;">
+                            {{ $customer->informations ?? '-' }}
+                        </span>
+                    </p>
                 </div>
 
                 <div class="col-md-4">
+                    <p>
+                        <strong>Ραντεβού (επιλεγμένη περίοδος):</strong><br>
+                        <span class="badge bg-dark fs-6">
+                            {{ $globalAppointmentsCount ?? 0 }}
+                        </span>
+                    </p>
                     <p>
                         <strong>Συνολικό Ποσό Ραντεβού:</strong><br>
                         <span class="badge bg-primary fs-6">
@@ -38,7 +85,7 @@
                             {{ number_format($globalOutstandingTotal, 2, ',', '.') }} €
                         </span>
                     </p>
-                    <small><i>Τα παραπάνω ποσά αναφέρονται στις επιλεγμένες ημερομηνίες</i></small>
+                    {{-- <small><i>Τα παραπάνω ποσά αναφέρονται στις επιλεγμένες ημερομηνίες</i></small> --}}
                 </div>
 
                 {{-- Ιστορικό πληρωμών ανά ημερομηνία --}}
@@ -105,127 +152,7 @@
                 </div>
             </div>
 
-            {{-- ===================== ΑΡΧΕΙΑ ΠΕΛΑΤΗ ===================== --}}
-            <div class="row mt-3">
-                <div class="col-12">
-                    <div class="border rounded p-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="mb-0">Αρχεία Περιστατικού</h6>
-
-                            <button type="button" class="btn btn-sm btn-primary"
-                                    onclick="document.getElementById('customerFileInput').click();">
-                                + Προσθήκη / Ανέβασμα αρχείου
-                            </button>
-                        </div>
-
-                        <form method="POST"
-                              action="{{ route('customers.files.store', $customer) }}"
-                              enctype="multipart/form-data"
-                              class="row g-2 align-items-end">
-                            @csrf
-
-                            <div class="col-md-4">
-                                <input id="customerFileInput" type="file" name="file" class="form-control d-none"
-                                       onchange="document.getElementById('customerFileName').value = this.files?.[0]?.name ?? '';">
-                                <input id="customerFileName" type="text" class="form-control" placeholder="Δεν επιλέχθηκε αρχείο" readonly>
-                                @error('file')
-                                    <div class="text-danger small mt-1">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted mb-1">Σημείωση (προαιρετικό)</label>
-                                <input type="text" name="notes" class="form-control" maxlength="1000" placeholder="π.χ. γνωμάτευση, παραστατικό...">
-                                @error('notes')
-                                    <div class="text-danger small mt-1">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="col-md-2 text-end">
-                                <button type="submit" class="btn btn-success w-100">Ανέβασμα</button>
-                            </div>
-                        </form>
-
-                        <hr class="my-3">
-
-                        @php
-                            $files = $customer->files?->sortByDesc('id') ?? collect();
-                        @endphp
-
-                        @if($files->count() === 0)
-                            <div class="text-muted">Δεν υπάρχουν αρχεία για αυτόν το περιστατικό.</div>
-                        @else
-                            <div class="table-responsive" style="max-height: 110px; overflow-y:auto;">
-                                <table class="table table-sm table-striped align-middle mb-0">
-                                    <thead>
-                                    <tr>
-                                        <th>Αρχείο</th>
-                                        <th>Μέγεθος</th>
-                                        <th>Ημ/νία</th>
-                                        <th>Ανέβηκε από</th>
-                                        <th>Σημείωση</th>
-                                        <th class="text-end">Ενέργειες</th>
-                                    </tr>
-                                    </thead>
-                                    <tbody>
-                                    @foreach($files as $f)
-                                        <tr>
-                                            <td>
-                                                <strong>{{ $f->original_name }}</strong>
-                                                @if($f->mime_type)
-                                                    <div class="text-muted small">{{ $f->mime_type }}</div>
-                                                @endif
-                                            </td>
-                                            <td>{{ number_format(($f->size ?? 0) / 1024, 1, ',', '.') }} KB</td>
-                                            <td>{{ $f->created_at?->format('d/m/Y H:i') ?? '-' }}</td>
-                                            <td>
-                                                @if($f->uploader)
-                                                    {{ $f->uploader->last_name }} {{ $f->uploader->first_name }}
-                                                @else
-                                                    <span class="text-muted">-</span>
-                                                @endif
-                                            </td>
-                                            <td>{{ $f->notes ?? '-' }}</td>
-                                            <td class="text-end">
-                                                @php
-                                                    $canPreview = \Illuminate\Support\Str::startsWith($f->mime_type, [
-                                                        'image/', 'application/pdf', 'text/'
-                                                    ]);
-                                                @endphp
-
-                                                @if($canPreview)
-                                                    <a class="btn btn-sm btn-outline-secondary"
-                                                       target="_blank"
-                                                       href="{{ route('customers.files.view', ['customer' => $customer->id, 'file' => $f->id]) }}">
-                                                        Άνοιγμα
-                                                    </a>
-                                                @endif
-
-                                                <a class="btn btn-sm btn-outline-primary"
-                                                   href="{{ route('customers.files.download', ['customer' => $customer->id, 'file' => $f->id]) }}">
-                                                    Download
-                                                </a>
-
-                                                <form method="POST"
-                                                      action="{{ route('customers.files.destroy', ['customer' => $customer->id, 'file' => $f->id]) }}"
-                                                      class="d-inline"
-                                                      onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτό το αρχείο;');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button class="btn btn-sm btn-danger">Διαγραφή</button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @endif
-
-                    </div>
-                </div>
-            </div>
-            {{-- ===================== /ΑΡΧΕΙΑ ΠΕΛΑΤΗ ===================== --}}
+           
 
             <div class="d-flex justify-content-end mt-3">
                 <a href="{{ route('customers.edit', ['customer' => $customer, 'redirect' => url()->full()]) }}"
@@ -256,6 +183,8 @@
                     $range = $filters['range'] ?? 'month';
                     $day   = $filters['day'] ?? now()->format('Y-m-d');
                     $month = $filters['month'] ?? now()->format('Y-m');
+
+                    $selectedProfessionalId = $filters['professional_id'] ?? 'all';
                 @endphp
 
                 <div class="row g-2 align-items-end">
@@ -268,13 +197,26 @@
                         </select>
                     </div>
 
+                    {{-- ✅ ΝΕΟ: Φίλτρο Επαγγελματία --}}
+                    <div class="col-md-3">
+                        <label class="form-label">Επαγγελματίας</label>
+                        <select name="professional_id" class="form-select" onchange="this.form.submit()">
+                            <option value="all" @selected($selectedProfessionalId === 'all')>Όλοι</option>
+
+                            @foreach(($appointmentProfessionals ?? []) as $pro)
+                                <option value="{{ $pro->id }}" @selected((string)$selectedProfessionalId === (string)$pro->id)>
+                                    {{ $pro->last_name }} {{ $pro->first_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
                     <div class="col-md-3">
                         @if($range === 'day')
                             <input type="date" hidden name="day" class="form-control" value="{{ $day }}">
                         @elseif($range === 'month')
                             <input type="month" hidden name="month" class="form-control" value="{{ $month }}">
                         @else
-                            <label class="form-label" hidden>Περίοδος</label>
                             <input type="text" hidden class="form-control" value="Όλα" disabled>
                         @endif
                     </div>
@@ -326,7 +268,7 @@
                         <th>Created</th>
                         <th>Ημ/νία & Ώρα</th>
                         <th>Επαγγελματίας</th>
-                        <th>Εταιρεία</th>
+                        {{-- <th>Εταιρεία</th> --}}
                         <th>Υπηρεσία</th>
                         <th>Σύνολο (€)</th>
                         <th>Πληρωμή</th>
@@ -357,7 +299,16 @@
                                 @endif
                             </td>
 
-                            <td>{{ $appointment->start_time?->format('d/m/Y H:i') }}</td>
+                            <td>
+                                <span class="inline-edit"
+                                    data-model="appointment"
+                                    data-id="{{ $appointment->id }}"
+                                    data-field="start_time"
+                                    data-type="datetime">
+                                    {{ $appointment->start_time?->format('d/m/Y H:i') ?? '-' }}
+                                </span>
+                            </td>
+
 
                             <td>
                                 @if($appointment->professional)
@@ -369,18 +320,26 @@
                                 @endif
                             </td>
 
-                            <td>{{ $appointment->company->name ?? '-' }}</td>
+                            {{-- <td>{{ $appointment->company->name ?? '-' }}</td> --}}
 
                             <td>
-                                <span class="badge
-                                    @if($appointment->status === 'completed') bg-success
-                                    @elseif($appointment->status === 'cancelled') bg-danger
-                                    @elseif($appointment->status === 'no_show') bg-warning text-dark
-                                    @else bg-secondary
-                                    @endif">
-                                    {{ $appointment->status }}
+                                @php
+                                    $serviceGreek = match($appointment->status) {
+                                        'logotherapia'  => 'ΛΟΓΟΘΕΡΑΠΕΙΑ',
+                                        'psixotherapia' => 'ΨΥΧΟΘΕΡΑΠΕΙΑ',
+                                        'ergotherapia'  => 'ΕΡΓΟΘΕΡΑΠΕΙΑ',
+                                        'omadiki'       => 'ΟΜΑΔΙΚΗ',
+                                        'eidikos'       => 'ΕΙΔΙΚΟΣ ΠΑΙΔΑΓΩΓΟΣ',
+                                        'aksiologisi'   => 'ΑΞΙΟΛΟΓΗΣΗ',
+                                        default         => mb_strtoupper($appointment->status ?? '-', 'UTF-8'),
+                                    };
+                                @endphp
+
+                                <span class="badge bg-info">
+                                    {{ $serviceGreek }}
                                 </span>
                             </td>
+
 
                             <td class="editable-price"
                                 data-id="{{ $appointment->id }}"
@@ -423,8 +382,15 @@
 
 
                             <td style="white-space: pre-wrap;">
-                                {{ \Illuminate\Support\Str::limit($appointment->notes ?? '-', 50) }}
+                                <span class="inline-edit"
+                                    data-model="appointment"
+                                    data-id="{{ $appointment->id }}"
+                                    data-field="notes"
+                                    data-type="textarea">
+                                    {{ $appointment->notes ?? '-' }}
+                                </span>
                             </td>
+
 
                             <td>
                                 <a href="{{ route('appointments.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
@@ -562,10 +528,139 @@
                     </div>
                     </div>
                 </form>
-                </div>
-
+            </div>
         </div>
     </div>
+
+    {{-- ===================== ΑΡΧΕΙΑ ΠΕΛΑΤΗ ===================== --}}
+    <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">Αρχεία Περιστατικού</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row mt-3">
+                                    <div class="col-12">
+                                        <div class="border rounded p-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                
+
+                                                <button type="button" class="btn btn-sm btn-primary"
+                                                        onclick="document.getElementById('customerFileInput').click();">
+                                                    + Προσθήκη / Ανέβασμα αρχείου
+                                                </button>
+                                            </div>
+
+                                            <form method="POST"
+                                                action="{{ route('customers.files.store', $customer) }}"
+                                                enctype="multipart/form-data"
+                                                class="row g-2 align-items-end">
+                                                @csrf
+
+                                                <div class="col-md-4">
+                                                    <input id="customerFileInput" type="file" name="file" class="form-control d-none"
+                                                        onchange="document.getElementById('customerFileName').value = this.files?.[0]?.name ?? '';">
+                                                    <input id="customerFileName" type="text" class="form-control" placeholder="Δεν επιλέχθηκε αρχείο" readonly>
+                                                    @error('file')
+                                                        <div class="text-danger small mt-1">{{ $message }}</div>
+                                                    @enderror
+                                                </div>
+
+                                                <div class="col-md-6">
+                                                    <label class="form-label small text-muted mb-1">Σημείωση (προαιρετικό)</label>
+                                                    <input type="text" name="notes" class="form-control" maxlength="1000" placeholder="π.χ. γνωμάτευση, παραστατικό...">
+                                                    @error('notes')
+                                                        <div class="text-danger small mt-1">{{ $message }}</div>
+                                                    @enderror
+                                                </div>
+
+                                                <div class="col-md-2 text-end">
+                                                    <button type="submit" class="btn btn-success w-100">Ανέβασμα</button>
+                                                </div>
+                                            </form>
+
+                                            <hr class="my-3">
+
+                                            @php
+                                                $files = $customer->files?->sortByDesc('id') ?? collect();
+                                            @endphp
+
+                                            @if($files->count() === 0)
+                                                <div class="text-muted">Δεν υπάρχουν αρχεία για αυτόν το περιστατικό.</div>
+                                            @else
+                                                <div class="table-responsive" style="max-height: 110px; overflow-y:auto;">
+                                                    <table class="table table-sm table-striped align-middle mb-0">
+                                                        <thead>
+                                                        <tr>
+                                                            <th>Αρχείο</th>
+                                                            <th>Μέγεθος</th>
+                                                            <th>Ημ/νία</th>
+                                                            <th>Ανέβηκε από</th>
+                                                            <th>Σημείωση</th>
+                                                            <th class="text-end">Ενέργειες</th>
+                                                        </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                        @foreach($files as $f)
+                                                            <tr>
+                                                                <td>
+                                                                    <strong>{{ $f->original_name }}</strong>
+                                                                    @if($f->mime_type)
+                                                                        <div class="text-muted small">{{ $f->mime_type }}</div>
+                                                                    @endif
+                                                                </td>
+                                                                <td>{{ number_format(($f->size ?? 0) / 1024, 1, ',', '.') }} KB</td>
+                                                                <td>{{ $f->created_at?->format('d/m/Y H:i') ?? '-' }}</td>
+                                                                <td>
+                                                                    @if($f->uploader)
+                                                                        {{ $f->uploader->last_name }} {{ $f->uploader->first_name }}
+                                                                    @else
+                                                                        <span class="text-muted">-</span>
+                                                                    @endif
+                                                                </td>
+                                                                <td>{{ $f->notes ?? '-' }}</td>
+                                                                <td class="text-end">
+                                                                    @php
+                                                                        $canPreview = \Illuminate\Support\Str::startsWith($f->mime_type, [
+                                                                            'image/', 'application/pdf', 'text/'
+                                                                        ]);
+                                                                    @endphp
+
+                                                                    @if($canPreview)
+                                                                        <a class="btn btn-sm btn-outline-secondary"
+                                                                        target="_blank"
+                                                                        href="{{ route('customers.files.view', ['customer' => $customer->id, 'file' => $f->id]) }}">
+                                                                            Άνοιγμα
+                                                                        </a>
+                                                                    @endif
+
+                                                                    <a class="btn btn-sm btn-outline-primary"
+                                                                    href="{{ route('customers.files.download', ['customer' => $customer->id, 'file' => $f->id]) }}">
+                                                                        Download
+                                                                    </a>
+
+                                                                    <form method="POST"
+                                                                        action="{{ route('customers.files.destroy', ['customer' => $customer->id, 'file' => $f->id]) }}"
+                                                                        class="d-inline"
+                                                                        onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε αυτό το αρχείο;');">
+                                                                        @csrf
+                                                                        @method('DELETE')
+                                                                        <button class="btn btn-sm btn-danger">Διαγραφή</button>
+                                                                    </form>
+                                                                </td>
+                                                            </tr>
+                                                        @endforeach
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            @endif
+
+                                        </div>
+                                    </div>
+                                </div>
+                </div>
+    </div>
+            {{-- ===================== /ΑΡΧΕΙΑ ΠΕΛΑΤΗ ===================== --}}
+
 
     <script>
         // Select all + delete button visibility
@@ -748,4 +843,129 @@
             toInput.addEventListener('change', updatePreview);
         });
     </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
+
+            if (!csrfToken) {
+                console.warn('CSRF token meta tag is missing. Inline editing will not work.');
+                return;
+            }
+
+            let activeInput = null;
+
+            function startEdit(el) {
+                if (activeInput) return;
+
+                const model = el.dataset.model;
+                const id    = el.dataset.id;
+                const field = el.dataset.field;
+                const type  = el.dataset.type || 'text';
+
+                const originalText = (el.textContent || '').trim();
+                const originalValue = (originalText === '-' ? '' : originalText);
+
+                let input;
+                if (type === 'textarea') {
+                    input = document.createElement('textarea');
+                    input.rows = 4;
+                    input.className = 'form-control form-control-sm';
+                    input.value = originalValue;
+                } else if (type === 'datetime') {
+                    input = document.createElement('input');
+                    input.type = 'datetime-local';
+                    input.className = 'form-control form-control-sm';
+                    input.style.width = '200px';
+
+                    // convert displayed "d/m/Y H:i" -> "Y-m-d\TH:i" if possible
+                    // if value is "-" keep empty
+                    const v = originalValue.trim();
+                    if (v && v !== '-') {
+                        const m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
+                        if (m) {
+                            const [_, dd, mm, yyyy, HH, ii] = m;
+                            input.value = `${yyyy}-${mm}-${dd}T${HH}:${ii}`;
+                        } else {
+                            input.value = '';
+                        }
+                    } else {
+                        input.value = '';
+                    }
+                } else if (type === 'number') {
+                    input = document.createElement('input');
+                    input.type = 'number';
+                    input.step = '0.01';
+                    input.min = '0';
+                    input.className = 'form-control form-control-sm';
+                    input.style.width = '120px';
+                    input.value = originalValue.replace(/[^\d,.-]/g,'').replace('.', '').replace(',', '.');
+                } else {
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'form-control form-control-sm';
+                    input.value = originalValue;
+                }
+
+                el.dataset._original = originalText;
+                el.innerHTML = '';
+                el.appendChild(input);
+                input.focus();
+                activeInput = input;
+
+                const restore = () => {
+                    el.textContent = el.dataset._original || '-';
+                    activeInput = null;
+                };
+
+                const save = () => {
+                    const newValue = input.value;
+
+                    el.innerHTML = '<span class="text-muted">Αποθήκευση…</span>';
+
+                    fetch("{{ route('inline.update') }}", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRF-TOKEN": csrfToken,
+                            "Accept": "application/json",
+                        },
+                        body: JSON.stringify({ model, id, field, value: newValue })
+                    })
+                    .then(res => {
+                        if (!res.ok) throw new Error('HTTP error ' + res.status);
+                        return res.json();
+                    })
+                    .then(data => {
+                        if (!data.success) throw new Error(data.message || 'Save failed');
+
+                        // αν υπάρχει formatted (π.χ. total_price) χρησιμοποίησέ το
+                        const text = (data.formatted ?? data.value ?? '').toString().trim();
+                        el.textContent = text !== '' ? text : '-';
+                        activeInput = null;
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert('Σφάλμα αποθήκευσης.');
+                        restore();
+                    });
+                };
+
+                input.addEventListener('blur', save);
+
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' && type !== 'textarea') { e.preventDefault(); input.blur(); }
+                    if (e.key === 'Escape') { e.preventDefault(); restore(); }
+                });
+            }
+
+            // delegate dblclick
+            document.addEventListener('dblclick', function (e) {
+                const el = e.target.closest('.inline-edit');
+                if (!el) return;
+                startEdit(el);
+            });
+        });
+        </script>
+
 @endsection
