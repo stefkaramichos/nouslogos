@@ -24,9 +24,9 @@ class NotificationController extends Controller
     {
         // ✅ ONLY FUTURE + ASC
         $q = Notification::query()
-            ->where('notify_at', '>=', now())
+            ->where('notify_at', '>=', now()->startOfDay())
             ->orderBy('notify_at', 'asc');
-
+ 
         if ($me->role === 'grammatia') {
             $companyIds = $me->companies->pluck('id');
 
