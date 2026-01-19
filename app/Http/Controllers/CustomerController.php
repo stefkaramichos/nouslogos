@@ -136,9 +136,16 @@ class CustomerController extends Controller
             $companyId = null;
         }
 
+        // ✅ NEW: active filter
+        $active = $request->input('active', '1'); // all | 1 | 0
+        if (!in_array((string)$active, ['all', '1', '0'], true)) {
+            $active = 'all';
+        }
+
         $customers = Customer::query()
             ->with(['company', 'professionals'])
             ->when($companyId, fn($q) => $q->where('company_id', $companyId))
+            ->when($active !== 'all', fn($q) => $q->where('is_active', (int)$active))
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
                     $qq->where('first_name', 'like', "%{$search}%")
@@ -149,13 +156,11 @@ class CustomerController extends Controller
                 });
             })
 
-            // ✅ ACTIVE ΠΑΝΩ, DISABLED ΚΑΤΩ
+            // ✅ ACTIVE ΠΑΝΩ, DISABLED ΚΑΤΩ (αν active=all)
             ->orderByDesc('is_active')
-
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get();
-
 
         $companies = Company::where('is_active', 1)->orderBy('id')->get();
 
@@ -164,8 +169,10 @@ class CustomerController extends Controller
             'companies' => $companies,
             'search'    => $search,
             'companyId' => $companyId,
+            'active'    => $active, // ✅ pass to blade
         ]);
     }
+
 
     public function create()
     {

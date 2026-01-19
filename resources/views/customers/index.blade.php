@@ -6,7 +6,15 @@
 @section('content')
     @php
         $search = $search ?? request('search');
-        $selectedCompany = $companyId ?? request('company_id');  // ✅ session-aware
+
+        // session-aware
+        $selectedCompany = $companyId ?? request('company_id');
+
+        // ✅ active filter (1 / 0 / all)
+        $activeFilter = $activeFilter ?? request('active', '1');
+        if (!in_array((string)$activeFilter, ['1','0','all'], true)) {
+            $activeFilter = '1';
+        }
     @endphp
 
     <div class="card">
@@ -21,8 +29,9 @@
 
             {{-- Search bar --}}
             <form method="GET" action="{{ route('customers.index') }}" class="mt-3">
-                {{-- keep company filter while searching --}}
+                {{-- keep filters while searching --}}
                 <input type="hidden" name="company_id" value="{{ $selectedCompany }}">
+                <input type="hidden" name="active" value="{{ $activeFilter }}">
 
                 <div class="input-group">
                     <input type="text"
@@ -35,7 +44,7 @@
                         Αναζήτηση
                     </button>
 
-                    @if((isset($search) && $search !== '') || request('company_id'))
+                    @if((isset($search) && $search !== '') || request('company_id') || request('active'))
                         <a href="{{ route('customers.index') }}" class="btn btn-outline-secondary">
                             Καθαρισμός
                         </a>
@@ -43,26 +52,57 @@
                 </div>
             </form>
 
-            {{-- Quick search buttons by company --}}
+            {{-- Quick filter buttons by company --}}
             <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">
                 <a href="{{ route('customers.index', [
                         'search' => request('search'),
                         'clear_company' => 1,
+                        'active' => $activeFilter,
                     ]) }}"
                    class="btn btn-sm {{ empty($selectedCompany) ? 'btn-primary' : 'btn-outline-primary' }}">
                     Όλοι
                 </a>
 
-                {{-- Companies --}}
                 @foreach(($companies ?? collect()) as $company)
-                    <a href="{{ route('customers.index', array_filter([
+                    <a href="{{ route('customers.index', [
                             'search' => request('search'),
                             'company_id' => $company->id,
-                        ])) }}"
+                            'active' => $activeFilter,
+                        ]) }}"
                        class="btn btn-sm {{ (string)$selectedCompany === (string)$company->id ? 'btn-primary' : 'btn-outline-primary' }}">
                         {{ $company->name }}
                     </a>
                 @endforeach
+            </div>
+
+            {{-- ✅ Active filter buttons (SAME COLORS as companies) --}}
+            <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
+                <a href="{{ route('customers.index', [
+                        'search' => request('search'),
+                        'company_id' => $selectedCompany,
+                        'active' => '1',
+                    ]) }}"
+                   class="btn btn-sm {{ (string)$activeFilter === '1' ? 'btn-primary' : 'btn-outline-primary' }}">
+                    ΕΝΕΡΓΟΙ
+                </a>
+
+                <a href="{{ route('customers.index', [
+                        'search' => request('search'),
+                        'company_id' => $selectedCompany,
+                        'active' => '0',
+                    ]) }}"
+                   class="btn btn-sm {{ (string)$activeFilter === '0' ? 'btn-primary' : 'btn-outline-primary' }}">
+                    ΑΝΕΝΕΡΓΟΙ
+                </a>
+
+                {{-- <a href="{{ route('customers.index', [
+                        'search' => request('search'),
+                        'company_id' => $selectedCompany,
+                        'active' => 'all',
+                    ]) }}"
+                   class="btn btn-sm {{ (string)$activeFilter === 'all' ? 'btn-primary' : 'btn-outline-primary' }}">
+                    ΟΛΑ
+                </a> --}}
             </div>
         </div>
 
@@ -76,10 +116,7 @@
                         <th>Τηλέφωνο</th>
                         <th>Θεραπευτές</th>
                         <th>Πληροφορίες</th>
-
-                        {{-- ✅ ΝΕΟ --}}
                         <th class="text-center">Κατάσταση</th>
-
                         <th class="text-end">Ενέργειες</th>
                     </tr>
                     </thead>
@@ -106,9 +143,7 @@
                             <td>{{ $customer->phone ?? '-' }}</td>
 
                             <td>
-                                @php
-                                    $pros = $customer->professionals ?? collect();
-                                @endphp
+                                @php $pros = $customer->professionals ?? collect(); @endphp
 
                                 @if($pros->isEmpty())
                                     <span class="text-muted">-</span>
@@ -131,8 +166,7 @@
                             <td class="text-center">
                                 <form method="POST"
                                       action="{{ route('customers.toggleActive', $customer) }}"
-                                      class="d-inline"
-                                      onsubmit="return true;">
+                                      class="d-inline">
                                     @csrf
 
                                     <div class="form-check form-switch d-inline-flex align-items-center justify-content-center m-0">
@@ -165,13 +199,13 @@
                                 </a>
 
                                 {{-- Edit --}}
-                                <a href="{{ route('customers.edit', $customer) }}"
+                                <a href="{{ route('customers.edit', ['customer' => $customer, 'redirect' => request()->fullUrl()]) }}"
                                    class="btn btn-sm btn-secondary"
                                    title="Επεξεργασία περιστατικού">
                                     <i class="bi bi-pencil-square"></i>
                                 </a>
 
-                                {{-- Delete (still disabled as you had) --}}
+                                {{-- Delete (kept disabled like before) --}}
                                 {{--
                                 <form action="{{ route('customers.destroy', $customer) }}"
                                       method="POST"
