@@ -14,9 +14,9 @@
             @csrf
             @method('PUT')
 
-            {{-- Πελάτης --}}
+            {{-- Περιστατικό --}}
             <div class="mb-3">
-                <label class="form-label">Πελάτης</label>
+                <label class="form-label">Περιστατικό</label>
                 <select name="customer_id" id="customer_select" class="form-select" {{ $user->role !== 'owner' ? 'required' : '' }}>
                     <option value="">-- Επιλέξτε --</option>
                     @foreach($customers as $c)

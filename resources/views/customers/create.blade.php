@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Νέος Πελάτης')
+@section('title', 'Νέο Περιστατικό')
 
 @section('content')
     <div class="card">
         <div class="card-header">
-            Νέος Πελάτης
+            Νέο Περιστατικό
         </div>
         <div class="card-body">
             <form action="{{ route('customers.store') }}" method="POST">

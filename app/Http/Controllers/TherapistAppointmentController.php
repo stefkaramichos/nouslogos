@@ -230,7 +230,7 @@ class TherapistAppointmentController extends Controller
                                 })
                                 ->exists();
                             if (!$allowed) {
-                                $fail('Ο πελάτης δεν ανήκει στον συγκεκριμένο θεραπευτή.');
+                                $fail('Το περιστατικό δεν ανήκει στον συγκεκριμένο θεραπευτή.');
                             }
                         },
                     ],
@@ -239,7 +239,7 @@ class TherapistAppointmentController extends Controller
                     'notes'      => 'nullable|string',
                 ],
                 [
-                    'customer_id.required' => 'Ο πελάτης είναι υποχρεωτικός.',
+                    'customer_id.required' => 'Το περιστατικό είναι υποχρεωτικός.',
                     'start_time.required'  => 'Η ημερομηνία/ώρα είναι υποχρεωτική.',
                 ]
             );
@@ -277,7 +277,7 @@ class TherapistAppointmentController extends Controller
 
         if ((!$hasCustomer && !$hasProf) || ($hasCustomer && $hasProf)) {
             return back()
-                ->withErrors(['customer_id' => 'Επιλέξτε ΜΟΝΟ Πελάτη ή ΜΟΝΟ Επαγγελματία.'])
+                ->withErrors(['customer_id' => 'Επιλέξτε ΜΟΝΟ περιστατικό ή ΜΟΝΟ Επαγγελματία.'])
                 ->withInput();
         }
 
@@ -372,7 +372,7 @@ class TherapistAppointmentController extends Controller
                                 })
                                 ->exists();
                             if (!$allowed) {
-                                $fail('Ο πελάτης δεν ανήκει στον συγκεκριμένο θεραπευτή.');
+                                $fail('Το περιστατικό δεν ανήκει στον συγκεκριμένο θεραπευτή.');
                             }
                         },
                     ],
@@ -407,7 +407,7 @@ class TherapistAppointmentController extends Controller
 
         if ((!$hasCustomer && !$hasProf) || ($hasCustomer && $hasProf)) {
             return back()
-                ->withErrors(['customer_id' => 'Επιλέξτε ΜΟΝΟ Πελάτη ή ΜΟΝΟ Επαγγελματία.'])
+                ->withErrors(['customer_id' => 'Επιλέξτε ΜΟΝΟ Περιστατικό ή ΜΟΝΟ Επαγγελματία.'])
                 ->withInput();
         }
 

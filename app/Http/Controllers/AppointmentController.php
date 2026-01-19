@@ -322,7 +322,7 @@ class AppointmentController extends Controller
                 'weeks'                 => 'nullable|integer|min:1|max:52',
             ],
             [
-                'customer_id.required'     => 'Ο πελάτης είναι υποχρεωτικός.',
+                'customer_id.required'     => 'Το περιστατικό είναι υποχρεωτικός.',
                 'professional_id.required' => 'Ο επαγγελματίας είναι υποχρεωτικός.',
                 'company_id.required'      => 'Η εταιρεία είναι υποχρεωτική.',
                 'start_time.required'      => 'Η ημερομηνία/ώρα είναι υποχρεωτική.',
@@ -459,7 +459,7 @@ class AppointmentController extends Controller
                 'professional_amount'   => 'nullable|numeric|min:0',
             ],
             [
-                'customer_id.required'     => 'Ο πελάτης είναι υποχρεωτικός.',
+                'customer_id.required'     => 'Το περιστατικό είναι υποχρεωτικός.',
                 'professional_id.required' => 'Ο επαγγελματίας είναι υποχρεωτικός.',
                 'company_id.required'      => 'Η εταιρεία είναι υποχρεωτική.',
                 'start_time.required'      => 'Η ημερομηνία/ώρα είναι υποχρεωτική.',

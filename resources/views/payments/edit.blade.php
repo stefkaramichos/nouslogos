@@ -14,7 +14,7 @@
         <div class="card-body">
             <p><strong>Ραντεβού #:</strong> {{ $appointment->id }}</p>
             <p><strong>Ημ/νία & Ώρα:</strong> {{ $appointment->start_time?->format('d/m/Y H:i') }}</p>
-            <p><strong>Πελάτης:</strong>
+            <p><strong>Περιστατικό:</strong>
                 {{ $appointment->customer->last_name ?? '' }}
                 {{ $appointment->customer->first_name ?? '' }}
             </p>

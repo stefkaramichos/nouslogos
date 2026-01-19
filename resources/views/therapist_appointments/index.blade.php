@@ -71,13 +71,13 @@
             @if($user_role === 'owner')
                 {{-- OWNER: unified party filter --}}
                 <div class="col-md-3">
-                    <label class="form-label">Με (Πελάτης / Επαγγελματίας)</label>
+                    <label class="form-label">Με (Περιστατικό / Επαγγελματίας)</label>
 
                     <input type="hidden" name="party_type" id="party_type_desktop" value="{{ $partyType }}">
                     <select name="party_id" id="party_select_desktop" class="form-select js-party-select">
                         <option value="">Όλοι</option>
 
-                        <optgroup label="Πελάτες">
+                        <optgroup label="Περιστατικά">
                             @foreach($customers as $c)
                                 <option value="{{ $c->id }}"
                                     data-type="customer"
@@ -114,9 +114,9 @@
             @else
                 {{-- NON-OWNER: original customer-only filter --}}
                 <div class="col-md-3">
-                    <label class="form-label">Πελάτης</label>
+                    <label class="form-label">Περιστατικό</label>
                     <select name="customer_id" class="form-select js-customer-select">
-                        <option value="">Όλοι οι πελάτες</option>
+                        <option value="">Όλα τα Περιστατικά</option>
                         @foreach($customers as $c)
                             <option value="{{ $c->id }}"
                                 {{ (string)$c->id === (string)($customerId ?? request('customer_id')) ? 'selected' : '' }}>
@@ -144,7 +144,7 @@
                     @if($user_role === 'owner')
                         <th>Με</th>
                     @else
-                        <th>Πελάτης</th>
+                        <th>Περιστατικό</th>
                     @endif
                     <th>Ημερομηνία & Ώρα</th>
                     <th>Σημειώσεις</th>
@@ -164,7 +164,7 @@
 
                         $modalWith = $displayName;
                         if ($user_role === 'owner') {
-                            if ($a->customer) $modalWith .= ' (Πελάτης)';
+                            if ($a->customer) $modalWith .= ' (Περιστατικό)';
                             elseif ($a->withProfessional) $modalWith .= ' (Επαγγελματίας)';
                         }
                     @endphp
@@ -248,7 +248,7 @@
                         <dt class="col-sm-3">Κωδικός</dt>
                         <dd class="col-sm-9" id="modalAppointmentId"></dd>
 
-                        <dt class="col-sm-3">{{ $user_role === 'owner' ? 'Με' : 'Πελάτης' }}</dt>
+                        <dt class="col-sm-3">{{ $user_role === 'owner' ? 'Με' : 'Περιστατικό' }}</dt>
                         <dd class="col-sm-9" id="modalAppointmentWith"></dd>
 
                         <dt class="col-sm-3">Ημερομηνία & Ώρα</dt>
@@ -323,11 +323,11 @@
                             <input type="hidden" name="party_type" id="party_type_mobile" value="{{ $partyType }}">
 
                             <div class="col-12">
-                                <label class="form-label">Με (Πελάτης / Επαγγελματίας)</label>
+                                <label class="form-label">Με (Περιστατικό / Επαγγελματίας)</label>
                                 <select name="party_id" id="party_select_mobile" class="form-select js-party-select-modal">
                                     <option value="">Όλοι</option>
 
-                                    <optgroup label="Πελάτες">
+                                    <optgroup label="Περιστατικά">
                                         @foreach($customers as $c)
                                             <option value="{{ $c->id }}"
                                                 data-type="customer"
@@ -363,9 +363,9 @@
                             </div>
                         @else
                             <div class="col-12">
-                                <label class="form-label">Πελάτης</label>
+                                <label class="form-label">Περιστατικό</label>
                                 <select name="customer_id" class="form-select js-customer-select-modal">
-                                    <option value="">Όλοι οι πελάτες</option>
+                                    <option value="">Όλα τα Περιστατικά</option>
                                     @foreach($customers as $c)
                                         <option value="{{ $c->id }}"
                                             {{ (string)$c->id === (string)($customerId ?? request('customer_id')) ? 'selected' : '' }}>
@@ -425,7 +425,7 @@
         } else {
             // Non-owner: customer only
             $('.js-customer-select').select2({
-                placeholder: 'Όλοι οι πελάτες',
+                placeholder: 'Όλα τα Περιστατικά',
                 allowClear: true,
                 width: '100%',
                 language: { noResults: function () { return 'Δεν βρέθηκαν αποτελέσματα'; } }
@@ -454,7 +454,7 @@
 
             } else {
                 $('.js-customer-select-modal').select2({
-                    placeholder: 'Όλοι οι πελάτες',
+                    placeholder: 'Όλα τα Περιστατικά',
                     allowClear: true,
                     width: '100%',
                     dropdownParent: $('#filtersModal'),

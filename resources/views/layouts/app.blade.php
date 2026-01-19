@@ -16,11 +16,23 @@
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
+    <!-- ✅ Apply collapsed early to avoid flicker -->
+    <script>
+    (function(){
+        try{
+            if (localStorage.getItem('sidebar_mode') === 'collapsed') {
+                document.documentElement.classList.add('sidebar-collapsed');
+            }
+        }catch(e){}
+    })();
+    </script>
+
     <style>
         body { min-height: 100vh; overflow-x: hidden; }
         .sidebar { min-height: 100vh; }
         .sidebar .nav-link.active { background-color: #0d6efd; color: #fff !important; }
         .sidebar .nav-link { color: #333; }
+        .sidebar{z-index: 200;}
 
         @media (max-width: 767.98px) {
             .sidebar { min-height: auto; }
@@ -45,6 +57,96 @@
         .notif-list {
             max-height: 260px;
             overflow: auto;
+        }
+
+        /* =========================
+           2 MODES SIDEBAR (NORMAL / COLLAPSED)
+           ========================= */
+
+        /* toggle button */
+        .sidebar-toggle {
+            width: 34px;
+            height: 34px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(0,0,0,.15);
+            border-radius: 10px;
+            background: #fff;
+        }
+
+        /* icons + labels for desktop sidebar items */
+        .nav-icon {
+            width: 1.25rem;
+            text-align: center;
+            display: inline-block;
+        }
+        .nav-label { display: inline; }
+
+        /* logo */
+        .sidebar-logo {
+            height: 32px;
+            width: auto;
+            display: block;
+        }
+
+        /* NORMAL MODE (default): keep Bootstrap cols as-is */
+        /* Collapsed mode overrides below */
+
+        /* COLLAPSED MODE: make sidebar one column */
+        .sidebar-collapsed .sidebar {
+            padding-left: .25rem !important;
+            padding-right: .25rem !important;
+        }
+
+        .sidebar-collapsed .sidebar .nav-link {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0 !important;
+            padding-left: .5rem;
+            padding-right: .5rem;
+        }
+
+        .sidebar-collapsed .sidebar .nav-label { display: none; }
+
+        .sidebar-collapsed .sidebar .logo-img {
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            padding-left: .25rem !important;
+            padding-right: .25rem !important;
+        }
+        .sidebar-collapsed .sidebar .sidebar-logo {
+            height: 22px;
+        }
+
+        /* bottom actions become vertical in collapsed mode */
+        .sidebar-collapsed #sidebarBottomActions {
+            flex-direction: column !important;
+            align-items: center !important;
+            gap: .5rem !important;
+        }
+        .sidebar-collapsed #sidebarBottomActions .btn {
+            width: 44px;
+            padding-left: 0;
+            padding-right: 0;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Bootstrap grid overrides for collapsed widths */
+        /* Sidebar col becomes very small; main becomes wider */
+        .sidebar-collapsed #desktopSidebarCol {
+            width: 72px !important;
+            flex: 0 0 72px !important;
+            max-width: 72px !important;
+        }
+        .sidebar-collapsed #desktopMainCol {
+            width: calc(100% - 72px) !important;
+            flex: 0 0 calc(100% - 72px) !important;
+            max-width: calc(100% - 72px) !important;
         }
     </style>
 </head>
@@ -77,7 +179,7 @@
                     <li class="nav-item mb-1">
                         <a class="nav-link @if(request()->routeIs('customers.*')) active @endif"
                            href="{{ route('customers.index') }}">
-                            👤 Πελάτες
+                            👤 Περιστατικά
                         </a>
                     </li>
                     <li class="nav-item mb-1">
@@ -146,15 +248,13 @@
                         <i class="bi bi-folder2-open"></i>
                     </a>
 
-                    {{-- ✅ Notifications Bell with Badge + Dropdown --}}
+                    {{-- Notifications Bell (MOBILE) --}}
                     <div class="position-relative">
                         <button type="button" id="notifBellBtnMobile" class="btn btn-outline-primary position-relative" title="Ειδοποιήσεις">
                             <i class="bi bi-bell"></i>
                             <span id="notifBadgeMobile"
                                   class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                                  style="display:none; font-size:.70rem;">
-                                0
-                            </span>
+                                  style="display:none; font-size:.70rem;">0</span>
                         </button>
 
                         <div id="notifDropdownMobile" class="card shadow notif-dropdown">
@@ -187,44 +287,65 @@
     <div class="row">
 
         {{-- DESKTOP SIDEBAR --}}
-        <nav class="col-md-2 col-lg-2 d-none d-md-block bg-light sidebar py-3">
+        <nav id="desktopSidebarCol" class="col-md-2 col-lg-2 d-none d-md-block bg-light sidebar py-3">
             <div class="position-sticky d-flex flex-column justify-content-between h-100">
                 <div>
-                    <div class="px-3 logo-img mb-4">
-                        <a class="navbar-brand fw-bold" href="#">
-                            <img src="{{ asset('images/logo.png') }}" alt="Booking App" height="32">
+                    <div class="px-3 logo-img mb-3 d-flex justify-content-between align-items-center">
+                        <a class="navbar-brand fw-bold m-0" href="#">
+                            <img class="sidebar-logo" src="{{ asset('images/logo.png') }}" alt="Booking App">
                         </a>
+
+                        {{-- ✅ Toggle button (desktop only) --}}
+                        <button type="button" id="sidebarToggleBtn" class="sidebar-toggle" title="Μίκρυνε/Άνοιξε">
+                            <i id="sidebarToggleIcon" class="bi"></i>
+                        </button>
                     </div>
-                    <hr>
+                    <hr class="mt-0">
 
                     <ul class="nav flex-column px-2">
                         @if($user && $user->role !== 'therapist')
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('customers.*')) active @endif"
-                                   href="{{ route('customers.index') }}">👤 Πελάτες</a>
+                                   href="{{ route('customers.index') }}">
+                                    <span class="nav-icon">👤</span>
+                                    <span class="nav-label">Περιστατικά</span>
+                                </a>
                             </li>
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('professionals.*')) active @endif"
-                                   href="{{ route('professionals.index') }}">💼 Θεραπευτές</a>
+                                   href="{{ route('professionals.index') }}">
+                                    <span class="nav-icon">💼</span>
+                                    <span class="nav-label">Θεραπευτές</span>
+                                </a>
                             </li>
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('appointments.*')) active @endif"
-                                   href="{{ route('appointments.index') }}">📅 Ραντεβού</a>
+                                   href="{{ route('appointments.index') }}">
+                                    <span class="nav-icon">📅</span>
+                                    <span class="nav-label">Ραντεβού</span>
+                                </a>
                             </li>
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('expenses.*')) active @endif"
-                                   href="{{ route('expenses.index') }}">💸 Έξοδα</a>
+                                   href="{{ route('expenses.index') }}">
+                                    <span class="nav-icon">💸</span>
+                                    <span class="nav-label">Έξοδα</span>
+                                </a>
                             </li>
                             @if(Auth::check() && Auth::user()->role === 'owner')
                                 <li class="nav-item mb-1">
                                     <a class="nav-link @if(request()->routeIs('settlements.*')) active @endif"
-                                       href="{{ route('settlements.index') }}">📑 Εκκαθάριση</a>
+                                       href="{{ route('settlements.index') }}">
+                                        <span class="nav-icon">📑</span>
+                                        <span class="nav-label">Εκκαθάριση</span>
+                                    </a>
                                 </li>
                             @endif
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('price_items.*')) active @endif"
                                    href="{{ route('price_items.index') }}">
-                                    🏷️ Τιμοκατάλογος
+                                    <span class="nav-icon">🏷️</span>
+                                    <span class="nav-label">Τιμοκατάλογος</span>
                                 </a>
                             </li>
                         @endif
@@ -232,7 +353,10 @@
                         @if($user && $user->role === 'therapist')
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('therapist_appointments.*')) active @endif"
-                                   href="{{ route('therapist_appointments.index') }}">🗓 Ραντεβού θεραπευτών</a>
+                                   href="{{ route('therapist_appointments.index') }}">
+                                    <span class="nav-icon">🗓</span>
+                                    <span class="nav-label">Ραντεβού θεραπευτών</span>
+                                </a>
                             </li>
                         @endif
                     </ul>
@@ -248,7 +372,7 @@
                         <hr class="my-2">
                     @endif
 
-                    <div class="d-flex justify-content-start gap-3 icon-actions">
+                    <div class="d-flex justify-content-start gap-3 icon-actions" id="sidebarBottomActions">
                         @if($user && in_array($user->role, ['owner', 'grammatia']))
                             <a href="{{ route('appointments.recycle') }}" class="btn btn-outline-secondary" title="Recycle Ραντεβού">
                                 <i class="bi bi-trash"></i>
@@ -258,15 +382,13 @@
                                 <i class="bi bi-folder2-open"></i>
                             </a>
 
-                            {{-- ✅ Notifications Bell with Badge + Dropdown --}}
+                            {{-- Notifications Bell (DESKTOP) --}}
                             <div class="position-relative">
                                 <button type="button" id="notifBellBtn" class="btn btn-outline-primary position-relative" title="Ειδοποιήσεις">
                                     <i class="bi bi-bell"></i>
                                     <span id="notifBadge"
                                           class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                                          style="display:none; font-size:.70rem;">
-                                        0
-                                    </span>
+                                          style="display:none; font-size:.70rem;">0</span>
                                 </button>
 
                                 <div id="notifDropdown" class="card shadow notif-dropdown">
@@ -296,7 +418,7 @@
         </nav>
 
         {{-- MAIN CONTENT --}}
-        <main class="col-12 col-md-10 ms-sm-auto col-lg-10 px-3 px-md-4 py-4">
+        <main id="desktopMainCol" class="col-12 col-md-10 ms-sm-auto col-lg-10 px-3 px-md-4 py-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4">
                 <h2 class="h3 mb-0" style="color:#b21691">@yield('title', 'Επισκόπηση')</h2>
             </div>
@@ -403,7 +525,6 @@
             });
         }
 
-        function open() { dropdown.style.display = 'block'; }
         function close() { dropdown.style.display = 'none'; }
         function toggle() { dropdown.style.display = (dropdown.style.display === 'none' || !dropdown.style.display) ? 'block' : 'none'; }
 
@@ -434,11 +555,9 @@
                 }
             },
             renderList,
-            close
         };
     }
 
-    // map IDs to instances
     const desktop = wireInstance('notif');
     const mobile  = wireInstance('notifMobile');
 
@@ -446,21 +565,39 @@
         const due = await fetchDue();
         const count = due.length;
 
-        if (desktop) {
-            desktop.setBadge(count);
-            desktop.renderList(due);
-        }
-        if (mobile) {
-            mobile.setBadge(count);
-            mobile.renderList(due);
-        }
+        if (desktop) { desktop.setBadge(count); desktop.renderList(due); }
+        if (mobile)  { mobile.setBadge(count);  mobile.renderList(due);  }
     }
 
-    // initial + poll
     refreshAll();
     setInterval(refreshAll, 60000);
 })();
 </script>
 @endif
+
+{{-- ✅ Sidebar 2-mode Toggle Script (desktop) --}}
+<script>
+(function () {
+    const btn = document.getElementById('sidebarToggleBtn');
+    const icon = document.getElementById('sidebarToggleIcon');
+    if (!btn || !icon) return;
+
+    function applyIcon() {
+        const collapsed = document.documentElement.classList.contains('sidebar-collapsed');
+        // collapsed => show "chevron right" (to expand), normal => chevron left (to collapse)
+        icon.className = collapsed ? 'bi bi-chevron-right' : 'bi bi-chevron-left';
+    }
+
+    applyIcon();
+
+    btn.addEventListener('click', function () {
+        document.documentElement.classList.toggle('sidebar-collapsed');
+        const collapsed = document.documentElement.classList.contains('sidebar-collapsed');
+        try { localStorage.setItem('sidebar_mode', collapsed ? 'collapsed' : 'normal'); } catch(e) {}
+        applyIcon();
+    });
+})();
+</script>
+
 </body>
 </html>

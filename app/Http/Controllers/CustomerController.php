@@ -201,7 +201,7 @@ class CustomerController extends Controller
         $customer = Customer::create($data);
         $customer->professionals()->sync($professionalIds);
 
-        return redirect()->route('customers.index')->with('success', 'Ο πελάτης δημιουργήθηκε επιτυχώς.');
+        return redirect()->route('customers.index')->with('success', 'Το περιστατικό δημιουργήθηκε επιτυχώς.');
     }
 
     public function edit(Request $request, Customer $customer)
@@ -243,10 +243,10 @@ class CustomerController extends Controller
         $customer->professionals()->sync($professionalIds);
 
         if ($request->filled('redirect_to')) {
-            return redirect($request->input('redirect_to'))->with('success', 'Ο πελάτης ενημερώθηκε επιτυχώς.');
+            return redirect($request->input('redirect_to'))->with('success', 'Το περιστατικό ενημερώθηκε επιτυχώς.');
         }
 
-        return redirect()->route('customers.index')->with('success', 'Ο πελάτης ενημερώθηκε επιτυχώς.');
+        return redirect()->route('customers.index')->with('success', 'Το περιστατικό ενημερώθηκε επιτυχώς.');
     }
 
     public function destroy(Customer $customer)
@@ -255,7 +255,7 @@ class CustomerController extends Controller
 
         return redirect()
             ->route('customers.index')
-            ->with('success', 'Ο πελάτης διαγράφηκε επιτυχώς.');
+            ->with('success', 'Το περιστατικό διαγράφηκε επιτυχώς.');
     }
 
     /* =========================================================
@@ -559,7 +559,7 @@ class CustomerController extends Controller
         }
 
         if ($dueTotal <= 0.0001) {
-            return back()->with('error', 'Δεν υπάρχουν χρωστούμενα ραντεβού για αυτόν τον πελάτη.');
+            return back()->with('error', 'Δεν υπάρχουν χρωστούμενα ραντεβού για αυτό το περιστατικό.');
         }
 
         $incoming = $cashY + $cashN + $card;
@@ -714,7 +714,7 @@ class CustomerController extends Controller
 
         return back()->with(
             'success',
-            $customer->is_active ? 'Ο πελάτης ενεργοποιήθηκε.' : 'Ο πελάτης απενεργοποιήθηκε.'
+            $customer->is_active ? 'Το περιστατικό ενεργοποιήθηκε.' : 'Το περιστατικό απενεργοποιήθηκε.'
         );
     }
 

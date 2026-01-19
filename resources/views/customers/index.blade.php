@@ -1,7 +1,7 @@
 {{-- resources/views/customers/index.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Πελάτες')
+@section('title', 'Περιστατικά')
 
 @section('content')
     @php
@@ -15,7 +15,7 @@
                 <span>Λίστα Πελατών</span>
 
                 <a href="{{ route('customers.create') }}" class="btn btn-primary btn-sm">
-                    + Προσθήκη Πελάτη
+                    + Προσθήκη Περιστατικού
                 </a>
             </div>
 
@@ -143,7 +143,7 @@
                                                {{ $isActive ? 'checked' : '' }}
                                                onchange="
                                                    if(!this.checked){
-                                                       if(!confirm('Σίγουρα θέλετε να απενεργοποιήσετε τον πελάτη;')){
+                                                       if(!confirm('Σίγουρα θέλετε να απενεργοποιήσετε το περιστατικό;')){
                                                            this.checked = true;
                                                            return;
                                                        }
@@ -167,7 +167,7 @@
                                 {{-- Edit --}}
                                 <a href="{{ route('customers.edit', $customer) }}"
                                    class="btn btn-sm btn-secondary"
-                                   title="Επεξεργασία πελάτη">
+                                   title="Επεξεργασία περιστατικού">
                                     <i class="bi bi-pencil-square"></i>
                                 </a>
 

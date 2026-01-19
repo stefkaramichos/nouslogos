@@ -139,7 +139,7 @@
 
                 <div class="row g-2">
                     <div class="col-md-6">
-                        <label class="form-label">Πελάτης</label>
+                        <label class="form-label">Περιστατικό</label>
                         <input type="text" name="customer" class="form-control"
                                placeholder="Όνομα ή επώνυμο..."
                                value="{{ $filters['customer'] ?? '' }}">
@@ -170,11 +170,11 @@
                     <tr>
                         <th>Θερ.</th>
                         <th>Ημερομηνία & Ώρα</th>
-                        <th>Πελάτης</th>
+                        <th>Περιστατικό</th>
                         <th>Εταιρεία</th>
                         <th>Σύνολο (€)</th>
                         <th>Ποσό Επαγγελματία (€)</th>
-                        <th>Πληρωμή Πελάτη</th>
+                        <th>Πληρωμή Περιστατικού</th>
                         <th>Σημειώσεις</th>
                         <th>Ενέργειες</th>
                     </tr>
@@ -316,7 +316,7 @@
                             <thead>
                             <tr>
                                 <th>Ημερομηνία</th>
-                                <th>Πελάτης</th>
+                                <th>Περιστατικό</th>
                                 <th>Σημειώσεις θεραπευτή</th>
                                 <th>Κατάσταση</th>
                             </tr>

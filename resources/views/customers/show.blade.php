@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Πελάτης: ' . $customer->last_name . ' ' . $customer->first_name)
+@section('title', 'Περιστατικό: ' . $customer->last_name . ' ' . $customer->first_name)
 
 @section('content')
     <div class="mb-3">
@@ -9,7 +9,7 @@
 
     {{-- Στοιχεία Πελάτη + Οικονομική εικόνα --}}
     <div class="card mb-4">
-        <div class="card-header">Στοιχεία Πελάτη</div>
+        <div class="card-header">Στοιχεία Περιστατικού</div>
 
         <div class="card-body">
             <div class="row mb-3">
@@ -99,7 +99,7 @@
                             </div>
                             <hr class="my-1">
                         @empty
-                            <span class="text-muted">Δεν έχουν γίνει πληρωμές για αυτόν τον πελάτη.</span>
+                            <span class="text-muted">Δεν έχουν γίνει πληρωμές για αυτόν το Περιστατικό.</span>
                         @endforelse
                     </div>
                 </div>
@@ -110,7 +110,7 @@
                 <div class="col-12">
                     <div class="border rounded p-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="mb-0">Αρχεία Πελάτη</h6>
+                            <h6 class="mb-0">Αρχεία Περιστατικού</h6>
 
                             <button type="button" class="btn btn-sm btn-primary"
                                     onclick="document.getElementById('customerFileInput').click();">
@@ -153,7 +153,7 @@
                         @endphp
 
                         @if($files->count() === 0)
-                            <div class="text-muted">Δεν υπάρχουν αρχεία για αυτόν τον πελάτη.</div>
+                            <div class="text-muted">Δεν υπάρχουν αρχεία για αυτόν το περιστατικό.</div>
                         @else
                             <div class="table-responsive" style="max-height: 110px; overflow-y:auto;">
                                 <table class="table table-sm table-striped align-middle mb-0">
@@ -229,7 +229,7 @@
 
             <div class="d-flex justify-content-end mt-3">
                 <a href="{{ route('customers.edit', ['customer' => $customer, 'redirect' => url()->full()]) }}"
-                   title="Επεξεργασία πελάτη"
+                   title="Επεξεργασία περιστατικού"
                    class="btn btn-sm btn-secondary">
                     <i class="bi bi-pencil-square"></i>
                 </a>
@@ -241,7 +241,7 @@
     {{-- ===================== ΡΑΝΤΕΒΟΥ ===================== --}}
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <span>Ραντεβού Πελάτη</span>
+            <span>Ραντεβού Περιστατικού</span>
 
             <a href="{{ route('appointments.create', ['customer_id' => $customer->id, 'redirect' => request()->fullUrl()]) }}"
                class="btn btn-primary mb-0">
@@ -449,7 +449,7 @@
                     @empty
                         <tr>
                             <td colspan="10" class="text-center text-muted py-4">
-                                Δεν υπάρχουν ραντεβού για αυτόν τον πελάτη.
+                                Δεν υπάρχουν ραντεβού για αυτόν τον περιστατικό.
                             </td>
                         </tr>
                     @endforelse

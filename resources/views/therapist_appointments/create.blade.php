@@ -14,16 +14,16 @@
 
                 {{-- ΠΕΛΑΤΗΣ --}}
                 <div class="mb-3">
-                    <label class="form-label">Πελάτης</label>
+                    <label class="form-label">Περιστατικό</label>
                     <select name="customer_id" id="customer_select" class="form-select select2">
-                        <option value="">-- Επιλέξτε πελάτη --</option>
+                        <option value="">-- Επιλέξτε περιστατικό --</option>
                         @foreach($customers as $customer)
                             <option value="{{ $customer->id }}" @selected(old('customer_id') == $customer->id)>
                                 {{ $customer->last_name }} {{ $customer->first_name }} ({{ $customer->phone }})
                             </option>
                         @endforeach
                     </select>
-                    <small class="text-muted">Επιλέξτε είτε Πελάτη είτε Επαγγελματία.</small>
+                    <small class="text-muted">Επιλέξτε είτε Περιστατικό είτε Επαγγελματία.</small>
                 </div>
                 @if($user->role === 'owner')
                     {{-- ΕΠΑΓΓΕΛΜΑΤΙΑΣ (ραντεβού με άλλον professional) --}}
@@ -37,7 +37,7 @@
                                 </option>
                             @endforeach
                         </select>
-                        <small class="text-muted">Επιλέξτε είτε Πελάτη είτε Επαγγελματία.</small>
+                        <small class="text-muted">Επιλέξτε είτε Περιστατικό είτε Επαγγελματία.</small>
                     </div>
                 @endif
                 {{-- ΗΜΕΡΟΜΗΝΙΑ & ΩΡΑ --}}
@@ -71,7 +71,7 @@
     $(function () {
         $('#customer_select').select2({
             width: '100%',
-            placeholder: '-- Επιλέξτε πελάτη --',
+            placeholder: '-- Επιλέξτε περιστατικό --',
             allowClear: true
         });
 

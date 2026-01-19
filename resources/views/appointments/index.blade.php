@@ -33,7 +33,7 @@
 
             <div class="row g-2">
                 <div class="col-md-3">
-                    <label class="form-label">Πελάτης</label>
+                    <label class="form-label">Περιστατικό</label>
                     <select name="customer_id" class="form-select">
                         <option value="">Όλοι</option>
                         @foreach($customers as $customer)
@@ -172,7 +172,7 @@
                 <thead>
                 <tr>
                     <th>Ημ/νία & Ώρα</th>
-                    <th>Πελάτης</th>
+                    <th>Περιστατικό</th>
                     <th>Επαγγελματίας</th>
                     <th>Εταιρεία</th>
                     <th>Υπηρεσία</th>

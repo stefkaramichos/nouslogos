@@ -18,11 +18,11 @@
 
                 <input type="hidden" name="redirect_to" value="{{ request('redirect') }}">
 
-                {{-- Πελάτης --}}
+                {{-- Περιστατικό --}}
                 <div class="mb-3">
-                    <label class="form-label">Πελάτης</label>
+                    <label class="form-label">Περιστατικό</label>
                     <select name="customer_id" class="form-select select2" required>
-                        <option value="">-- Επιλέξτε πελάτη --</option>
+                        <option value="">-- Επιλέξτε περιστατικό --</option>
                         @foreach($customers as $customer)
                             <option value="{{ $customer->id }}"
                                 @selected(old('customer_id', $appointment->customer_id) == $customer->id)>
