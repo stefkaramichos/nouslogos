@@ -70,15 +70,18 @@ Route::middleware('auth')->group(function () {
         ->name('appointments.payment.update');
 
     Route::post('/customers/{customer}/pay-all', [CustomerController::class, 'payAll'])
-    ->name('customers.payAll');
+        ->name('customers.payAll');
 
     Route::delete('/customers/{customer}/appointments/delete-selected', [CustomerController::class, 'deleteAppointments'])
-    ->name('customers.deleteAppointments');
+      ->name('customers.deleteAppointments');
 
     Route::get('/api/customers/last-appointment', [AppointmentController::class, 'getLastForCustomer'])
-    ->name('customers.lastAppointment');
+        ->name('customers.lastAppointment');
     Route::post('/appointments/store-multiple', [AppointmentController::class, 'storeMultiple'])
-    ->name('appointments.storeMultiple');
+        ->name('appointments.storeMultiple');
+    
+        Route::post('/customers/{customer}/payments/update-day-total', [CustomerController::class, 'updatePaymentsDayTotal'])
+        ->name('customers.payments.updateDayTotal');
 
 
  

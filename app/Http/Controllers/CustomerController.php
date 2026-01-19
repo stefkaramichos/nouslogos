@@ -519,6 +519,244 @@ class CustomerController extends Controller
         ));
     }
 
+    
+    public function updatePaymentsDayTotal(Request $request, Customer $customer)
+    {
+        $data = $request->validate([
+            'day_key' => 'required|string', // "Y-m-d" ή "no-date"
+            'total'   => 'required|numeric|min:0',
+        ]);
+
+        $dayKey   = $data['day_key'];
+        $newTotal = (float)$data['total'];
+
+        // helper: βρες payments query για την ημέρα
+        $paymentsQuery = Payment::where('customer_id', $customer->id);
+
+        $paidAtForNew = null; // αν day_key = no-date, paid_at NULL
+        if ($dayKey === 'no-date') {
+            $paymentsQuery->whereNull('paid_at');
+            $paidAtForNew = null;
+        } else {
+            try {
+                $start = Carbon::createFromFormat('Y-m-d', $dayKey)->startOfDay();
+                $end   = Carbon::createFromFormat('Y-m-d', $dayKey)->endOfDay();
+            } catch (\Exception $e) {
+                return response()->json(['success' => false, 'message' => 'Μη έγκυρη ημερομηνία.'], 422);
+            }
+
+            $paymentsQuery->whereBetween('paid_at', [$start, $end]);
+            // για νέες πληρωμές κράτα την ίδια μέρα (βάζω "τώρα" αλλά στη συγκεκριμένη ημερομηνία)
+            $paidAtForNew = Carbon::createFromFormat('Y-m-d', $dayKey)->setTimeFromTimeString(now()->format('H:i:s'));
+        }
+
+        DB::transaction(function () use ($customer, $paymentsQuery, $newTotal, $paidAtForNew, &$responsePayload) {
+
+            // payments της ημέρας (τελευταία πρώτα) για “μείωση”
+            $dayPaymentsDesc = (clone $paymentsQuery)
+                ->orderByRaw('paid_at IS NULL DESC') // null τελευταίο/πρώτο δεν έχει σημασία πολύ
+                ->orderByDesc('paid_at')
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->get();
+
+            $currentTotal = (float)$dayPaymentsDesc->sum('amount');
+            $delta = $newTotal - $currentTotal;
+
+            // Αν είναι ίδιο, τέλος
+            if (abs($delta) < 0.0001) {
+                $responsePayload = [
+                    'success' => true,
+                    'formatted_total' => number_format($currentTotal, 2, ',', '.') . ' €',
+                    'old_total' => $currentTotal,
+                    'new_total' => $currentTotal,
+                ];
+                return;
+            }
+
+            // Θα χρειαστούμε defaults για νέες πληρωμές (method/tax/bank) από την πιο πρόσφατη της ημέρας
+            $lastPayment = $dayPaymentsDesc->first();
+            $defaultMethod = $lastPayment?->method ?? 'cash';
+            $defaultTax    = $lastPayment?->tax ?? 'Y';
+            $defaultBank   = $lastPayment?->bank ?? null;
+
+            // =========================
+            //  A) ΜΕΙΩΣΗ (delta < 0)
+            // =========================
+            if ($delta < 0) {
+                $toRemove = abs($delta);
+
+                // ξεκινάμε από τις πιο πρόσφατες πληρωμές
+                foreach ($dayPaymentsDesc as $p) {
+                    if ($toRemove <= 0) break;
+
+                    $amt = (float)$p->amount;
+                    if ($amt <= 0) {
+                        // καθάρισε τυχόν σκουπίδια
+                        $p->delete();
+                        continue;
+                    }
+
+                    if ($amt <= $toRemove + 0.0001) {
+                        // αυτή η πληρωμή μηδενίζεται -> delete
+                        $toRemove -= $amt;
+                        $p->delete();
+                    } else {
+                        // μειώνουμε ποσό και κρατάμε την πληρωμή
+                        $p->amount = $amt - $toRemove;
+                        $p->save();
+                        $toRemove = 0;
+                    }
+                }
+
+                // Αν ο χρήστης ζήτησε π.χ. 0 και “έφαγες” όλες, ΟΚ.
+                // Αν δεν υπήρχαν αρκετά χρήματα να αφαιρεθούν (πρακτικά δεν γίνεται γιατί currentTotal>=newTotal), αγνόησε.
+
+                // Μετά το delete/updates, ανανέωσε totals
+                $newComputed = (float)(clone $paymentsQuery)->sum('amount');
+
+                // ✅ Ενημέρωσε is_full flags σωστά στα affected appointments
+                $affectedAppointmentIds = Payment::where('customer_id', $customer->id)
+                    ->whereNotNull('appointment_id')
+                    ->pluck('appointment_id')
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                $this->recalcIsFullForAppointments($affectedAppointmentIds);
+
+                $responsePayload = [
+                    'success' => true,
+                    'formatted_total' => number_format($newComputed, 2, ',', '.') . ' €',
+                    'old_total' => $currentTotal,
+                    'new_total' => $newComputed,
+                ];
+                return;
+            }
+
+            // =========================
+            //  B) ΑΥΞΗΣΗ (delta > 0)
+            // =========================
+            $toAdd = $delta;
+
+            // Βρες ραντεβού με υπόλοιπο (oldest first)
+            $appointments = Appointment::where('customer_id', $customer->id)
+                ->with('payments')
+                ->orderBy('start_time', 'asc')
+                ->lockForUpdate()
+                ->get();
+
+            // Φτιάξε λίστα (appointment_id => due)
+            $dueList = [];
+            $dueTotal = 0.0;
+
+            foreach ($appointments as $a) {
+                $total = (float)($a->total_price ?? 0);
+                if ($total <= 0) continue;
+
+                $paid = (float)$a->payments->sum('amount');
+                $due  = max(0, $total - $paid);
+
+                if ($due > 0.0001) {
+                    $dueList[] = ['id' => $a->id, 'due' => $due];
+                    $dueTotal += $due;
+                }
+            }
+
+            // Αν δεν υπάρχουν χρωστούμενα, μπορείς:
+            // - είτε να το απορρίψεις
+            // - είτε να το αφήσεις σαν "προκαταβολή" (χωρίς appointment_id)
+            // Εσύ λες "δημιούργησε αντίστοιχες πληρωμές" -> άρα μόνο σε ραντεβού.
+            if ($dueTotal <= 0.0001) {
+                throw new \Exception('Δεν υπάρχουν χρωστούμενα ραντεβού για να μοιραστεί το ποσό.');
+            }
+
+            // Μην επιτρέψεις να πληρώσει παραπάνω από τα χρωστούμενα (αν θες να επιτρέπεται overpay πες μου)
+            if ($toAdd > $dueTotal + 0.0001) {
+                throw new \Exception('Το ποσό είναι μεγαλύτερο από το συνολικό υπόλοιπο των χρωστούμενων ραντεβού.');
+            }
+
+            // Allocate σε πολλά appointments (oldest first)
+            $createdAppointmentIds = [];
+
+            foreach ($dueList as $row) {
+                if ($toAdd <= 0) break;
+
+                $apptId = (int)$row['id'];
+                $due    = (float)$row['due'];
+
+                $payNow = min($due, $toAdd);
+
+                Payment::create([
+                    'appointment_id' => $apptId,
+                    'customer_id'    => $customer->id,
+                    'amount'         => $payNow,
+                    'is_full'        => 0, // θα το ξανα-υπολογίσουμε μετά
+                    'paid_at'        => $paidAtForNew ?? now(), // αν no-date -> null (επιτρέπεται)
+                    'method'         => $defaultMethod,
+                    'tax'            => $defaultTax,
+                    'bank'           => $defaultBank,
+                    'notes'          => '[AUTO_DAY_TOTAL] Προσαρμογή ημερήσιου συνόλου.',
+                    'created_by'     => Auth::id(),
+                ]);
+
+                $createdAppointmentIds[] = $apptId;
+                $toAdd -= $payNow;
+            }
+
+            // cleanup: σβήσε τυχόν μηδενικές πληρωμές της ημέρας (αν υπήρχαν ήδη)
+            (clone $paymentsQuery)->where('amount', '<=', 0)->delete();
+
+            // ✅ Recalc is_full στα appointments που επηρεάστηκαν
+            $this->recalcIsFullForAppointments(array_values(array_unique($createdAppointmentIds)));
+
+            $newComputed = (float)(clone $paymentsQuery)->sum('amount');
+
+            $responsePayload = [
+                'success' => true,
+                'formatted_total' => number_format($newComputed, 2, ',', '.') . ' €',
+                'old_total' => $currentTotal,
+                'new_total' => $newComputed,
+            ];
+        });
+
+        return response()->json($responsePayload ?? ['success' => false, 'message' => 'Άγνωστο σφάλμα.'], 200);
+    }
+
+    /**
+     * Επανυπολογίζει το is_full για τα payments ανά appointment:
+     * - αν paid >= total => το τελευταίο payment γίνεται is_full=1, τα υπόλοιπα 0
+     * - αλλιώς όλα 0
+     */
+    private function recalcIsFullForAppointments(array $appointmentIds): void
+    {
+        if (empty($appointmentIds)) return;
+
+        $appointments = Appointment::whereIn('id', $appointmentIds)
+            ->with('payments')
+            ->get();
+
+        foreach ($appointments as $a) {
+            $total = (float)($a->total_price ?? 0);
+            $paid  = (float)$a->payments->sum('amount');
+
+            // κάνε reset
+            Payment::where('appointment_id', $a->id)->update(['is_full' => 0]);
+
+            if ($total > 0 && $paid >= $total) {
+                $last = Payment::where('appointment_id', $a->id)
+                    ->orderByDesc('paid_at')
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($last) {
+                    $last->is_full = 1;
+                    $last->save();
+                }
+            }
+        }
+    }
+
 
     public function inlineUpdate(Request $request)
     {

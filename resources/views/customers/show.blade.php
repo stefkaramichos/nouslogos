@@ -107,7 +107,13 @@
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
                                         <strong>{{ $dateLabel }}</strong>
-                                        <span class="badge bg-primary ms-1">
+                                        <span
+                                            class="badge bg-primary ms-1 payment-day-total-edit"
+                                            data-day-key="{{ $dateKey === 'Χωρίς ημερομηνία' ? 'no-date' : $dateKey }}"
+                                            data-customer-id="{{ $customer->id }}"
+                                            style="cursor:pointer;"
+                                            title="Διπλό κλικ για αλλαγή ημερήσιου συνόλου"
+                                        >
                                             {{ number_format($dayTotal, 2, ',', '.') }} €
                                         </span>
                                     </div>
@@ -967,5 +973,99 @@
             });
         });
         </script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (!csrfToken) return;
+
+    let active = null;
+    let saving = false; // ✅ για να μη γίνει διπλό save
+
+    document.addEventListener('dblclick', function (e) {
+        const el = e.target.closest('.payment-day-total-edit');
+        if (!el) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (active || saving) return;
+
+        const customerId   = el.dataset.customerId;
+        const dayKey       = el.dataset.dayKey; // "2026-01-19" or "no-date"
+        const originalText = (el.textContent || '').trim();
+
+        const numericRaw = originalText
+            .replace(/[^\d,.-]/g, '')
+            .replace('.', '')
+            .replace(',', '.');
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.step = '0.01';
+        input.min = '0';
+        input.className = 'form-control form-control-sm d-inline-block';
+        input.style.width = '90px';
+        input.value = numericRaw ? parseFloat(numericRaw) : 0;
+
+        el.innerHTML = '';
+        el.appendChild(input);
+        input.focus();
+        active = input;
+
+        const restore = () => {
+            el.textContent = originalText;
+            active = null;
+            saving = false;
+        };
+
+        const endpoint = "{{ route('customers.payments.updateDayTotal', ['customer' => '__ID__']) }}"
+            .replace('__ID__', customerId);
+
+        const save = () => {
+            if (saving) return;          // ✅ guard
+            saving = true;
+
+            const newVal = input.value;
+
+            el.innerHTML = '<span class="text-muted">Αποθήκευση…</span>';
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    day_key: dayKey,
+                    total: newVal
+                })
+            })
+            .then(async res => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) throw data;
+                return data;
+            })
+            .then(() => {
+                // ✅ ΜΕΤΑ ΤΗΝ ΕΠΙΤΥΧΙΑ: full reload για να ενημερωθούν totals/lines
+                window.location.reload();
+            })
+            .catch(err => {
+                console.error(err);
+                alert(err?.message || 'Σφάλμα αποθήκευσης.');
+                restore();
+            });
+        };
+
+        input.addEventListener('blur', save);
+
+        input.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+            if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
+        });
+    });
+});
+</script>
 
 @endsection
