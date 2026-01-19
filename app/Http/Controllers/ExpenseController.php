@@ -5,11 +5,18 @@ namespace App\Http\Controllers;
 use App\Models\Expense;
 use App\Models\Company;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ExpenseController extends Controller
 {
     public function index(Request $request)
     {
+         $user = Auth::user();
+
+        if (!$user || $user->role !== 'owner') {
+            abort(403, 'Δεν έχετε πρόσβαση σε αυτή τη σελίδα.');
+        }
+
         $companyId = $request->get('company_id');
 
         $query = Expense::with('company')->orderByDesc('created_at');
@@ -37,6 +44,12 @@ class ExpenseController extends Controller
 
     public function store(Request $request)
     {
+         $user = Auth::user();
+
+        if (!$user || $user->role !== 'owner') {
+            abort(403, 'Δεν έχετε πρόσβαση σε αυτή τη σελίδα.');
+        }
+
         $validated = $request->validate([
             'company_id'  => ['required', 'exists:companies,id'],
             'amount'      => ['required', 'numeric', 'min:0'],
@@ -62,6 +75,13 @@ class ExpenseController extends Controller
 
     public function update(Request $request, Expense $expense)
     {
+
+         $user = Auth::user();
+
+        if (!$user || $user->role !== 'owner') {
+            abort(403, 'Δεν έχετε πρόσβαση σε αυτή τη σελίδα.');
+        }
+
         $validated = $request->validate([
             'company_id'  => ['required', 'exists:companies,id'],
             'amount'      => ['required', 'numeric', 'min:0'],
@@ -77,6 +97,12 @@ class ExpenseController extends Controller
 
     public function destroy(Expense $expense)
     {
+         $user = Auth::user();
+
+        if (!$user || $user->role !== 'owner') {
+            abort(403, 'Δεν έχετε πρόσβαση σε αυτή τη σελίδα.');
+        }
+
         $expense->delete();
 
         return redirect()

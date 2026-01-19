@@ -12,7 +12,7 @@
     <div class="card">
         <div class="card-header">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <span>Λίστα Πελατών</span>
+                <span>Λίστα Περιστατικών</span>
 
                 <a href="{{ route('customers.create') }}" class="btn btn-primary btn-sm">
                     + Προσθήκη Περιστατικού

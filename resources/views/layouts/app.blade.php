@@ -48,7 +48,7 @@
             position:fixed;
             left: 30px;
             bottom: 100px;
-            width:234px;
+            width:334px;
             z-index:2000;
         }
         @media (max-width: 767.98px) {
@@ -185,7 +185,7 @@
                     <li class="nav-item mb-1">
                         <a class="nav-link @if(request()->routeIs('professionals.*')) active @endif"
                            href="{{ route('professionals.index') }}">
-                            💼 Θεραπευτές
+                            🧑‍⚕️ Θεραπευτές
                         </a>
                     </li>
                     <li class="nav-item mb-1">
@@ -194,12 +194,14 @@
                             📅 Ραντεβού
                         </a>
                     </li>
+                    @if(Auth::check() && Auth::user()->role === 'owner')
                     <li class="nav-item mb-1">
                         <a class="nav-link @if(request()->routeIs('expenses.*')) active @endif"
                            href="{{ route('expenses.index') }}">
                             💸 Έξοδα
                         </a>
                     </li>
+                    @endif
                     @if(Auth::check() && Auth::user()->role === 'owner')
                         <li class="nav-item mb-1">
                             <a class="nav-link @if(request()->routeIs('settlements.*')) active @endif"
@@ -314,7 +316,7 @@
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('professionals.*')) active @endif"
                                    href="{{ route('professionals.index') }}">
-                                    <span class="nav-icon">💼</span>
+                                    <span class="nav-icon">🧑‍⚕️</span>
                                     <span class="nav-label">Θεραπευτές</span>
                                 </a>
                             </li>
@@ -325,6 +327,7 @@
                                     <span class="nav-label">Ραντεβού</span>
                                 </a>
                             </li>
+                            @if(Auth::check() && Auth::user()->role === 'owner')
                             <li class="nav-item mb-1">
                                 <a class="nav-link @if(request()->routeIs('expenses.*')) active @endif"
                                    href="{{ route('expenses.index') }}">
@@ -332,6 +335,7 @@
                                     <span class="nav-label">Έξοδα</span>
                                 </a>
                             </li>
+                            @endif
                             @if(Auth::check() && Auth::user()->role === 'owner')
                                 <li class="nav-item mb-1">
                                     <a class="nav-link @if(request()->routeIs('settlements.*')) active @endif"
