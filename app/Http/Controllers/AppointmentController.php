@@ -49,138 +49,155 @@ class AppointmentController extends Controller
     }
 
     public function index(Request $request)
-    {
-        $customers     = Customer::orderBy('last_name')->get();
-        $professionals = Professional::orderBy('last_name')->get();
-        $companies     = Company::orderBy('name')->get();
+{
+    // dropdown lists
+    $customers     = Customer::orderBy('last_name')->get();
+    $professionals = Professional::orderBy('last_name')->get();
+    $companies     = Company::orderBy('name')->get();
 
-        $range = $request->input('range', 'month');
-        $nav   = $request->input('nav');
-        $day   = $request->input('day');
-        $month = $request->input('month');
+    // -----------------------------
+    // VIEW + PERIOD (day/week/month/all)
+    // -----------------------------
+    $view = $request->input('view', 'week'); // week | day | month | table
+    if (!in_array($view, ['week','day','month','table'], true)) {
+        $view = 'week';
+    }
 
-        if (!$request->hasAny([
-            'range','day','month','nav',
-            'customer_id','professional_id','company_id','status','payment_status','payment_method',
-            'from','to'
-        ])) {
-            $range = 'month';
-            $month = now()->format('Y-m');
-            $month = null; // όπως το είχες
+    $nav   = $request->input('nav');         // prev | next
+    $day   = $request->input('day');         // Y-m-d (base date for day/week)
+    $month = $request->input('month');       // Y-m
+
+    // default base date
+    $baseDate = $day ? Carbon::parse($day) : now();
+
+    // If month view and month not provided -> current month
+    if ($view === 'month' && !$month) {
+        $month = now()->format('Y-m');
+    }
+
+    // -----------------------------
+    // NAVIGATION (prev/next)
+    // -----------------------------
+    if ($nav === 'prev' || $nav === 'next') {
+        if ($view === 'day') {
+            $baseDate = $nav === 'prev' ? $baseDate->copy()->subDay() : $baseDate->copy()->addDay();
+        } elseif ($view === 'week') {
+            $baseDate = $nav === 'prev' ? $baseDate->copy()->subWeek() : $baseDate->copy()->addWeek();
+        } elseif ($view === 'month') {
+            $m = Carbon::createFromFormat('Y-m', $month ?: now()->format('Y-m'))->startOfMonth();
+            $m = $nav === 'prev' ? $m->subMonth() : $m->addMonth();
+            $month = $m->format('Y-m');
         }
+    }
 
-        $legacyFrom = $request->input('from');
-        $legacyTo   = $request->input('to');
-        if ($legacyFrom && $legacyTo && !$request->hasAny(['range','day','month'])) {
-            if ($legacyFrom === $legacyTo) {
-                $range = 'day';
-                $day   = $legacyFrom;
-            } else {
-                $range = 'all';
-            }
+    // reflect back to strings
+    $day = $baseDate->toDateString();
+
+    // -----------------------------
+    // Compute from/to depending on view
+    // -----------------------------
+    $from = null;
+    $to   = null;
+
+    $weekStart = null;
+    $weekEnd   = null;
+    $weekDays  = collect();
+
+    if ($view === 'day') {
+        $from = $baseDate->copy()->startOfDay();
+        $to   = $baseDate->copy()->endOfDay();
+    } elseif ($view === 'week') {
+        $weekStart = $baseDate->copy()->startOfWeek(Carbon::MONDAY)->startOfDay();
+        $weekEnd   = $baseDate->copy()->endOfWeek(Carbon::SUNDAY)->endOfDay();
+
+        $from = $weekStart->copy();
+        $to   = $weekEnd->copy();
+
+        // build 7 days array for header
+        $tmp = $weekStart->copy();
+        for ($i = 0; $i < 7; $i++) {
+            $weekDays->push($tmp->copy());
+            $tmp->addDay();
         }
-
-        if ($range === 'day') {
-            $day = $day ?: now()->toDateString();
-            $month = null;
-        } elseif ($range === 'month') {
-            $month = $month ?: now()->format('Y-m');
-            $day = null;
-        } else {
-            $day = null;
-            $month = null;
-        }
-
-        if ($nav === 'prev' || $nav === 'next') {
-            if ($range === 'day') {
-                $base = Carbon::parse($day ?: now()->toDateString());
-                $base = $nav === 'prev' ? $base->subDay() : $base->addDay();
-                $day  = $base->toDateString();
-            } elseif ($range === 'month') {
-                $base = Carbon::createFromFormat('Y-m', $month ?: now()->format('Y-m'))->startOfMonth();
-                $base = $nav === 'prev' ? $base->subMonth() : $base->addMonth();
-                $month = $base->format('Y-m');
-            }
-        }
-
+    } elseif ($view === 'month') {
+        $m = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+        $from = $m->copy()->startOfMonth()->startOfDay();
+        $to   = $m->copy()->endOfMonth()->endOfDay();
+    } else {
+        // table/all => no date restriction unless from/to given (optional)
+        // Αν θες να έχει "all time" άστο έτσι.
         $from = null;
         $to   = null;
+    }
 
-        if ($range === 'day' && $day) {
-            $from = Carbon::parse($day)->toDateString();
-            $to   = Carbon::parse($day)->toDateString();
-        } elseif ($range === 'month' && $month) {
-            $m    = Carbon::createFromFormat('Y-m', $month);
-            $from = $m->copy()->startOfMonth()->toDateString();
-            $to   = $m->copy()->endOfMonth()->toDateString();
-        } else {
-            if ($legacyFrom) $from = $legacyFrom;
-            if ($legacyTo)   $to   = $legacyTo;
-        }
+    // -----------------------------
+    // Other filters
+    // -----------------------------
+    $customerId     = $request->input('customer_id');
+    $professionalId = $request->input('professional_id');
+    $companyId      = $request->input('company_id');
+    $status         = $request->input('status', 'all');
+    $paymentStatus  = $request->input('payment_status', 'all');
+    $paymentMethod  = $request->input('payment_method', 'all');
 
-        $selectedLabel = 'Όλα';
-        if ($range === 'day' && $day) {
-            $selectedLabel = Carbon::parse($day)->locale('el')->translatedFormat('D d/m/Y');
-        } elseif ($range === 'month' && $month) {
-            $selectedLabel = Carbon::createFromFormat('Y-m', $month)->locale('el')->translatedFormat('F Y');
-        }
+    // -----------------------------
+    // Query appointments
+    // -----------------------------
+    $query = Appointment::query()
+        ->with(['customer', 'professional', 'company', 'payments'])
+        ->leftJoin('customers', 'customers.id', '=', 'appointments.customer_id')
+        ->orderBy('appointments.start_time', 'asc')
+        ->orderBy('customers.last_name', 'asc')
+        ->select('appointments.*');
 
-        $customerId     = $request->input('customer_id');
-        $professionalId = $request->input('professional_id');
-        $companyId      = $request->input('company_id');
-        $status         = $request->input('status');
-        $paymentStatus  = $request->input('payment_status');
-        $paymentMethod  = $request->input('payment_method');
+    if ($from) $query->where('appointments.start_time', '>=', $from);
+    if ($to)   $query->where('appointments.start_time', '<=', $to);
 
-        $query = Appointment::query()
-            ->with(['customer', 'professional', 'company', 'payments'])
-            ->leftJoin('customers', 'customers.id', '=', 'appointments.customer_id')
-            ->orderBy('appointments.start_time', 'desc')
-            ->orderBy('customers.last_name', 'asc')
-            ->select('appointments.*');
+    if ($customerId)     $query->where('appointments.customer_id', $customerId);
+    if ($professionalId) $query->where('appointments.professional_id', $professionalId);
+    if ($companyId)      $query->where('appointments.company_id', $companyId);
 
-        if ($from) $query->whereDate('start_time', '>=', $from);
-        if ($to)   $query->whereDate('start_time', '<=', $to);
+    // status filter (token μέσα σε comma-separated string)
+    if ($status && $status !== 'all') {
+        $query->where(function ($q) use ($status) {
+            $q->where('status', $status)
+              ->orWhere('status', 'like', $status . ',%')
+              ->orWhere('status', 'like', '%,' . $status . ',%')
+              ->orWhere('status', 'like', '%,' . $status);
+        });
+    }
 
-        if ($customerId)     $query->where('appointments.customer_id', $customerId);
-        if ($professionalId) $query->where('appointments.professional_id', $professionalId);
-        if ($companyId)      $query->where('appointments.company_id', $companyId);
+    $appointments = $query->get();
 
-        if ($status && $status !== 'all') {
-            $query->where(function ($q) use ($status) {
-                $q->where('status', $status)
-                  ->orWhere('status', 'like', $status . ',%')
-                  ->orWhere('status', 'like', '%,' . $status . ',%')
-                  ->orWhere('status', 'like', '%,' . $status);
-            });
-        }
+    // payment_status filter
+    if ($paymentStatus && $paymentStatus !== 'all') {
+        $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
+            $total = (float)($a->total_price ?? 0);
 
-        $appointments = $query->get();
+            // total_price <= 0 => θεωρείται full
+            if ($total <= 0) return $paymentStatus === 'full';
 
-        if ($paymentStatus && $paymentStatus !== 'all') {
-            $appointments = $appointments->filter(function ($a) use ($paymentStatus) {
-                $total = (float) ($a->total_price ?? 0);
+            $paid = (float)$a->payments->sum('amount');
 
-                if ($total <= 0) {
-                    return $paymentStatus === 'full';
-                }
+            if ($paymentStatus === 'unpaid')  return $paid <= 0;
+            if ($paymentStatus === 'partial') return $paid > 0 && $paid < $total;
+            if ($paymentStatus === 'full')    return $paid >= $total;
 
-                $paid  = (float) $a->payments->sum('amount');
+            return true;
+        })->values();
+    }
 
-                if ($paymentStatus === 'unpaid')  return $paid <= 0;
-                if ($paymentStatus === 'partial') return $paid > 0 && $paid < $total;
-                if ($paymentStatus === 'full')    return $paid >= $total;
+    // payment_method filter
+    if ($paymentMethod && $paymentMethod !== 'all') {
+        $appointments = $appointments->filter(function ($a) use ($paymentMethod) {
+            return $a->payments->where('method', $paymentMethod)->sum('amount') > 0;
+        })->values();
+    }
 
-                return true;
-            });
-        }
-
-        if ($paymentMethod && $paymentMethod !== 'all') {
-            $appointments = $appointments->filter(function ($a) use ($paymentMethod) {
-                return $a->payments->where('method', $paymentMethod)->sum('amount') > 0;
-            });
-        }
-
+    // -----------------------------
+    // Pagination: μόνο στο table view (για calendar view θέλεις ΟΛΑ)
+    // -----------------------------
+    if ($view === 'table') {
         $perPage = 25;
         $currentPage = Paginator::resolveCurrentPage() ?: 1;
 
@@ -196,54 +213,74 @@ class AppointmentController extends Controller
                 'query' => $request->query(),
             ]
         );
-
-        $prevUrl = null;
-        $nextUrl = null;
-
-        if ($range !== 'all') {
-            $baseQuery = $request->query();
-            unset($baseQuery['nav']);
-            unset($baseQuery['from'], $baseQuery['to']);
-
-            if ($range === 'day') {
-                $baseQuery['range'] = 'day';
-                $baseQuery['day']   = $day ?: now()->toDateString();
-                unset($baseQuery['month']);
-            } elseif ($range === 'month') {
-                $baseQuery['range'] = 'month';
-                $baseQuery['month'] = $month ?: now()->format('Y-m');
-                unset($baseQuery['day']);
-            }
-
-            $prevUrl = $request->url() . '?' . http_build_query(array_merge($baseQuery, ['nav' => 'prev']));
-            $nextUrl = $request->url() . '?' . http_build_query(array_merge($baseQuery, ['nav' => 'next']));
-        }
-
-        $filters = [
-            'range'           => $range,
-            'day'             => $day,
-            'month'           => $month,
-            'from'            => $from,
-            'to'              => $to,
-            'customer_id'     => $customerId,
-            'professional_id' => $professionalId,
-            'company_id'      => $companyId,
-            'status'          => $status ?? 'all',
-            'payment_status'  => $paymentStatus ?? 'all',
-            'payment_method'  => $paymentMethod ?? 'all',
-        ];
-
-        return view('appointments.index', compact(
-            'appointments',
-            'filters',
-            'customers',
-            'professionals',
-            'companies',
-            'prevUrl',
-            'nextUrl',
-            'selectedLabel'
-        ));
+    } else {
+        // calendar view: κράτα collection
+        $appointments = $appointments->values();
     }
+
+    // -----------------------------
+    // Selected label
+    // -----------------------------
+    $selectedLabel = 'Όλα';
+    if ($view === 'day') {
+        $selectedLabel = $baseDate->copy()->locale('el')->translatedFormat('D d/m/Y');
+    } elseif ($view === 'week') {
+        $selectedLabel =
+            $weekStart->copy()->locale('el')->translatedFormat('D d/m/Y') .
+            ' - ' .
+            $weekEnd->copy()->locale('el')->translatedFormat('D d/m/Y');
+    } elseif ($view === 'month') {
+        $selectedLabel = Carbon::createFromFormat('Y-m', $month)->locale('el')->translatedFormat('F Y');
+    }
+
+    // -----------------------------
+    // Prev/Next URLs (κρατά όλα τα φίλτρα)
+    // -----------------------------
+    $baseQuery = $request->query();
+    unset($baseQuery['nav']); // always rebuild
+
+    // ensure we always pass current view
+    $baseQuery['view'] = $view;
+
+    // keep correct date param for each view
+    if ($view === 'month') {
+        $baseQuery['month'] = $month;
+        unset($baseQuery['day']);
+    } else {
+        $baseQuery['day'] = $day; // base date for week/day
+        unset($baseQuery['month']);
+    }
+
+    $prevUrl = $request->url() . '?' . http_build_query(array_merge($baseQuery, ['nav' => 'prev']));
+    $nextUrl = $request->url() . '?' . http_build_query(array_merge($baseQuery, ['nav' => 'next']));
+
+    $filters = [
+        'view'            => $view,
+        'day'             => $day,
+        'month'           => $month,
+        'customer_id'     => $customerId,
+        'professional_id' => $professionalId,
+        'company_id'      => $companyId,
+        'status'          => $status ?? 'all',
+        'payment_status'  => $paymentStatus ?? 'all',
+        'payment_method'  => $paymentMethod ?? 'all',
+    ];
+
+    return view('appointments.index', compact(
+        'appointments',
+        'filters',
+        'customers',
+        'professionals',
+        'companies',
+        'prevUrl',
+        'nextUrl',
+        'selectedLabel',
+        'weekStart',
+        'weekEnd',
+        'weekDays'
+    ));
+}
+
 
     public function getLastForCustomer(Request $request)
     {
