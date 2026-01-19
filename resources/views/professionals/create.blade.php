@@ -32,7 +32,7 @@
                     </select>
                 </div>
 
-                {{-- <div class="mb-3">
+                <div class="mb-3">
                     <label class="form-label">Τηλέφωνο</label>
                     <input type="text" name="phone" class="form-control" value="{{ old('phone') }}" >
                 </div>
@@ -41,7 +41,7 @@
                     <label class="form-label">Φωτογραφία Προφίλ</label>
                     <input type="file" name="profile_image" class="form-control" accept="image/*">
                     <small class="text-muted">Επιτρέπονται εικόνες (jpg, png, webp, μέχρι 2MB).</small>
-                </div> --}}
+                </div> 
 
                 {{-- Μισθός --}}
                 @if(auth()->user()->role === 'owner')

@@ -209,10 +209,6 @@ class ProfessionalController extends Controller
             $rules['password'] = 'nullable|string|min:6|confirmed';
         }
 
-        if (Auth::user()->role !== 'owner') {
-            unset($data['salary']);
-        }
-
         $messages = [
             'first_name.required' => 'Το μικρό όνομα είναι υποχρεωτικό.',
             'password.confirmed'  => 'Οι κωδικοί δεν ταιριάζουν.',
@@ -220,6 +216,10 @@ class ProfessionalController extends Controller
         ];
 
         $data = $request->validate($rules, $messages);
+
+        if (Auth::user()->role !== 'owner') {
+            unset($data['salary']);
+        }
 
         if (Auth::user()->role === 'owner' && !empty($data['password'])) {
             $professional->password = Hash::make($data['password']);
@@ -255,9 +255,12 @@ class ProfessionalController extends Controller
 
         $professional->customers()->sync($customerIds);
 
+        $redirect = $request->input('redirect');
+
         return redirect()
-            ->route('professionals.index')
-            ->with('success', 'Ο επαγγελματίας ενημερώθηκε επιτυχώς.');
+            ->to($redirect ?: route('customers.show', $customer))
+            ->with('success', 'Ο θεραπευτής ενημερώθηκε επιτυχώς.');
+
     }
 
     public function destroy(Professional $professional)

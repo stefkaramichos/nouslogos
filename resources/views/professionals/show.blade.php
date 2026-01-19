@@ -70,6 +70,13 @@
                 </p>
                 --}}
             </div>
+            <div class="d-flex justify-content-end mt-3">
+                <a href="{{ route('professionals.edit', ['professional' => $professional, 'redirect' => request()->fullUrl()]) }}"
+                title="Επεξεργασία επαγγελματία"
+                class="btn btn-sm btn-secondary">
+                    <i class="bi bi-pencil-square"></i>
+                </a>
+            </div>
         </div>
     </div>
 

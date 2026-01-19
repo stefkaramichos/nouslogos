@@ -32,6 +32,8 @@
                         value="{{ old('last_name', $professional->last_name) }}"
                     >
                 </div>
+                
+                <input type="hidden" name="redirect" value="{{ request('redirect', url()->previous()) }}">
 
                 <div class="mb-3">
                     <label class="form-label">Ειδικότητα</label>
@@ -44,7 +46,7 @@
                     </select>
                 </div>
 
-                {{-- <div class="mb-3">
+                <div class="mb-3">
                     <label class="form-label">Τηλέφωνο</label>
                     <input
                         type="text"
@@ -53,7 +55,6 @@
                         value="{{ old('phone', $professional->phone) }}"
                     >
                 </div>
-
                 <div class="mb-3">
                     <label class="form-label">Φωτογραφία Προφίλ</label>
 
@@ -71,7 +72,7 @@
                         Αν ανεβάσετε νέα εικόνα, θα αντικαταστήσει την παλιά.
                     </small>
                 </div>
---}}
+
 
                 <div class="mb-3">
                     <label class="form-label">Email</label>
