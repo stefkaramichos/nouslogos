@@ -1090,6 +1090,19 @@ class CustomerController extends Controller
         return back()->with('success', 'Η πληρωμή καταχωρήθηκε επιτυχώς.');
     }
 
+    public function toggleCompleted(Request $request, Customer $customer)
+    {
+        $data = $request->validate([
+            'completed' => 'required|in:0,1',
+        ]);
+
+        $customer->completed = (int)$data['completed'];
+        $customer->save();
+
+        return back()->with('success', 'Ενημερώθηκε η κατάσταση Completed.');
+    }
+
+
     /**
      * ✅ Διαγραφή πληρωμών grouped ανά ημέρα (paid_at)
      */

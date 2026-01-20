@@ -111,7 +111,7 @@
                 <table class="table table-striped mb-0 align-middle">
                     <thead>
                     <tr>
-                        <th>Γραφείο</th>
+                        <th class="text-center">✓</th>
                         <th>Ονοματεπώνυμο</th>
                         <th>Τηλέφωνο</th>
                         <th>Θεραπευτές</th>
@@ -125,10 +125,33 @@
                     @forelse($customers as $customer)
                         @php
                             $isActive = (int)($customer->is_active ?? 1) === 1;
+                             $isCompleted = (int)($customer->completed ?? 0) === 1;
                         @endphp
 
-                        <tr @if(!$isActive) class="text-muted" style="opacity:0.65;" @endif>
-                            <td>{{ $customer->company->name ?? '-' }}</td>
+                        <tr
+                            class="{{ !$isActive ? 'text-muted' : '' }} {{ $isCompleted ? 'completed-row' : '' }}"
+                            @if(!$isActive) style="opacity:0.65;" @endif
+                        >
+                                                    {{-- <td>{{ $customer->company->name ?? '-' }}</td> --}}
+
+                            <td class="text-center">
+                                <form method="POST" action="{{ route('customers.toggleCompleted', $customer) }}" class="d-inline">
+                                    @csrf
+
+                                    <div class="form-check m-0 d-inline-flex align-items-center justify-content-center">
+                                        <input class="form-check-input"
+                                            type="checkbox"
+                                            id="cust_completed_{{ $customer->id }}"
+                                            {{ $isCompleted ? 'checked' : '' }}
+                                            onchange="
+                                                this.form.querySelector('input[name=completed]').value = this.checked ? 1 : 0;
+                                                this.form.submit();
+                                            ">
+                                        <input type="hidden" name="completed" value="{{ $isCompleted ? 1 : 0 }}">
+                                    </div>
+                                </form>
+                            </td>
+
 
                             <td>
                                 <a href="{{ route('customers.show', $customer) }}"

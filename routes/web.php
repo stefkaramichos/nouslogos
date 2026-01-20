@@ -170,6 +170,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/inline-update', [CustomerController::class, 'inlineUpdate'])
     ->name('inline.update');
 
+    Route::post('/customers/{customer}/toggle-completed', [CustomerController::class, 'toggleCompleted'])
+    ->name('customers.toggleCompleted');
+
+
 });
 
 Route::get('/hash-password', [\App\Http\Controllers\HashController::class, 'hashPassword']);

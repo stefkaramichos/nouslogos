@@ -59,6 +59,10 @@
             overflow: auto;
         }
 
+        tr.completed-row td {
+            background-color: rgb(0 0 0 / 20%) !important;
+        }
+
         /* =========================
            2 MODES SIDEBAR (NORMAL / COLLAPSED)
            ========================= */
