@@ -17,6 +17,17 @@
         }
     @endphp
 
+    <style>
+            tr.row-flash > td {
+                animation: flashRow 2.5s ease-in-out;
+            }
+
+            @keyframes flashRow {
+                0%   { background-color: rgba(255, 230, 150, 0.95); }
+                100% { background-color: transparent; }
+            }
+    </style>
+
     <div class="card">
         <div class="card-header">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -130,7 +141,7 @@
 
                         <tr
                             class="{{ !$isActive ? 'text-muted' : '' }} {{ $isCompleted ? 'completed-row' : '' }}"
-                            @if(!$isActive) style="opacity:0.65;" @endif
+                            @if(!$isActive) style="opacity:0.65;" @endif id="customer_row_{{ $customer->id }}"
                         >
                                                     {{-- <td>{{ $customer->company->name ?? '-' }}</td> --}}
 
@@ -212,21 +223,27 @@
                                     </div>
                                 </form>
                             </td>
+                            @php
+                                $baseRedirect = request()->fullUrl();
+                                $sep = str_contains($baseRedirect, '?') ? '&' : '?';
+                                $redirectWithFlash = $baseRedirect . $sep . 'flash_row=customer_row_' . $customer->id;
+                            @endphp
 
                             <td class="text-end">
-                                {{-- Add Appointment --}}
-                                <a href="{{ route('appointments.create', ['customer_id' => $customer->id, 'redirect' => request()->fullUrl()]) }}"
-                                   class="btn btn-sm btn-success text-white"
-                                   title="Προσθήκη Ραντεβού">
-                                    +
-                                </a>
+                                                            {{-- Add Appointment --}}
+                                <a href="{{ route('appointments.create', [
+                                    'customer_id' => $customer->id,
+                                    'redirect' => $redirectWithFlash,
+                                ]) }}" class="btn btn-sm btn-success text-white">+</a>
 
-                                {{-- Edit --}}
-                                <a href="{{ route('customers.edit', ['customer' => $customer, 'redirect' => request()->fullUrl()]) }}"
-                                   class="btn btn-sm btn-secondary"
-                                   title="Επεξεργασία περιστατικού">
+                                <a href="{{ route('customers.edit', [
+                                    'customer' => $customer,
+                                    'redirect' => $redirectWithFlash,
+                                ]) }}" class="btn btn-sm btn-secondary">
                                     <i class="bi bi-pencil-square"></i>
                                 </a>
+
+
 
                                 {{-- Delete (kept disabled like before) --}}
                                 {{--
@@ -264,3 +281,23 @@
         --}}
     </div>
 @endsection
+@push('scripts')
+<script>
+window.addEventListener("load", function () {
+    const url = new URL(window.location.href);
+    const rowId = url.searchParams.get("flash_row");
+    if (!rowId) return;
+
+    const row = document.getElementById(rowId);
+    if (!row) return;
+
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.add("row-flash");
+
+    setTimeout(() => row.classList.remove("row-flash"), 2500);
+
+    url.searchParams.delete("flash_row");
+    window.history.replaceState({}, document.title, url.toString());
+});
+</script>
+@endpush
