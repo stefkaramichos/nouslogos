@@ -204,7 +204,57 @@
                 </div>
             </div>
 
-           
+           {{-- ✅ Logs Διόρθωσης (customer_tax_fix_logs) --}}
+            @php
+                $logs = $taxFixLogs ?? collect();
+            @endphp
+
+            @if($logs->count() > 0)
+                <div class="border rounded col-6 p-2 mt-2"
+                    style="max-height: 140px; overflow-y:auto; font-size:0.8rem; background:#f8f9fa;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <strong>Διορθώσεις</strong>
+                        <span class="badge bg-dark">{{ $logs->count() }}</span>
+                    </div>
+
+                    @foreach($logs as $log)
+                        @php
+                            $dateLabel = $log->run_at
+                                ? \Carbon\Carbon::parse($log->run_at)->format('d/m/Y')
+                                : '-';
+
+                            // ποσό που μας ενδιαφέρει: fix_amount (π.χ. 15€)
+                            $amount = (float)($log->fix_amount ?? 0);
+
+                            $comment = $log->comment ?? null;
+                        @endphp
+
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ $dateLabel }}</strong>
+                                    <span class="badge bg-primary ms-1">
+                                        {{ number_format($amount, 2, ',', '.') }} €
+                                    </span>
+                                </div>
+                            </div>
+
+                            @if($comment)
+                                <div class="text-muted" style="font-size:0.75rem;">
+                                    {{ $comment }}
+                                </div>
+                            @else
+                                <div class="text-muted" style="font-size:0.75rem;">
+                                    -
+                                </div>
+                            @endif
+                        </div>
+
+                        <hr class="my-1">
+                    @endforeach
+                </div>
+            @endif
+
 
             <div class="d-flex justify-content-end mt-3">
                 <a href="{{ route('customers.edit', ['customer' => $customer, 'redirect' => url()->full()]) }}"
@@ -563,23 +613,59 @@
                 <h6 class="mb-2">🧾 Διόρθωση παλαιότερων πληρωμών (Μετρητά Χωρίς Απόδειξη ➜ Με Απόδειξη)</h6>
 
                 <form method="POST" action="{{ route('customers.payments.taxFixOldest', $customer) }}"
-                        onsubmit="return confirm('Σίγουρα; Θα αλλάξουν οι X παλαιότερες πληρωμές cash χωρίς απόδειξη σε 35€ με απόδειξη.');">
-                    @csrf
-                    <div class="row g-2 align-items-end">
-                    <div class="col-md-3">
+                    onsubmit="return confirm('Σίγουρα; Θα γίνει διόρθωση και θα προστεθούν νέα payments των 5€ ανά εγγραφή.');">
+                @csrf
 
-                        <input type="number" name="fix_amount" min="5" step="5" class="form-control" placeholder="π.χ. 5,10,15..." required>
-                       
-                        @error('fix_amount')
+                <div class="row g-2 mt-3 align-items-end">
+
+                    <div class="col-md-2">
+                    <label class="form-label">Ποσό</label>
+                    <input type="number" name="fix_amount" min="5" step="5" class="form-control"
+                            placeholder="π.χ. 5,10,15..." required>
+                    @error('fix_amount')
                         <div class="text-danger small mt-1">{{ $message }}</div>
-                        @enderror
+                    @enderror
                     </div>
 
-                    <div class="col-md-3">
-                        <button class="btn btn-warning w-100" type="submit">Εκτέλεση Διόρθωσης</button>
+                    {{-- ✅ run_at date only --}}
+                    <div class="col-md-2">
+                    <label class="form-label">Ημερομηνία Εκτέλεσης</label>
+                    <input type="date" name="run_at" class="form-control" required
+                            value="{{ now()->toDateString() }}">
+                    @error('run_at')
+                        <div class="text-danger small mt-1">{{ $message }}</div>
+                    @enderror
                     </div>
+
+                    {{-- ✅ method --}}
+                    <div class="col-md-2">
+                    <label class="form-label">Τρόπος</label>
+                    <select name="method" class="form-select" required>
+                        <option value="cash">Μετρητά</option>
+                        <option value="card">Κάρτα</option>
+                    </select>
+                    @error('method')
+                        <div class="text-danger small mt-1">{{ $message }}</div>
+                    @enderror
                     </div>
+
+                    <div class="col-md-4">
+                    <label class="form-label">Σχόλιο</label>
+                    <input type="text" name="comment" class="form-control" maxlength="1000"
+                            placeholder="προαιρετικό σχόλιο...">
+                    @error('comment')
+                        <div class="text-danger small mt-1">{{ $message }}</div>
+                    @enderror
+                    </div>
+
+                    <div class="col-md-2">
+                    <button class="btn btn-warning w-100" type="submit">Εκτέλεση Διόρθωσης</button>
+                    </div>
+
+                </div>
                 </form>
+
+
             </div>
         </div>
     </div>

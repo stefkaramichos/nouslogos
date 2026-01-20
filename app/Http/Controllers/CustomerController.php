@@ -297,6 +297,13 @@ class CustomerController extends Controller
             'files.uploader',
         ]);
 
+        $taxFixLogs = DB::table('customer_tax_fix_logs')
+            ->where('customer_id', $customer->id)
+            ->orderByDesc('run_at')
+            ->orderByDesc('id')
+            ->get();
+
+
         /**
          * 🔹 Ιστορικό πληρωμών (ομαδοποίηση ανά paid_at)
          * (μένει όπως ήταν: αφορά ΟΛΕΣ τις πληρωμές του πελάτη)
@@ -520,6 +527,7 @@ class CustomerController extends Controller
             // ✅ NEW for filter dropdown
             'appointmentProfessionals',
             'prepayment',
+            'taxFixLogs',
         ));
     }
 
@@ -1088,34 +1096,70 @@ class CustomerController extends Controller
     public function destroyPaymentsByDay(Request $request, Customer $customer)
     {
         $data = $request->validate([
-            'day_key' => 'required|string',
+            'day_key' => 'required|string', // "Y-m-d" ή "no-date"
         ]);
 
         $dayKey = $data['day_key'];
 
-        // χωρίς ημερομηνία
+        // 1) Query των payments που θα σβηστούν
+        $paymentsQuery = Payment::where('customer_id', $customer->id);
+
         if ($dayKey === 'no-date') {
-            $deleted = Payment::where('customer_id', $customer->id)
-                ->whereNull('paid_at')
-                ->delete();
+            $paymentsQuery->whereNull('paid_at');
+        } else {
+            try {
+                $start = Carbon::createFromFormat('Y-m-d', $dayKey)->startOfDay();
+                $end   = Carbon::createFromFormat('Y-m-d', $dayKey)->endOfDay();
+            } catch (\Exception $e) {
+                return back()->with('error', 'Μη έγκυρη ημερομηνία.');
+            }
 
-            return back()->with('success', "Διαγράφηκαν {$deleted} πληρωμές (χωρίς ημερομηνία).");
+            $paymentsQuery->whereBetween('paid_at', [$start, $end]);
         }
 
-        // Y-m-d
-        try {
-            $start = Carbon::createFromFormat('Y-m-d', $dayKey)->startOfDay();
-            $end   = Carbon::createFromFormat('Y-m-d', $dayKey)->endOfDay();
-        } catch (\Exception $e) {
-            return back()->with('error', 'Μη έγκυρη ημερομηνία.');
+        $deleted = 0;
+        $logsDeleted = 0;
+
+        DB::transaction(function () use ($customer, $paymentsQuery, &$deleted, &$logsDeleted) {
+
+            // 2) IDs payments που θα διαγραφούν
+            $idsToDelete = (clone $paymentsQuery)->pluck('id')->all();
+
+            // 3) Διαγραφή logs που έχουν μέσα payment_ids κάποιο από αυτά
+            if (!empty($idsToDelete)) {
+                $logQuery = DB::table('customer_tax_fix_logs')
+                    ->where('customer_id', $customer->id)
+                    ->where(function ($q) use ($idsToDelete) {
+                        foreach ($idsToDelete as $pid) {
+                            // ✅ MariaDB-safe: 2nd arg πρέπει να είναι valid JSON text (π.χ. "287" ή 287)
+                            $q->orWhereRaw(
+                                "JSON_CONTAINS(payment_ids, ?, '$')",
+                                [json_encode((int)$pid)]
+                            );
+                        }
+                    });
+
+                $logsDeleted = $logQuery->delete();
+            }
+
+            // 4) Διαγραφή payments
+            $deleted = (clone $paymentsQuery)->delete();
+        });
+
+        if ($dayKey === 'no-date') {
+            return back()->with(
+                'success',
+                "Διαγράφηκαν {$deleted} πληρωμές (χωρίς ημερομηνία) και {$logsDeleted} logs."
+            );
         }
 
-        $deleted = Payment::where('customer_id', $customer->id)
-            ->whereBetween('paid_at', [$start, $end])
-            ->delete();
-
-        return back()->with('success', "Διαγράφηκαν {$deleted} πληρωμές για {$dayKey}.");
+        return back()->with(
+            'success',
+            "Διαγράφηκαν {$deleted} πληρωμές για {$dayKey} και {$logsDeleted} logs."
+        );
     }
+
+
 
     /**
      * ✅ Delete appointments (soft delete) selected
@@ -1167,29 +1211,37 @@ class CustomerController extends Controller
             'fix_amount' => ['required','integer','min:5', function ($attr, $value, $fail) {
                 if ($value % 5 !== 0) $fail('Το ποσό πρέπει να είναι πολλαπλάσιο του 5 (5,10,15...).');
             }],
+            'run_at'  => 'required|date',         // ✅ date only
+            'method'  => 'required|in:cash,card', // ✅ user choice
+            'comment' => 'nullable|string|max:1000',
         ]);
 
-        $x = (int) ($data['fix_amount'] / 5);
-        if ($x <= 0) {
-            return back()->with('error', 'Μη έγκυρη τιμή.');
-        }
+        $fixAmount = (int)$data['fix_amount'];
+        $x = (int)($fixAmount / 5);
+        if ($x <= 0) return back()->with('error', 'Μη έγκυρη τιμή.');
 
-        // 🔎 Πρώτος έλεγχος: υπάρχει ΤΟΥΛΑΧΙΣΤΟΝ 1 payment που να πληροί τα criteria;
-        $baseQuery = \App\Models\Payment::where('customer_id', $customer->id)
+        $baseQuery = Payment::where('customer_id', $customer->id)
             ->where('method', 'cash')
             ->where('tax', 'N');
 
-        if (! $baseQuery->exists()) {
-            return back()->with('error', 'Δεν βρέθηκε κανένα ραντεβού με πληρωμή μετρητών χωρίς απόδειξη.');
+        if (!$baseQuery->exists()) {
+            return back()->with('error', 'Δεν βρέθηκε κανένα payment cash χωρίς απόδειξη (tax=N).');
         }
 
+        // ✅ paid_at will be date at start of day (00:00:00)
+        $runAt  = Carbon::parse($data['run_at'])->startOfDay();
+        $method = $data['method'];
+
         $changedPayments = 0;
+        $createdAddons   = 0;
         $changedAppointments = 0;
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($customer, $x, &$changedPayments, &$changedAppointments) {
+        DB::transaction(function () use (
+            $customer, $x, $runAt, $method, $data,
+            &$changedPayments, &$createdAddons, &$changedAppointments
+        ) {
 
-            // X πιο παλιές πληρωμές
-            $payments = \App\Models\Payment::where('customer_id', $customer->id)
+            $payments = Payment::where('customer_id', $customer->id)
                 ->where('method', 'cash')
                 ->where('tax', 'N')
                 ->orderByRaw('paid_at IS NULL DESC')
@@ -1199,50 +1251,92 @@ class CustomerController extends Controller
                 ->lockForUpdate()
                 ->get();
 
-            if ($payments->isEmpty()) {
-                return;
-            }
+            if ($payments->isEmpty()) return;
 
             $paymentIds = $payments->pluck('id')->all();
-            $appointmentIds = $payments
-                ->pluck('appointment_id')
-                ->filter()                 // πετάμε NULL
+
+            $appointmentIds = $payments->pluck('appointment_id')
+                ->filter()
                 ->unique()
                 ->values()
                 ->all();
 
-            // 1) Update payments
-            $changedPayments = \App\Models\Payment::whereIn('id', $paymentIds)->update([
-                'amount' => 35.00,
-                'tax' => 'Y',
+            // ✅ 1) Mark old payments fixed (DON'T change amount)
+            $changedPayments = Payment::whereIn('id', $paymentIds)->update([
+                'tax'          => 'Y',
                 'is_tax_fixed' => 1,
-                'tax_fixed_at' => now(),
-                'updated_at' => now(),
+                'tax_fixed_at' => $runAt,
+                'updated_at'   => now(),
             ]);
 
-            // 2) Update appointments ΜΟΝΟ αν υπάρχουν
+            // ✅ 2) Create NEW payment 5€ for each old payment (method chosen by user)
+            foreach ($payments as $p) {
+                if (!$p->appointment_id) continue;
+
+                Payment::create([
+                    'appointment_id' => $p->appointment_id,
+                    'customer_id'    => $customer->id,
+                    'amount'         => 5.00,
+                    'is_full'        => 0,
+                    'paid_at'        => $runAt,
+                    'method'         => $method,
+                    'tax'            => 'Y',
+                    'bank'           => null, // ✅ no bank
+                    'notes'          => '[TAX_FIX_ADDON] +5€ για διόρθωση παλαιού cash χωρίς απόδειξη.'
+                                    . (!empty($data['comment']) ? ' ' . $data['comment'] : ''),
+                    'created_by'     => Auth::id(),
+                ]);
+
+                $createdAddons++;
+            }
+
+            // ✅ 3) Increase total_price by +5 (not set)
             if (!empty($appointmentIds)) {
-                $changedAppointments = \App\Models\Appointment::whereIn('id', $appointmentIds)->update([
-                    'total_price' => 35.00,
-                    'updated_at' => now(),
+                $changedAppointments = Appointment::whereIn('id', $appointmentIds)->update([
+                    'total_price' => DB::raw('COALESCE(total_price,0) + 5.00'),
+                    'updated_at'  => now(),
                 ]);
             }
+
+            // ✅ 4) recalc is_full
+            $this->recalcIsFullForAppointments($appointmentIds);
+
+            // ✅ 5) log
+            DB::table('customer_tax_fix_logs')->insert([
+                'customer_id' => $customer->id,
+                'created_by'  => Auth::id(),
+
+                'fix_amount'  => $x * 5,
+                'x_payments'  => $x,
+
+                'old_amount'  => 0.00,
+                'new_amount'  => 5.00,
+
+                'changed_payments'     => (int)$changedPayments,
+                'changed_appointments' => (int)$changedAppointments,
+
+                'run_at'  => $runAt,                 // ✅ date only
+                'comment' => $data['comment'] ?? null,
+
+                'payment_ids'     => json_encode($paymentIds, JSON_UNESCAPED_UNICODE),
+                'appointment_ids' => json_encode($appointmentIds, JSON_UNESCAPED_UNICODE),
+
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         });
 
-        // 🧾 Τελικά μηνύματα
         if ($changedPayments === 0) {
             return back()->with('error', 'Δεν βρέθηκαν πληρωμές για διόρθωση.');
         }
 
-        if ($changedAppointments === 0) {
-            return back()->with('warning', 'Οι πληρωμές διορθώθηκαν, αλλά δεν βρέθηκε κανένα συνδεδεμένο ραντεβού για ενημέρωση ποσού.');
-        }
-
         return back()->with(
             'success',
-            "Ολοκληρώθηκε: διορθώθηκαν {$changedPayments} πληρωμές και ενημερώθηκαν {$changedAppointments} ραντεβού (ποσό 35€)."
+            "Ολοκληρώθηκε: διορθώθηκαν {$changedPayments} παλιές πληρωμές και δημιουργήθηκαν {$createdAddons} νέα payments των 5€."
         );
     }
+
+
 
 
 
