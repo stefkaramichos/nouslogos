@@ -54,9 +54,7 @@
                             data-id="{{ $customer->id }}"
                             data-field="informations"
                             data-type="textarea"
-                            style="white-space: pre-wrap; display:inline-block; width:100%;">
-                            {{ $customer->informations ?? '-' }}
-                        </span>
+                            style="white-space: pre-wrap; display:inline-block; width:100%;">{{ $customer->informations ?? '-' }}</span>
                     </p>
                 </div>
 
@@ -210,7 +208,7 @@
             @endphp
 
             @if($logs->count() > 0)
-                <div class="border rounded col-6 p-2 mt-2"
+                <div class="border rounded col-md-4 p-2 mt-5"
                     style="max-height: 140px; overflow-y:auto; font-size:0.8rem; background:#f8f9fa;">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <strong>Διορθώσεις</strong>
@@ -451,10 +449,12 @@
 
                             {{-- Πληρωμή (ΣΩΣΤΟ για split) --}}
                            {{-- Πληρωμή (με κανόνα: total_price <= 0 => ΠΛΗΡΩΜΕΝΟ) --}}
-                            <td>
-                                @php
-                                    $isZeroPrice = $total <= 0; // $total ήδη είναι (float)($appointment->total_price ?? 0)
-                                @endphp
+                            <td class="appointment-paid-edit"
+                                data-appointment-id="{{ $appointment->id }}"
+                                data-original="{{ number_format($paidTotal, 2, ',', '.') }}"
+                                style="cursor:pointer;">
+                                {{-- το υπάρχον σου UI (badges/labels) ΜΕΣΑ εδώ όπως είναι --}}
+                                @php $isZeroPrice = $total <= 0; @endphp
 
                                 @if($isZeroPrice)
                                     <span class="badge bg-success">Πλήρως πληρωμένο</span>
@@ -481,6 +481,7 @@
                                     @endif
                                 @endif
                             </td>
+
 
 
                             <td style="white-space: pre-wrap;">
@@ -1192,6 +1193,89 @@ document.addEventListener('DOMContentLoaded', function () {
 
         input.addEventListener('blur', save);
 
+        input.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+            if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
+        });
+    });
+});
+</script>
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (!csrfToken) return;
+
+    let activeInput = null;
+
+    document.addEventListener('dblclick', function (e) {
+        const cell = e.target.closest('.appointment-paid-edit');
+        if (!cell) return;
+        if (activeInput) return;
+
+        e.preventDefault();
+
+        const appointmentId = cell.dataset.appointmentId;
+        const originalHTML  = cell.innerHTML;
+
+        // πάρε paidTotal από data-original (ή κάνε parse από το DOM αν θες)
+        const raw = (cell.dataset.original || '0')
+            .replace(/[^\d,.-]/g,'')
+            .replace('.', '')
+            .replace(',', '.');
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.step = '0.01';
+        input.min = '0';
+        input.className = 'form-control form-control-sm';
+        input.style.width = '120px';
+        input.value = raw ? parseFloat(raw) : 0;
+
+        cell.innerHTML = '';
+        cell.appendChild(input);
+        input.focus();
+        activeInput = input;
+
+        const restore = () => {
+            cell.innerHTML = originalHTML;
+            activeInput = null;
+        };
+
+        const save = () => {
+            const newVal = input.value.trim();
+            if (newVal === '') return restore();
+
+            cell.innerHTML = '<span class="text-muted">Αποθήκευση…</span>';
+
+            fetch(`{{ url('/appointments') }}/${appointmentId}/update-paid-total`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ paid_total: newVal })
+            })
+            .then(async res => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) throw data;
+                return data;
+            })
+            .then(() => {
+                // πιο απλό/σίγουρο: reload για να ανανεωθούν badges + cash/card breakdown
+                window.location.reload();
+            })
+            .catch(err => {
+                console.error(err);
+                alert(err?.message || 'Σφάλμα αποθήκευσης.');
+                restore();
+            });
+        };
+
+        input.addEventListener('blur', save);
         input.addEventListener('keydown', function (ev) {
             if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
             if (ev.key === 'Escape') { ev.preventDefault(); restore(); }

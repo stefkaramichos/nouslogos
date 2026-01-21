@@ -723,6 +723,111 @@ class AppointmentController extends Controller
         });
     }
 
+    public function updatePaidTotal(Request $request, Appointment $appointment)
+    {
+        $data = $request->validate([
+            'paid_total' => 'required|numeric|min:0',
+        ]);
+
+        $newTotal = (float)$data['paid_total'];
+
+        $totalPrice = (float)($appointment->total_price ?? 0);
+
+        if ($newTotal > $totalPrice + 0.0001) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Το ποσό πληρωμής δεν μπορεί να είναι μεγαλύτερο από το ποσό του ραντεβού.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($appointment, $newTotal, &$result) {
+            $appointment->load('payments');
+
+            // lock payments του appointment
+            $payments = Payment::where('appointment_id', $appointment->id)
+                ->orderByDesc('paid_at')
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->get();
+
+            $currentTotal = (float)$payments->sum('amount');
+            $delta = $newTotal - $currentTotal;
+
+            // ίδιο ποσό
+            if (abs($delta) < 0.0001) {
+                $result = ['success' => true, 'paid_total' => $currentTotal];
+                return;
+            }
+
+            // defaults από τελευταία πληρωμή
+            $last = $payments->first();
+            $defaultMethod = $last?->method ?? 'cash';
+            $defaultTax    = $last?->tax ?? 'Y';
+            $defaultBank   = $last?->bank ?? null;
+
+            // A) ΜΕΙΩΣΗ -> κόψε από τις πιο πρόσφατες πληρωμές
+            if ($delta < 0) {
+                $toRemove = abs($delta);
+
+                foreach ($payments as $p) {
+                    if ($toRemove <= 0) break;
+
+                    $amt = (float)$p->amount;
+
+                    if ($amt <= $toRemove + 0.0001) {
+                        $toRemove -= $amt;
+                        $p->delete();
+                    } else {
+                        $p->amount = $amt - $toRemove;
+                        $p->save();
+                        $toRemove = 0;
+                    }
+                }
+            }
+            // B) ΑΥΞΗΣΗ -> φτιάξε νέα πληρωμή με τη διαφορά
+            else {
+                Payment::create([
+                    'appointment_id' => $appointment->id,
+                    'customer_id'    => $appointment->customer_id,
+                    'amount'         => $delta,
+                    'is_full'        => 0,
+                    'paid_at'        => now(),
+                    'method'         => $defaultMethod,
+                    'tax'            => $defaultTax,
+                    'bank'           => $defaultBank,
+                    'notes'          => '[INLINE_EDIT] Update paid total from appointments table.',
+                    'created_by'     => Auth::id(),
+                ]);
+            }
+
+            // recalc is_full για το appointment
+            $appointment->load('payments');
+            $total = (float)($appointment->total_price ?? 0);
+            $paid  = (float)$appointment->payments->sum('amount');
+
+            Payment::where('appointment_id', $appointment->id)->update(['is_full' => 0]);
+
+            if ($total > 0 && $paid >= $total) {
+                $lastPay = Payment::where('appointment_id', $appointment->id)
+                    ->orderByDesc('paid_at')
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($lastPay) {
+                    $lastPay->is_full = 1;
+                    $lastPay->save();
+                }
+            }
+
+            $result = ['success' => true, 'paid_total' => $paid];
+        });
+
+        return response()->json([
+            'success' => true,
+            'paid_total' => $result['paid_total'] ?? 0,
+            'formatted' => number_format((float)($result['paid_total'] ?? 0), 2, ',', '.') . ' €',
+        ]);
+    }
 
     public function destroy(Request $request, Appointment $appointment)
     {
