@@ -44,4 +44,10 @@ class Customer extends Model
             ->withTimestamps();
     }
 
+    public function receipts()
+    {
+        return $this->hasMany(\App\Models\CustomerReceipt::class);
+    }
+
+
 }

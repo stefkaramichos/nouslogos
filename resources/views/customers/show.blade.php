@@ -201,57 +201,330 @@
                     </div>
                 </div>
             </div>
+            <hr>
 
-           {{-- ✅ Logs Διόρθωσης (customer_tax_fix_logs) --}}
-            @php
-                $logs = $taxFixLogs ?? collect();
-            @endphp
+            <div class="row mt-2 mb-3">
+                {{-- ✅ Logs Διόρθωσης (customer_tax_fix_logs) --}}
+                @php
+                    $logs = $taxFixLogs ?? collect();
+                @endphp
 
-            @if($logs->count() > 0)
-                <div class="border rounded col-md-4 p-2 mt-5"
-                    style="max-height: 140px; overflow-y:auto; font-size:0.8rem; background:#f8f9fa;">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <strong>Διορθώσεις</strong>
-                        <span class="badge bg-dark">{{ $logs->count() }}</span>
-                    </div>
-
-                    @foreach($logs as $log)
-                        @php
-                            $dateLabel = $log->run_at
-                                ? \Carbon\Carbon::parse($log->run_at)->format('d/m/Y')
-                                : '-';
-
-                            // ποσό που μας ενδιαφέρει: fix_amount (π.χ. 15€)
-                            $amount = (float)($log->fix_amount ?? 0);
-
-                            $comment = $log->comment ?? null;
-                        @endphp
-
-                        <div class="mb-2">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong>{{ $dateLabel }}</strong>
-                                    <span class="badge bg-primary ms-1">
-                                        {{ number_format($amount, 2, ',', '.') }} €
-                                    </span>
-                                </div>
-                            </div>
-
-                            @if($comment)
-                                <div class="text-muted" style="font-size:0.75rem;">
-                                    {{ $comment }}
-                                </div>
-                            @else
-                                <div class="text-muted" style="font-size:0.75rem;">
-                                    -
-                                </div>
-                            @endif
+                @if($logs->count() > 0)
+                    <div class="border rounded col-md-4 p-2"
+                        style="max-height: 140px; overflow-y:auto; font-size:0.8rem; background:#f8f9fa;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <strong>Διορθώσεις</strong>
+                            <span class="badge bg-dark">{{ $logs->count() }}</span>
                         </div>
 
-                        <hr class="my-1">
-                    @endforeach
+                        @foreach($logs as $log)
+                            @php
+                                $dateLabel = $log->run_at
+                                    ? \Carbon\Carbon::parse($log->run_at)->format('d/m/Y')
+                                    : '-';
+
+                                // ποσό που μας ενδιαφέρει: fix_amount (π.χ. 15€)
+                                $amount = (float)($log->fix_amount ?? 0);
+
+                                $comment = $log->comment ?? null;
+                            @endphp
+
+                            <div class="mb-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ $dateLabel }}</strong>
+                                        <span class="badge bg-primary ms-1">
+                                            {{ number_format($amount, 2, ',', '.') }} €
+                                        </span>
+                                    </div>
+                                </div>
+
+                                @if($comment)
+                                    <div class="text-muted" style="font-size:0.75rem;">
+                                        {{ $comment }}
+                                    </div>
+                                @else
+                                    <div class="text-muted" style="font-size:0.75rem;">
+                                        -
+                                    </div>
+                                @endif
+                            </div>
+
+                            <hr class="my-1">
+                        @endforeach
+                    </div>
+                @endif
+
+                <div class="col-md-8">
+                    {{-- ===================== ΑΠΟΔΕΙΞΕΙΣ (ΝΕΟ BOX) ===================== --}}
+                    <div class="border rounded p-2" style="background:#f8f9fa;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong>Αποδείξεις</strong>
+
+                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#receiptCreateModal">
+                                + Νέα Απόδειξη
+                            </button>
+                        </div>
+
+                        <div class="table-responsive" style="max-height: 180px; overflow-y:auto; font-size:0.85rem;">
+                            <table class="table table-sm table-striped align-middle mb-0">
+                                <thead>
+                                <tr>
+                                    <th>Ποσό</th>
+                                    <th>Ημ/νία</th>
+                                    <th>Κόπηκε;</th>
+                                    <th>Σχόλιο</th>
+                                    <th class="text-end">Ενέργειες</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                @forelse(($receipts ?? collect()) as $r) 
+                                    <tr id="receipt_row_{{ $r->id }}">
+                                        <td class="receipt-inline-edit"
+                                            data-id="{{ $r->id }}"
+                                            data-field="amount"
+                                            data-type="number"
+                                            data-original="{{ number_format((float)$r->amount, 2, ',', '.') }}"
+                                            style="cursor:pointer; white-space:nowrap;">
+                                            <span class="badge bg-primary">
+                                                {{ number_format((float)$r->amount, 2, ',', '.') }} €
+                                            </span>
+                                            <small class="text-muted ms-1">(dblclick)</small>
+                                        </td>
+
+                                        <td class="receipt-inline-edit"
+                                            data-id="{{ $r->id }}"
+                                            data-field="receipt_date"
+                                            data-type="date"
+                                            data-original="{{ $r->receipt_date ? \Carbon\Carbon::parse($r->receipt_date)->format('Y-m-d') : '' }}"
+                                            style="cursor:pointer; white-space:nowrap;">
+                                            {{ $r->receipt_date ? \Carbon\Carbon::parse($r->receipt_date)->format('d/m/Y') : '-' }}
+                                            <small class="text-muted ms-1">(dblclick)</small>
+                                        </td>
+
+                                        <td class="receipt-inline-edit"
+                                            data-id="{{ $r->id }}"
+                                            data-field="is_issued"
+                                            data-type="bool"
+                                            data-original="{{ (int)($r->is_issued ?? 0) }}"
+                                            style="cursor:pointer; white-space:nowrap;">
+                                            @if((int)($r->is_issued ?? 0) === 1)
+                                                <span class="badge bg-success">ΝΑΙ</span>
+                                            @else
+                                                <span class="badge bg-secondary">ΟΧΙ</span>
+                                            @endif
+                                            <small class="text-muted ms-1">(dblclick)</small>
+                                        </td>
+
+                                        <td class="receipt-inline-edit"
+                                            data-id="{{ $r->id }}"
+                                            data-field="comment"
+                                            data-type="text"
+                                            data-original="{{ $r->comment ?? '' }}"
+                                            style="cursor:pointer; max-width:240px;">
+                                            {{ $r->comment ? \Illuminate\Support\Str::limit($r->comment, 40) : '-' }}
+                                            <small class="text-muted ms-1">(dblclick)</small>
+                                        </td>
+
+                                        <td class="text-end">
+                                            <form method="POST"
+                                                action="{{ route('customers.receipts.destroy', ['customer' => $customer->id, 'receipt' => $r->id]) }}"
+                                                class="d-inline"
+                                                onsubmit="return confirm('Σίγουρα διαγραφή απόδειξης;');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button class="btn btn-sm btn-outline-danger py-0 px-2">Διαγραφή</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-3">
+                                            Δεν υπάρχουν αποδείξεις.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {{-- ===================== /ΑΠΟΔΕΙΞΕΙΣ ===================== --}}
+
+                    {{-- ===================== MODAL CREATE ===================== --}}
+                    <div class="modal fade" id="receiptCreateModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <form class="modal-content"
+                            method="POST"
+                            action="{{ route('customers.receipts.store', $customer) }}">
+                        @csrf
+
+                        <div class="modal-header">
+                            <h5 class="modal-title">Νέα Απόδειξη</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+
+                        <div class="modal-body">
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <label class="form-label">Ποσό (€)</label>
+                                    <input type="number" step="0.01" min="0" name="amount" class="form-control" required>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label">Ημερομηνία</label>
+                                    <input type="date" name="receipt_date" class="form-control" value="{{ now()->toDateString() }}">
+                                </div>
+
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="1" id="is_issued_create" name="is_issued">
+                                        <label class="form-check-label" for="is_issued_create">
+                                            Έχει κοπεί
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Σχόλιο</label>
+                                    <input type="text" name="comment" maxlength="1000" class="form-control" placeholder="προαιρετικό...">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Άκυρο</button>
+                            <button type="submit" class="btn btn-success">Αποθήκευση</button>
+                        </div>
+                        </form>
+                    </div>
+                    </div>
+                    {{-- ===================== /MODAL CREATE ===================== --}}
+
+                    @push('scripts')
+                    <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                        if (!csrfToken) return;
+
+                        let activeInput = null;
+
+                        function toGreekDate(d) {
+                            if (!d) return '-';
+                            const m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                            if (!m) return d;
+                            return `${m[3]}/${m[2]}/${m[1]}`;
+                        }
+
+                        function startEdit(cell) {
+                            if (activeInput) return;
+
+                            const id    = cell.dataset.id;
+                            const field = cell.dataset.field;
+                            const type  = cell.dataset.type || 'text';
+                            const originalHTML = cell.innerHTML;
+                            const originalVal  = cell.dataset.original ?? '';
+
+                            let input;
+
+                            if (type === 'number') {
+                                input = document.createElement('input');
+                                input.type = 'number';
+                                input.step = '0.01';
+                                input.min  = '0';
+                                input.className = 'form-control form-control-sm';
+                                input.style.width = '110px';
+
+                                const raw = (originalVal || '0')
+                                    .replace(/[^\d,.-]/g,'')
+                                    .replace('.', '')
+                                    .replace(',', '.');
+                                input.value = raw ? parseFloat(raw) : 0;
+                            }
+                            else if (type === 'date') {
+                                input = document.createElement('input');
+                                input.type = 'date';
+                                input.className = 'form-control form-control-sm';
+                                input.style.width = '150px';
+                                input.value = originalVal || '';
+                            }
+                            else if (type === 'bool') {
+                                input = document.createElement('select');
+                                input.className = 'form-select form-select-sm';
+                                input.style.width = '90px';
+                                input.innerHTML = `
+                                    <option value="0">ΟΧΙ</option>
+                                    <option value="1">ΝΑΙ</option>
+                                `;
+                                input.value = String(parseInt(originalVal || '0', 10));
+                            }
+                            else {
+                                input = document.createElement('input');
+                                input.type = 'text';
+                                input.className = 'form-control form-control-sm';
+                                input.style.width = '220px';
+                                input.value = originalVal || '';
+                            }
+
+                            cell.innerHTML = '';
+                            cell.appendChild(input);
+                            input.focus();
+                            activeInput = input;
+
+                            const restore = () => {
+                                cell.innerHTML = originalHTML;
+                                activeInput = null;
+                            };
+
+                            const save = () => {
+                                const newVal = (input.value ?? '').toString();
+
+                                cell.innerHTML = '<span class="text-muted">Αποθήκευση…</span>';
+
+                                fetch(`{{ url('/customers/' . $customer->id) }}/receipts/${id}/inline-update`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRF-TOKEN': csrfToken,
+                                        'Accept': 'application/json',
+                                    },
+                                    body: JSON.stringify({ field: field, value: newVal })
+                                })
+                                .then(async res => {
+                                    const data = await res.json().catch(() => ({}));
+                                    if (!res.ok || !data.success) throw data;
+                                    return data;
+                                })
+                                .then((data) => {
+                                    // πιο safe: reload για να ξαναβγάλει σωστά badges/format/limit
+                                    window.location.reload();
+                                })
+                                .catch(err => {
+                                    console.error(err);
+                                    alert(err?.message || 'Σφάλμα αποθήκευσης.');
+                                    restore();
+                                });
+                            };
+
+                            input.addEventListener('blur', save);
+                            input.addEventListener('keydown', function (ev) {
+                                if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+                                if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
+                            });
+                        }
+
+                        document.addEventListener('dblclick', function (e) {
+                            const cell = e.target.closest('.receipt-inline-edit');
+                            if (!cell) return;
+                            e.preventDefault();
+                            startEdit(cell);
+                        });
+                    });
+                    </script>
+                    @endpush
+
                 </div>
-            @endif
+            </div>
+           
 
 
             <div class="d-flex justify-content-end mt-3">

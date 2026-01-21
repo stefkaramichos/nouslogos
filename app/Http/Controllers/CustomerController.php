@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use App\Models\CustomerPrepayment;
+use App\Models\CustomerReceipt;
 
 class CustomerController extends Controller
 {
@@ -295,7 +296,12 @@ class CustomerController extends Controller
             'appointments.payments',
             'appointments.creator',
             'files.uploader',
+            'receipts',
         ]);
+
+        $receipts = $customer->receipts()
+            ->orderByDesc('id')
+            ->get();
 
         $taxFixLogs = DB::table('customer_tax_fix_logs')
             ->where('customer_id', $customer->id)
@@ -528,6 +534,7 @@ class CustomerController extends Controller
             'appointmentProfessionals',
             'prepayment',
             'taxFixLogs',
+            'receipts',
         ));
     }
 

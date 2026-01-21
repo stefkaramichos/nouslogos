@@ -15,6 +15,7 @@ use App\Http\Controllers\AppointmentTrashController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\PriceItemController;
+use App\Http\Controllers\CustomerReceiptController;
 
 
 // 🔹 Login routes (χωρίς auth)
@@ -175,6 +176,17 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/appointments/{appointment}/update-paid-total', [AppointmentController::class, 'updatePaidTotal'])
     ->name('appointments.updatePaidTotal');
+
+
+    Route::post('/customers/{customer}/receipts', [CustomerReceiptController::class, 'store'])
+        ->name('customers.receipts.store');
+
+    Route::delete('/customers/{customer}/receipts/{receipt}', [CustomerReceiptController::class, 'destroy'])
+        ->name('customers.receipts.destroy');
+
+    Route::post('/customers/{customer}/receipts/{receipt}/inline-update', [CustomerReceiptController::class, 'inlineUpdate'])
+        ->name('customers.receipts.inlineUpdate');
+
 
 });
 
