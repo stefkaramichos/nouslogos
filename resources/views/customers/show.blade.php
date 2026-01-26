@@ -271,9 +271,9 @@
                                 <thead>
                                 <tr>
                                     <th>Ποσό</th>
-                                    <th>Ημ/νία</th>
-                                    <th>Κόπηκε;</th>
                                     <th>Σχόλιο</th>
+                                    <th>Κόπηκε;</th>
+                                    <th>Ημ/νία</th>
                                     <th class="text-end">Ενέργειες</th>
                                 </tr>
                                 </thead>
@@ -294,11 +294,11 @@
 
                                         <td class="receipt-inline-edit"
                                             data-id="{{ $r->id }}"
-                                            data-field="receipt_date"
-                                            data-type="date"
-                                            data-original="{{ $r->receipt_date ? \Carbon\Carbon::parse($r->receipt_date)->format('Y-m-d') : '' }}"
-                                            style="cursor:pointer; white-space:nowrap;">
-                                            {{ $r->receipt_date ? \Carbon\Carbon::parse($r->receipt_date)->format('d/m/Y') : '-' }}
+                                            data-field="comment"
+                                            data-type="text"
+                                            data-original="{{ $r->comment ?? '' }}"
+                                            style="cursor:pointer; max-width:240px;">
+                                            {{ $r->comment ? \Illuminate\Support\Str::limit($r->comment, 140) : '-' }}
                                             <small class="text-muted ms-1">(dblclick)</small>
                                         </td>
 
@@ -316,13 +316,14 @@
                                             <small class="text-muted ms-1">(dblclick)</small>
                                         </td>
 
+
                                         <td class="receipt-inline-edit"
                                             data-id="{{ $r->id }}"
-                                            data-field="comment"
-                                            data-type="text"
-                                            data-original="{{ $r->comment ?? '' }}"
-                                            style="cursor:pointer; max-width:240px;">
-                                            {{ $r->comment ? \Illuminate\Support\Str::limit($r->comment, 40) : '-' }}
+                                            data-field="receipt_date"
+                                            data-type="date"
+                                            data-original="{{ $r->receipt_date ? \Carbon\Carbon::parse($r->receipt_date)->format('Y-m-d') : '' }}"
+                                            style="cursor:pointer; white-space:nowrap;">
+                                            {{ $r->receipt_date ? \Carbon\Carbon::parse($r->receipt_date)->format('d/m/Y') : '-' }}
                                             <small class="text-muted ms-1">(dblclick)</small>
                                         </td>
 
@@ -370,11 +371,11 @@
                                     <input type="number" step="0.01" min="0" name="amount" class="form-control" required>
                                 </div>
 
-                                <div class="col-md-4">
-                                    <label class="form-label">Ημερομηνία</label>
-                                    <input type="date" name="receipt_date" class="form-control" value="{{ now()->toDateString() }}">
+                                <div class="col-8">
+                                    <label class="form-label">Σχόλιο</label>
+                                    <input type="text" name="comment" maxlength="1000" class="form-control" placeholder="προαιρετικό...">
                                 </div>
-
+                                
                                 <div class="col-md-4 d-flex align-items-end">
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" value="1" id="is_issued_create" name="is_issued">
@@ -383,10 +384,11 @@
                                         </label>
                                     </div>
                                 </div>
-
-                                <div class="col-12">
-                                    <label class="form-label">Σχόλιο</label>
-                                    <input type="text" name="comment" maxlength="1000" class="form-control" placeholder="προαιρετικό...">
+                                
+                                
+                                <div class="col-md-4">
+                                    <label class="form-label">Ημερομηνία</label>
+                                    <input type="date" name="receipt_date" class="form-control" value="{{ now()->toDateString() }}">
                                 </div>
                             </div>
                         </div>

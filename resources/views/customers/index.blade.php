@@ -246,7 +246,7 @@
 
 
                                 {{-- Delete (kept disabled like before) --}}
-                                {{--
+                                
                                 <form action="{{ route('customers.destroy', $customer) }}"
                                       method="POST"
                                       class="d-inline"
@@ -257,7 +257,7 @@
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
-                                --}}
+                               
                             </td>
                         </tr>
                     @empty
