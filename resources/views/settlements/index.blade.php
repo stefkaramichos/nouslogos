@@ -86,15 +86,46 @@
 
                 
                 {{-- Κρατάμε το κουτί "Προσωπικά ραντεβού" όπως είναι (αν θες το αφαιρούμε) --}}
-                <div class="col-md-3">
-                    <div class="border rounded p-3 h-100">
-                        <h6 class="text-muted mb-1">Προσωπικά ραντεβού</h6>
-                        <small class="text-muted d-block">Γιάννης #1:</small>
-                        <strong>{{ number_format($partner1Personal, 2, ',', '.') }} €</strong><br>
-                        <small class="text-muted d-block mt-2">Ελένη #2:</small>
-                        <strong>{{ number_format($partner2Personal, 2, ',', '.') }} €</strong>
+              <div class="col-md-3">
+                    <div class="border rounded p-3 h-100 d-flex flex-column">
+                        <h6 class="text-muted mb-1">Χρωστούμενα (Απλήρωτα ραντεβού)</h6>
+
+                        <strong class="mb-1">
+                            {{ number_format($unpaidTotal, 2, ',', '.') }} €
+                        </strong>
+
+                        <small class="text-muted mb-2">
+                            Πλήθος: <strong>{{ $unpaidAppointments->count() }}</strong>
+                        </small>
+
+                        {{-- Scrollable list --}}
+                        <div class="border rounded p-2 mt-2 flex-grow-1"
+                            style="overflow-y:auto; max-height:180px; font-size:0.9rem">
+
+                            @forelse($unpaidByCustomer as $row)
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <div>
+                                        <strong>{{ $row['name'] }}</strong><br>
+                                        <small class="text-muted">
+                                            {{ $row['count'] }} ραντεβού
+                                        </small>
+                                    </div>
+
+                                    <span class="badge bg-danger">
+                                        {{ number_format($row['total'], 2, ',', '.') }} €
+                                    </span>
+                                </div>
+                                <hr class="my-1">
+                            @empty
+                                <div class="text-muted text-center">
+                                    Δεν υπάρχουν απλήρωτα ραντεβού
+                                </div>
+                            @endforelse
+                        </div>
                     </div>
                 </div>
+
+
                 {{-- ΕΔΩ ΑΝΤΙ ΓΙΑ "Μετρητά χωρίς απόδειξη" -> ΕΚΚΑΘΑΡΙΣΕΙΣ --}}
                 <div class="col-md-3">
                     <div class="border rounded p-3 h-100">
@@ -261,6 +292,7 @@
                             </tr>
                             </thead>
                             <tbody>
+                                {{ $unpaidTotal }}
                             @forelse($payments as $pay)
                                 @php
                                     $appt = $pay->appointment;

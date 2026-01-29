@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Payment;
 use App\Models\Expense;
 use App\Models\Professional;
+use App\Models\Appointment; 
 use App\Models\Settlement;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
@@ -135,6 +136,38 @@ class SettlementController extends Controller
             'to_month'   => $toMonth,
         ];
 
+        
+        $unpaidAppointments = Appointment::with(['professional','customer'])
+            ->where('start_time', '>=', $rangeStart)
+            ->where('start_time', '<',  $rangeEndExclusive)
+            ->whereNull('deleted_at')
+            ->whereDoesntHave('payments')
+            ->where(function ($q) {
+                $q->whereNotNull('total_price')
+                ->where('total_price', '>', 0);
+            })
+            ->orderBy('start_time', 'desc')
+            ->get();
+
+        $unpaidTotal = (float) $unpaidAppointments->sum(fn($a) => (float)($a->total_price ?? 0));
+
+
+        $unpaidByCustomer = $unpaidAppointments
+            ->groupBy('customer_id')
+            ->map(function ($items) {
+                $customer = $items->first()->customer;
+
+                return [
+                    'name'  => $customer ? ($customer->last_name.' '.$customer->first_name) : 'Άγνωστος',
+                    'count' => $items->count(),
+                    'total' => $items->sum(fn ($a) => (float) ($a->total_price ?? 0)),
+                ];
+            })
+            ->filter(fn ($row) => $row['total'] > 0)   // extra safety
+            ->sortByDesc('total')
+            ->values();
+
+
         return view('settlements.index', compact(
             'filters',
             'totalAmount',
@@ -161,7 +194,10 @@ class SettlementController extends Controller
             'settlements',
             'savedTotals',
             'liveTotals',
-            'isSettled'
+            'isSettled',
+            'unpaidTotal',
+            'unpaidAppointments',
+            'unpaidByCustomer',
         ));
     }
 
