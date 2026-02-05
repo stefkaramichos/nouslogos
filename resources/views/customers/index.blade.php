@@ -30,12 +30,21 @@
 
     <div class="card">
         <div class="card-header">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <span>Λίστα Περιστατικών</span>
-
-                <a href="{{ route('customers.create') }}" class="btn btn-primary btn-sm">
-                    + Προσθήκη Περιστατικού
-                </a>
+            <div class="d-flex  align-items-center flex-wrap row">
+                <div class="col-md-8">
+                    <span>Λίστα Περιστατικών</span>
+                </div>
+            
+                <div class="d-flex justify-content-end gap-2 col-md-4">
+                    <a href="{{ route('customers.print', request()->query()) }}"
+                        target="_blank"
+                        class="btn btn-outline-secondary btn-sm">
+                            🖨 Εκτύπωση Λίστας
+                    </a>
+                    <a href="{{ route('customers.create') }}" class="btn btn-primary btn-sm">
+                        + Προσθήκη Περιστατικού
+                    </a>
+                </div>
             </div>
 
             {{-- Search bar --}}
@@ -91,6 +100,14 @@
                 <a href="{{ route('customers.index', [
                         'search' => request('search'),
                         'company_id' => $selectedCompany,
+                        'active' => 'all',
+                    ]) }}"
+                   class="btn btn-sm {{ (string)$activeFilter === 'all' ? 'btn-primary' : 'btn-outline-primary' }}">
+                    ΟΛΑ
+                </a>
+                <a href="{{ route('customers.index', [
+                        'search' => request('search'),
+                        'company_id' => $selectedCompany,
                         'active' => '1',
                     ]) }}"
                    class="btn btn-sm {{ (string)$activeFilter === '1' ? 'btn-primary' : 'btn-outline-primary' }}">
@@ -106,14 +123,6 @@
                     ΑΝΕΝΕΡΓΟΙ
                 </a>
 
-                {{-- <a href="{{ route('customers.index', [
-                        'search' => request('search'),
-                        'company_id' => $selectedCompany,
-                        'active' => 'all',
-                    ]) }}"
-                   class="btn btn-sm {{ (string)$activeFilter === 'all' ? 'btn-primary' : 'btn-outline-primary' }}">
-                    ΟΛΑ
-                </a> --}}
             </div>
         </div>
 
@@ -125,8 +134,9 @@
                         <th class="text-center">✓</th>
                         <th>Ονοματεπώνυμο</th>
                         <th>Τηλέφωνο</th>
-                        <th>Θεραπευτές</th>
+                        {{-- <th>Θεραπευτές</th> --}}
                         <th>Πληροφορίες</th>
+                        <th>Αποδείξεις (ΟΧΙ ΚΟΜΜΕΝΕΣ)</th>
                         <th class="text-center">Κατάσταση</th>
                         <th class="text-end">Ενέργειες</th>
                     </tr>
@@ -175,7 +185,7 @@
                             </td>
 
                             <td>{{ $customer->phone ?? '-' }}</td>
-
+{{-- 
                             <td>
                                 @php $pros = $customer->professionals ?? collect(); @endphp
 
@@ -184,17 +194,50 @@
                                 @else
                                     {{ $pros->map(fn($p) => trim(($p->last_name ?? '').' '.($p->first_name ?? '')))->implode(', ') }}
                                 @endif
-                            </td>
+                            </td> --}}
 
                             <td>
                                 @if($customer->informations)
                                     <span title="{{ $customer->informations }}" style="cursor: help;">
-                                        {{ Str::limit($customer->informations, 30) }}
+                                        {{ Str::limit($customer->informations, 100) }}
                                     </span>
                                 @else
                                     <span class="text-muted">-</span>
                                 @endif
                             </td>
+
+                            <td>
+                                    @php
+                                        $unissued = $customer->receipts ?? collect(); // ήδη φορτωμένες ΜΟΝΟ is_issued=0
+                                        $unissuedCount = $unissued->count();
+                                        $unissuedSum = (float)$unissued->sum('amount');
+                                    @endphp
+
+                                    @if($unissuedCount === 0)
+                                        <span class="text-muted">-</span>
+                                    @else
+                                        <div class="d-flex flex-column" style="line-height:1.1;">
+                                            <span class="badge bg-warning text-dark align-self-start">
+                                                {{ $unissuedCount }} ΟΧΙ
+                                            </span>
+
+                                            <small class="text-muted">
+                                                {{ number_format($unissuedSum, 2, ',', '.') }} €
+                                            </small>
+
+                                            <small class="text-muted">
+                                                {{-- δείξε μέχρι 2-3 σχόλια για “preview” --}}
+                                                @foreach($unissued->take(2) as $r)
+                                                    {{ \Illuminate\Support\Str::limit($r->comment ?? 'χωρίς σχόλιο', 100) }}@if(!$loop->last), @endif
+                                                @endforeach
+                                                @if($unissuedCount > 2)
+                                                    …
+                                                @endif
+                                            </small>
+                                        </div>
+                                    @endif
+                                </td>
+
 
                             {{-- ✅ SWITCH enable/disable --}}
                             <td class="text-center">
@@ -262,7 +305,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-4">
+                            <td colspan="8" class="text-center text-muted py-4">
                                 Δεν υπάρχουν πελάτες για εμφάνιση.
                             </td>
                         </tr>

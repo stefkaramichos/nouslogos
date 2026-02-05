@@ -62,7 +62,10 @@
                     <p>
                         <strong>Ραντεβού (επιλεγμένη περίοδος):</strong><br>
                         <span class="badge bg-dark fs-6">
-                            {{ $globalAppointmentsCount ?? 0 }}
+                            {{ $nonZeroAppointmentsCount ?? 0 }}
+                            @if(($zeroAppointmentsCount ?? 0) > 0)
+                                ( + {{ $zeroAppointmentsCount }} μηδενικά )
+                            @endif
                         </span>
                     </p>
                     <p>
@@ -76,6 +79,20 @@
                         <span class="badge bg-success fs-6">
                             {{ number_format($globalPaidTotal, 2, ',', '.') }} €
                         </span>
+                        <div class="small text-muted mt-1">
+                            <div>
+                                Μετρητά (ΜΑ): {{ number_format($paidBreakdown['cash_y']['amount'] ?? 0, 2, ',', '.') }} €
+                                · Ραντεβού: {{ str_replace('.', ',', (string)($paidBreakdown['cash_y']['appt_count'] ?? 0)) }}
+                            </div>
+                            <div>
+                                Μετρητά (ΧΑ): {{ number_format($paidBreakdown['cash_n']['amount'] ?? 0, 2, ',', '.') }} €
+                                · Ραντεβού: {{ str_replace('.', ',', (string)($paidBreakdown['cash_n']['appt_count'] ?? 0)) }}
+                            </div>
+                            <div>
+                                Κάρτα: {{ number_format($paidBreakdown['card']['amount'] ?? 0, 2, ',', '.') }} €
+                                · Ραντεβού: {{ str_replace('.', ',', (string)($paidBreakdown['card']['appt_count'] ?? 0)) }}
+                            </div>
+                        </div>
                     </p>
                     <p>
                         <strong>Υπόλοιπο (απλήρωτο):</strong><br>
@@ -211,7 +228,7 @@
 
                 @if($logs->count() > 0)
                     <div class="border rounded col-md-4 p-2"
-                        style="max-height: 140px; overflow-y:auto; font-size:0.8rem; background:#f8f9fa;">
+                        style="max-height: 240px; overflow-y:auto; font-size:0.8rem; background:#f8f9fa;">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <strong>Διορθώσεις</strong>
                             <span class="badge bg-dark">{{ $logs->count() }}</span>
@@ -270,8 +287,8 @@
                             <table class="table table-sm table-striped align-middle mb-0">
                                 <thead>
                                 <tr>
-                                    <th>Ποσό</th>
                                     <th>Σχόλιο</th>
+                                    <th>Ποσό</th>
                                     <th>Κόπηκε;</th>
                                     <th>Ημ/νία</th>
                                     <th class="text-end">Ενέργειες</th>
@@ -280,27 +297,27 @@
                                 <tbody>
                                 @forelse(($receipts ?? collect()) as $r) 
                                     <tr id="receipt_row_{{ $r->id }}">
+                                        
                                         <td class="receipt-inline-edit"
-                                            data-id="{{ $r->id }}"
-                                            data-field="amount"
-                                            data-type="number"
-                                            data-original="{{ number_format((float)$r->amount, 2, ',', '.') }}"
-                                            style="cursor:pointer; white-space:nowrap;">
-                                            <span class="badge bg-primary">
-                                                {{ number_format((float)$r->amount, 2, ',', '.') }} €
-                                            </span>
-                                            <small class="text-muted ms-1">(dblclick)</small>
-                                        </td>
-
-                                        <td class="receipt-inline-edit"
-                                            data-id="{{ $r->id }}"
-                                            data-field="comment"
-                                            data-type="text"
-                                            data-original="{{ $r->comment ?? '' }}"
-                                            style="cursor:pointer; max-width:240px;">
-                                            {{ $r->comment ? \Illuminate\Support\Str::limit($r->comment, 140) : '-' }}
-                                            <small class="text-muted ms-1">(dblclick)</small>
-                                        </td>
+                                        data-id="{{ $r->id }}"
+                                        data-field="comment"
+                                        data-type="text"
+                                        data-original="{{ $r->comment ?? '' }}"
+                                        style="cursor:pointer; max-width:240px;">
+                                        {{ $r->comment ? \Illuminate\Support\Str::limit($r->comment, 140) : '-' }}
+                                        <small class="text-muted ms-1"> </small>
+                                    </td>
+                                    <td class="receipt-inline-edit"
+                                        data-id="{{ $r->id }}"
+                                        data-field="amount"
+                                        data-type="number"
+                                        data-original="{{ number_format((float)$r->amount, 2, ',', '.') }}"
+                                        style="cursor:pointer; white-space:nowrap;">
+                                        <span class="badge bg-primary">
+                                            {{ number_format((float)$r->amount, 2, ',', '.') }} €
+                                        </span>
+                                        <small class="text-muted ms-1"> </small>
+                                    </td>
 
                                         <td class="receipt-inline-edit"
                                             data-id="{{ $r->id }}"
@@ -313,7 +330,7 @@
                                             @else
                                                 <span class="badge bg-secondary">ΟΧΙ</span>
                                             @endif
-                                            <small class="text-muted ms-1">(dblclick)</small>
+                                            <small class="text-muted ms-1"> </small>
                                         </td>
 
 
@@ -324,7 +341,7 @@
                                             data-original="{{ $r->receipt_date ? \Carbon\Carbon::parse($r->receipt_date)->format('Y-m-d') : '' }}"
                                             style="cursor:pointer; white-space:nowrap;">
                                             {{ $r->receipt_date ? \Carbon\Carbon::parse($r->receipt_date)->format('d/m/Y') : '-' }}
-                                            <small class="text-muted ms-1">(dblclick)</small>
+                                            <small class="text-muted ms-1"> </small>
                                         </td>
 
                                         <td class="text-end">
@@ -562,7 +579,7 @@
                     $selectedProfessionalId = $filters['professional_id'] ?? 'all';
                 @endphp
 
-                <div class="row g-2 align-items-end">
+                <div class="row g-2">
                     <div class="col-md-3">
                         <label class="form-label">Περίοδος</label>
                         <select name="range" class="form-select" onchange="this.form.submit()">
@@ -573,18 +590,34 @@
                     </div>
 
                     {{-- ✅ ΝΕΟ: Φίλτρο Επαγγελματία --}}
-                    <div class="col-md-3">
-                        <label class="form-label">Επαγγελματίας</label>
-                        <select name="professional_id" class="form-select" onchange="this.form.submit()">
-                            <option value="all" @selected($selectedProfessionalId === 'all')>Όλοι</option>
+                    @php
+                        $range = $filters['range'] ?? 'month';
+                        $day   = $filters['day'] ?? now()->format('Y-m-d');
+                        $month = $filters['month'] ?? now()->format('Y-m');
 
+                        // ✅ MULTI selected ids
+                        $selectedProfessionalIds = $filters['professional_ids'] ?? [];
+                        if (!is_array($selectedProfessionalIds)) $selectedProfessionalIds = [];
+                    @endphp
+
+                    <div class="col-md-3">
+                        <label class="form-label">Επαγγελματίες</label>
+
+                        <select name="professional_ids[]" class="form-select" multiple size="3" onchange="this.form.submit()">
                             @foreach(($appointmentProfessionals ?? []) as $pro)
-                                <option value="{{ $pro->id }}" @selected((string)$selectedProfessionalId === (string)$pro->id)>
+                                <option value="{{ $pro->id }}" @selected(in_array((string)$pro->id, array_map('strval', $selectedProfessionalIds), true))>
                                     {{ $pro->last_name }} {{ $pro->first_name }}
                                 </option>
                             @endforeach
                         </select>
+
+                        <div class="form-text">
+                            Ctrl (Windows) / Cmd (Mac) για πολλαπλή επιλογή.
+                            <a href="{{ route('customers.show', $customer, array_merge(request()->query(), ['professional_ids' => []])) }}"
+                            class="ms-2">Καθαρισμός</a>
+                        </div>
                     </div>
+
 
                     <div class="col-md-3">
                         @if($range === 'day')
@@ -802,7 +835,7 @@
             </div>
 
             {{-- ===================== OUTSTANDING SPLIT PAYMENT (NO DATES) ===================== --}}
-            <div class="border rounded p-3 mb-3" style="background:#f8f9fa">
+            <div id="pay-outstanding" class="border rounded p-3 mb-3" style="background:#f8f9fa">
                 <h6 class="mb-2">💶 Πληρωμή όλων των χρωστούμενων ραντεβού</h6>
 
                 {{-- Preview box (server-side) --}}
@@ -847,13 +880,13 @@
                                 class="form-control" placeholder="0.00">
                         </div>
 
-                        <div class="col-md-2">
+                        {{-- <div class="col-md-2">
                             <label class="form-label">Τράπεζα (Κάρτα)</label>
                             <input type="text" name="card_bank" class="form-control" maxlength="255"
                                 placeholder="π.χ. Alpha">
-                        </div>
+                        </div> --}}
 
-                        <div class="col-md-2">
+                        <div class="col-md-4">
                             <label class="form-label">Ημερομηνία Πληρωμής</label>
                             <input
                                 type="date"
@@ -885,7 +918,7 @@
 
 
 
-            <div class="border rounded p-3 mb-3" style="background:#fff3cd">
+            <div id="tax-fix-oldest" class="border rounded p-3 mb-3" style="background:#fff3cd">
                 <h6 class="mb-2">🧾 Διόρθωση παλαιότερων πληρωμών (Μετρητά Χωρίς Απόδειξη ➜ Με Απόδειξη)</h6>
 
                 <form method="POST" action="{{ route('customers.payments.taxFixOldest', $customer) }}"

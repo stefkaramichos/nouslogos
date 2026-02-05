@@ -43,9 +43,9 @@
             <table class="table table-hover align-middle">
                 <thead>
                 <tr>
-                    <th>Δημιουργήθηκε</th>
-                    <th>Σημείωση</th>
+                    {{-- <th>Δημιουργήθηκε</th> --}}
                     <th>Ημερομηνία ειδοποίησης</th>
+                    <th>Σημείωση</th>
                     <th>Κατάσταση</th>
                     <th class="text-end">Ενέργειες</th>
                 </tr>
@@ -65,15 +65,15 @@
                         data-notify="{{ optional($n->notify_at)->timezone(config('app.timezone'))->format('d/m/Y H:i') }}"
                         data-status="{{ $n->is_read ? 'Διαβασμένη' : 'Αδιάβαστη' }}"
                     >
-                        <td>{{ optional($n->created_at)->timezone(config('app.timezone'))->format('d/m/Y H:i') }}</td>
+                        {{-- <td>{{ optional($n->created_at)->timezone(config('app.timezone'))->format('d/m/Y H:i') }}</td> --}}
 
+                        <td>{{ optional($n->notify_at)->timezone(config('app.timezone'))->format('d/m/Y H:i') }}</td>
                         <td style="background-color: {{ $bg }};"
                             class="rounded px-2"
                             title="{{ $n->note }}">
                             {{ \Illuminate\Support\Str::limit($n->note, 60) }}
                         </td>
 
-                        <td>{{ optional($n->notify_at)->timezone(config('app.timezone'))->format('d/m/Y H:i') }}</td>
 
                         <td>
                             @if($n->is_read)

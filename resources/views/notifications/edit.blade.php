@@ -27,6 +27,22 @@
                        value="{{ old('notify_at', optional($notification->notify_at)->format('Y-m-d\TH:i')) }}">
             </div>
 
+            <div class="mb-3 form-check">
+                {{-- Ensures a value is always posted even if checkbox is unchecked --}}
+                <input type="hidden" name="is_read" value="0">
+
+                <input
+                    type="checkbox"
+                    name="is_read"
+                    value="1"
+                    class="form-check-input"
+                    id="is_read"
+                    {{ old('is_read', $notification->is_read) ? 'checked' : '' }}
+                >
+                <label class="form-check-label" for="is_read">Έχει διαβαστεί</label>
+            </div>
+
+
             <button class="btn btn-primary">Αποθήκευση</button>
         </form>
     </div>

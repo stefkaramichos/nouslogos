@@ -108,6 +108,7 @@ class NotificationController extends Controller
         $data = $request->validate([
             'note'      => ['required', 'string', 'max:5000'],
             'notify_at' => ['required', 'date'],
+            'is_read'   => ['required', 'boolean'],
         ]);
 
         $notification->update($data);

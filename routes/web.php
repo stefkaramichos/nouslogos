@@ -58,6 +58,11 @@ Route::middleware('auth')->group(function () {
     Route::delete('/appointments/{appointment}/force', [AppointmentTrashController::class, 'forceDelete'])
             ->name('appointments.forceDelete');
 
+              // customers print
+    Route::get('/customers/print', [CustomerController::class, 'printIndex'])
+        ->name('customers.print');
+
+
     // Πελάτες / Επαγγελματίες / Ραντεβού
     Route::resource('customers', CustomerController::class);
     Route::resource('professionals', ProfessionalController::class);
@@ -167,6 +172,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
     Route::post('/customers/{customer}/payments/tax-fix-oldest', [\App\Http\Controllers\CustomerController::class, 'taxFixOldestCashNoReceipt'])
     ->name('customers.payments.taxFixOldest');
+
+  
 
     Route::post('/inline-update', [CustomerController::class, 'inlineUpdate'])
     ->name('inline.update');

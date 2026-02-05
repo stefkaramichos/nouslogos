@@ -122,7 +122,7 @@
                     <option value="ergotherapia">Εργοθεραπεία</option>
                     <option value="omadiki">Ομαδική</option>
                     <option value="eidikos">Ειδικός παιδαγωγός</option>
-                    <option value="aksiologisi">Αξιολόγηση</option>
+                    <option value="aksiologisi">Αξιολόγηση / Τηλ. Επικοινωνία / Ενημερωτικό</option>
                 </select>
                 <small class="text-muted">Μπορείς να επιλέξεις πάνω από μία.</small>
             </div>

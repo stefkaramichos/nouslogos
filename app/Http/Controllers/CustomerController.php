@@ -116,6 +116,67 @@ class CustomerController extends Controller
      |  INDEX / CRUD CUSTOMER
      ========================================================= */
 
+     public function printIndex(Request $request)
+    {
+        $search = $request->input('search');
+
+        // session-aware εταιρεία (ίδιο logic με index)
+        if ($request->boolean('clear_company')) {
+            $request->session()->forget('customers_company_id');
+        }
+
+        if (!$request->boolean('clear_company') && $request->has('company_id')) {
+            $request->session()->put('customers_company_id', $request->input('company_id'));
+        }
+
+        $companyId = $request->has('company_id')
+            ? $request->input('company_id')
+            : $request->session()->get('customers_company_id');
+
+        if ($companyId === '' || $companyId === null) {
+            $companyId = null;
+        }
+
+        // active filter
+        $active = $request->input('active', '1'); // all | 1 | 0
+        if (!in_array((string)$active, ['all', '1', '0'], true)) {
+            $active = 'all';
+        }
+
+        $customers = Customer::query()
+            ->with([
+                // ✅ only unissued receipts
+                'receipts' => function ($q) {
+                    $q->where('is_issued', 0)
+                    ->orderByDesc('receipt_date')
+                    ->orderByDesc('id');
+                },
+            ])
+            ->when($companyId, fn($q) => $q->where('company_id', $companyId))
+            ->when($active !== 'all', fn($q) => $q->where('is_active', (int)$active))
+            ->when($search, function ($q) use ($search) {
+                $q->where(function ($qq) use ($search) {
+                    $qq->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhereHas('company', fn($qc) => $qc->where('name', 'like', "%{$search}%"));
+                });
+            })
+            ->orderByDesc('is_active')
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
+
+        return view('customers.print', [
+            'customers' => $customers,
+            'search'    => $search,
+            'companyId' => $companyId,
+            'active'    => $active,
+        ]);
+    }
+
+
     public function index(Request $request)
     {
         $search = $request->input('search');
@@ -138,14 +199,23 @@ class CustomerController extends Controller
             $companyId = null;
         }
 
-        // ✅ NEW: active filter
+        // ✅ active filter
         $active = $request->input('active', '1'); // all | 1 | 0
         if (!in_array((string)$active, ['all', '1', '0'], true)) {
             $active = 'all';
         }
 
         $customers = Customer::query()
-            ->with(['company', 'professionals'])
+            ->with([
+                'company',
+                'professionals',
+                // ✅ ONLY unissued receipts
+                'receipts' => function ($q) {
+                    $q->where('is_issued', 0)
+                    ->orderByDesc('receipt_date')
+                    ->orderByDesc('id');
+                },
+            ])
             ->when($companyId, fn($q) => $q->where('company_id', $companyId))
             ->when($active !== 'all', fn($q) => $q->where('is_active', (int)$active))
             ->when($search, function ($q) use ($search) {
@@ -157,8 +227,6 @@ class CustomerController extends Controller
                         ->orWhereHas('company', fn($qc) => $qc->where('name', 'like', "%{$search}%"));
                 });
             })
-
-            // ✅ ACTIVE ΠΑΝΩ, DISABLED ΚΑΤΩ (αν active=all)
             ->orderByDesc('is_active')
             ->orderBy('last_name')
             ->orderBy('first_name')
@@ -171,9 +239,10 @@ class CustomerController extends Controller
             'companies' => $companies,
             'search'    => $search,
             'companyId' => $companyId,
-            'active'    => $active, // ✅ pass to blade
+            'active'    => $active,
         ]);
     }
+
 
 
     public function create()
@@ -309,7 +378,6 @@ class CustomerController extends Controller
             ->orderByDesc('id')
             ->get();
 
-
         /**
          * 🔹 Ιστορικό πληρωμών (ομαδοποίηση ανά paid_at)
          * (μένει όπως ήταν: αφορά ΟΛΕΣ τις πληρωμές του πελάτη)
@@ -371,15 +439,23 @@ class CustomerController extends Controller
         $paymentStatus = $request->input('payment_status'); // unpaid/partial/full/all
         $paymentMethod = $request->input('payment_method'); // cash/card/all
 
-        // ✅ NEW: Professional filter
-        $professionalId = $request->input('professional_id'); // id or "all"/null
-
-        if ($professionalId === '' || $professionalId === 'all' || $professionalId === null) {
-            $professionalId = null;
-        } else {
-            $professionalId = (int)$professionalId;
-            if ($professionalId <= 0) $professionalId = null;
+        // ✅ Multiple professionals filter (array)
+        $professionalIds = $request->input('professional_ids', []);
+        if (!is_array($professionalIds)) {
+            $professionalIds = [];
         }
+
+        // ✅ backward compatibility (αν έρχεται ακόμα professional_id=all ή professional_id=5)
+        $legacyProfessionalId = $request->input('professional_id');
+        if (!empty($legacyProfessionalId) && $legacyProfessionalId !== 'all') {
+            $professionalIds[] = $legacyProfessionalId;
+        }
+
+        // κρατά μόνο θετικούς ints, unique
+        $professionalIds = array_values(array_unique(array_filter(array_map(function ($v) {
+            $id = (int)$v;
+            return $id > 0 ? $id : null;
+        }, $professionalIds))));
 
         /**
          * 🔹 Collection appointments (όχι DB query)
@@ -388,7 +464,7 @@ class CustomerController extends Controller
             ->sortByDesc('start_time')
             ->values();
 
-        // ✅ List professionals που υπάρχουν σε ραντεβού (για dropdown)
+        // ✅ List professionals που υπάρχουν σε ραντεβού (για dropdown/multi-select)
         $appointmentProfessionals = $appointmentsCollection
             ->map(fn($a) => $a->professional)
             ->filter()
@@ -407,10 +483,10 @@ class CustomerController extends Controller
             });
         }
 
-        // ✅ NEW: Professional filter
-        if ($professionalId) {
-            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($professionalId) {
-                return (int)($a->professional_id ?? 0) === (int)$professionalId;
+        // ✅ Multiple professionals filter
+        if (!empty($professionalIds)) {
+            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($professionalIds) {
+                return in_array((int)($a->professional_id ?? 0), $professionalIds, true);
             });
         }
 
@@ -443,13 +519,68 @@ class CustomerController extends Controller
          */
         $appointments = $filteredAppointments;
 
+        // ✅ Count ραντεβού: non-zero & zero (για badge)
+        $nonZeroAppointmentsCount = $appointments->filter(function ($a) {
+            $t = (float)($a->total_price ?? 0);
+            return $t > 0.0001;
+        })->count();
+
+        $zeroAppointmentsCount = $appointments->count() - $nonZeroAppointmentsCount;
+
+        // ✅ Totals
         $globalAppointmentsCount = $appointments->count();
 
         $globalTotalAmount = $appointments->sum(fn($a) => (float)($a->total_price ?? 0));
         $globalPaidTotal   = $appointments->sum(fn($a) => (float)$a->payments->sum('amount'));
         $globalOutstandingTotal = max($globalTotalAmount - $globalPaidTotal, 0);
 
-        // 🔹 Totals filtered (cash/card) - πάνω στο filtered
+        /**
+         * ✅ NEW: Αναλυτικό breakdown πληρωμών + "πόσα ραντεβού" (fractional)
+         * cash_y = cash + tax=Y
+         * cash_n = cash + tax=N
+         * card   = method=card
+         */
+        $paidBreakdown = [
+            'cash_y' => ['amount' => 0.0, 'appt_count' => 0.0],
+            'cash_n' => ['amount' => 0.0, 'appt_count' => 0.0],
+            'card'   => ['amount' => 0.0, 'appt_count' => 0.0],
+        ];
+
+        foreach ($appointments as $a) {
+            $paidTotal = (float)$a->payments->sum('amount');
+            if ($paidTotal <= 0.0001) continue;
+
+            $cashY = (float)$a->payments
+                ->where('method', 'cash')
+                ->where('tax', 'Y')
+                ->sum('amount');
+
+            $cashN = (float)$a->payments
+                ->where('method', 'cash')
+                ->where('tax', 'N')
+                ->sum('amount');
+
+            $card = (float)$a->payments
+                ->where('method', 'card')
+                ->sum('amount');
+
+            // ποσά
+            $paidBreakdown['cash_y']['amount'] += $cashY;
+            $paidBreakdown['cash_n']['amount'] += $cashN;
+            $paidBreakdown['card']['amount']   += $card;
+
+            // fractional counts
+            if ($cashY > 0) $paidBreakdown['cash_y']['appt_count'] += ($cashY / $paidTotal);
+            if ($cashN > 0) $paidBreakdown['cash_n']['appt_count'] += ($cashN / $paidTotal);
+            if ($card  > 0) $paidBreakdown['card']['appt_count']   += ($card  / $paidTotal);
+        }
+
+        // στρογγυλοποίηση counts (για εμφάνιση τύπου 5,5)
+        $paidBreakdown['cash_y']['appt_count'] = round($paidBreakdown['cash_y']['appt_count'], 1);
+        $paidBreakdown['cash_n']['appt_count'] = round($paidBreakdown['cash_n']['appt_count'], 1);
+        $paidBreakdown['card']['appt_count']   = round($paidBreakdown['card']['appt_count'], 1);
+
+        // 🔹 Totals filtered (cash/card) - όπως είχες
         $appointmentsCount = $appointments->count();
         $cashTotal = $appointments->sum(fn($a) => (float)$a->payments->where('method', 'cash')->sum('amount'));
         $cardTotal = $appointments->sum(fn($a) => (float)$a->payments->where('method', 'card')->sum('amount'));
@@ -460,7 +591,7 @@ class CustomerController extends Controller
         [$outstandingCount, $outstandingAmount] = $this->calcOutstandingForCustomer($customer->id);
 
         /**
-         * 🔹 Prev/Next URLs + Filters array (κρατάμε ΚΑΙ professional_id)
+         * 🔹 Prev/Next URLs + Filters array (κρατάμε ΚΑΙ professional_ids[])
          */
         $filters = [
             'range' => $range,
@@ -468,7 +599,7 @@ class CustomerController extends Controller
             'month' => $month,
             'payment_status' => $paymentStatus ?? 'all',
             'payment_method' => $paymentMethod ?? 'all',
-            'professional_id' => $professionalId ?? 'all',
+            'professional_ids' => $professionalIds,
         ];
 
         $prevUrl = null;
@@ -478,12 +609,14 @@ class CustomerController extends Controller
             $baseQuery = $request->query();
             unset($baseQuery['nav']);
 
-            // κράτα και το professional_id μέσα στα query strings
-            if ($professionalId) {
-                $baseQuery['professional_id'] = $professionalId;
+            // ✅ kill legacy param
+            unset($baseQuery['professional_id']);
+
+            // ✅ κράτα professional_ids[] στο query
+            if (!empty($professionalIds)) {
+                $baseQuery['professional_ids'] = $professionalIds;
             } else {
-                // αν είναι all μην το βάζεις υποχρεωτικά
-                unset($baseQuery['professional_id']);
+                unset($baseQuery['professional_ids']);
             }
 
             if ($range === 'day') {
@@ -514,11 +647,18 @@ class CustomerController extends Controller
             'appointments',
             'appointmentsCount',
 
+            // ✅ Counts για εμφάνιση στο badge
+            'nonZeroAppointmentsCount',
+            'zeroAppointmentsCount',
+
             // ✅ FILTERED totals
             'globalAppointmentsCount',
             'globalTotalAmount',
             'globalPaidTotal',
             'globalOutstandingTotal',
+
+            // ✅ αναλυτικό breakdown πληρωμών
+            'paidBreakdown',
 
             'cashTotal',
             'cardTotal',
@@ -530,7 +670,6 @@ class CustomerController extends Controller
             'outstandingCount',
             'outstandingAmount',
 
-            // ✅ NEW for filter dropdown
             'appointmentProfessionals',
             'prepayment',
             'taxFixLogs',
@@ -899,9 +1038,10 @@ class CustomerController extends Controller
      */
     public function payOutstandingSplit(Request $request, Customer $customer)
     {
+        // ✅ anchor που στέλνει η φόρμα (π.χ. pay-outstanding)
+        $anchor = $request->input('_anchor', 'pay-outstanding');
+
         $data = $request->validate([
-            // ✅ ο χρήστης διαλέγει πότε έγινε/καταχωρήθηκε η πληρωμή
-            // στείλτο από input datetime-local
             'paid_at'       => 'required|date',
 
             'cash_y_amount' => 'nullable|numeric|min:0',
@@ -913,20 +1053,20 @@ class CustomerController extends Controller
             'notes'         => 'nullable|string|max:1000',
         ], [
             'paid_at.required' => 'Πρέπει να επιλέξετε ημερομηνία/ώρα πληρωμής.',
-        ]); 
+        ]);
 
         $cashY = (float)($data['cash_y_amount'] ?? 0);
         $cashN = (float)($data['cash_n_amount'] ?? 0);
         $card  = (float)($data['card_amount'] ?? 0);
 
         if ($cashY <= 0 && $cashN <= 0 && $card <= 0) {
-            return back()->with('error', 'Βάλτε ποσό σε τουλάχιστον ένα πεδίο (Μετρητά με/χωρίς απόδειξη ή Κάρτα).');
+            return redirect()->back()
+                ->withFragment($anchor)
+                ->with('error', 'Βάλτε ποσό σε τουλάχιστον ένα πεδίο (Μετρητά με/χωρίς απόδειξη ή Κάρτα).');
         }
 
-        // ✅ paid_at από user
         $paidAt = Carbon::parse($data['paid_at']);
 
-        // όλα τα ραντεβού του πελάτη (με ποσό)
         $appointments = Appointment::where('customer_id', $customer->id)
             ->whereNotNull('total_price')
             ->where('total_price', '>', 0)
@@ -975,18 +1115,18 @@ class CustomerController extends Controller
             });
 
             $incoming = $cashY + $cashN + $card;
-            return back()->with('success', 'Καταχωρήθηκε προπληρωμή: ' . number_format($incoming, 2, ',', '.') . ' €');
-        }
 
+            return redirect()->back()
+                ->withFragment($anchor)
+                ->with('success', 'Καταχωρήθηκε προπληρωμή: ' . number_format($incoming, 2, ',', '.') . ' €');
+        }
 
         $incoming = $cashY + $cashN + $card;
 
-    
         DB::transaction(function () use ($appointments, $customer, $cashY, $cashN, $card, $data, $paidAt) {
 
-            // helper allocate to due appointments (oldest first) returning leftover from bucket
             $allocateToDue = function (float $amount, string $method, string $tax, ?string $bank = null)
-                use (&$appointments, $customer, $data, $paidAt) : float {
+                use (&$appointments, $customer, $data, $paidAt): float {
 
                 $remaining = $amount;
 
@@ -1020,20 +1160,20 @@ class CustomerController extends Controller
                     $remaining -= $payNow;
                 }
 
-                return $remaining; // ✅ leftover = προπληρωμή
+                return $remaining;
             };
 
-            // 1) allocate to due (όσο υπάρχει due)
+            // 1) allocate
             $leftCashY = $cashY > 0 ? $allocateToDue($cashY, 'cash', 'Y', null) : 0;
             $leftCashN = $cashN > 0 ? $allocateToDue($cashN, 'cash', 'N', null) : 0;
 
-            $leftCard  = 0;
+            $leftCard = 0;
             if ($card > 0) {
                 $bank = $data['card_bank'] ?? null;
                 $leftCard = $allocateToDue($card, 'card', 'Y', $bank);
             }
 
-            // 2) update is_full για όσα καλύφθηκαν
+            // 2) update is_full
             foreach ($appointments as $a) {
                 $total = (float)($a->total_price ?? 0);
                 if ($total <= 0) continue;
@@ -1055,7 +1195,7 @@ class CustomerController extends Controller
                 }
             }
 
-            // 3) Αν περίσσεψε κάτι => προπληρωμή
+            // 3) leftovers => προπληρωμή
             $extraTotal = (float)$leftCashY + (float)$leftCashN + (float)$leftCard;
 
             if ($extraTotal > 0.0001) {
@@ -1092,10 +1232,17 @@ class CustomerController extends Controller
 
         if ($incoming > $dueTotal + 0.0001) {
             $extra = $incoming - $dueTotal;
-            return back()->with('success', 'Η πληρωμή καταχωρήθηκε. Προπληρωμή: ' . number_format($extra, 2, ',', '.') . ' €');
+
+            return redirect()->back()
+                ->withFragment($anchor)
+                ->with('success', 'Η πληρωμή καταχωρήθηκε. Προπληρωμή: ' . number_format($extra, 2, ',', '.') . ' €');
         }
-        return back()->with('success', 'Η πληρωμή καταχωρήθηκε επιτυχώς.');
+
+        return redirect()->back()
+            ->withFragment($anchor)
+            ->with('success', 'Η πληρωμή καταχωρήθηκε επιτυχώς.');
     }
+
 
     public function toggleCompleted(Request $request, Customer $customer)
     {
@@ -1227,6 +1374,9 @@ class CustomerController extends Controller
 
     public function taxFixOldestCashNoReceipt(Request $request, Customer $customer)
     {
+        // ✅ anchor που στέλνει η φόρμα (π.χ. tax-fix-oldest)
+        $anchor = $request->input('_anchor', 'tax-fix-oldest');
+
         $data = $request->validate([
             'fix_amount' => ['required','integer','min:5', function ($attr, $value, $fail) {
                 if ($value % 5 !== 0) $fail('Το ποσό πρέπει να είναι πολλαπλάσιο του 5 (5,10,15...).');
@@ -1238,14 +1388,21 @@ class CustomerController extends Controller
 
         $fixAmount = (int)$data['fix_amount'];
         $x = (int)($fixAmount / 5);
-        if ($x <= 0) return back()->with('error', 'Μη έγκυρη τιμή.');
+
+        if ($x <= 0) {
+            return redirect()->back()
+                ->withFragment($anchor)
+                ->with('error', 'Μη έγκυρη τιμή.');
+        }
 
         $baseQuery = Payment::where('customer_id', $customer->id)
             ->where('method', 'cash')
             ->where('tax', 'N');
 
         if (!$baseQuery->exists()) {
-            return back()->with('error', 'Δεν βρέθηκε κανένα payment cash χωρίς απόδειξη (tax=N).');
+            return redirect()->back()
+                ->withFragment($anchor)
+                ->with('error', 'Δεν βρέθηκε κανένα payment cash χωρίς απόδειξη (tax=N).');
         }
 
         // ✅ paid_at will be date at start of day (00:00:00)
@@ -1347,18 +1504,18 @@ class CustomerController extends Controller
         });
 
         if ($changedPayments === 0) {
-            return back()->with('error', 'Δεν βρέθηκαν πληρωμές για διόρθωση.');
+            return redirect()->back()
+                ->withFragment($anchor)
+                ->with('error', 'Δεν βρέθηκαν πληρωμές για διόρθωση.');
         }
 
-        return back()->with(
-            'success',
-            "Ολοκληρώθηκε: διορθώθηκαν {$changedPayments} παλιές πληρωμές και δημιουργήθηκαν {$createdAddons} νέα payments των 5€."
-        );
+        return redirect()->back()
+            ->withFragment($anchor)
+            ->with(
+                'success',
+                "Ολοκληρώθηκε: διορθώθηκαν {$changedPayments} παλιές πληρωμές και δημιουργήθηκαν {$createdAddons} νέα payments των 5€."
+            );
     }
-
-
-
-
 
 
 }
