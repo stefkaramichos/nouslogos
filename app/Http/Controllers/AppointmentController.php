@@ -740,6 +740,8 @@ class AppointmentController extends Controller
             ], 422);
         }
 
+        $result = null;
+
         DB::transaction(function () use ($appointment, $newTotal, &$result) {
             $appointment->load('payments');
 
@@ -765,6 +767,13 @@ class AppointmentController extends Controller
             $defaultTax    = $last?->tax ?? 'Y';
             $defaultBank   = $last?->bank ?? null;
 
+            // ✅ paid_at από τελευταία πληρωμή (όχι now)
+            $defaultPaidAt = $last?->paid_at; // μπορεί να είναι null
+            if (!$defaultPaidAt) {
+                // fallback μόνο αν δεν υπάρχει προηγούμενη πληρωμή
+                $defaultPaidAt = now();
+            }
+
             // A) ΜΕΙΩΣΗ -> κόψε από τις πιο πρόσφατες πληρωμές
             if ($delta < 0) {
                 $toRemove = abs($delta);
@@ -784,14 +793,14 @@ class AppointmentController extends Controller
                     }
                 }
             }
-            // B) ΑΥΞΗΣΗ -> φτιάξε νέα πληρωμή με τη διαφορά
+            // B) ΑΥΞΗΣΗ -> φτιάξε νέα πληρωμή με τη διαφορά (με paid_at της τελευταίας)
             else {
                 Payment::create([
                     'appointment_id' => $appointment->id,
                     'customer_id'    => $appointment->customer_id,
                     'amount'         => $delta,
                     'is_full'        => 0,
-                    'paid_at'        => now(),
+                    'paid_at'        => $defaultPaidAt, // ✅ εδώ
                     'method'         => $defaultMethod,
                     'tax'            => $defaultTax,
                     'bank'           => $defaultBank,
@@ -823,12 +832,13 @@ class AppointmentController extends Controller
         });
 
         return response()->json([
-            'success' => true,
-            'paid_total' => $result['paid_total'] ?? 0,
+            'success'   => true,
+            'paid_total'=> (float)($result['paid_total'] ?? 0),
             'formatted' => number_format((float)($result['paid_total'] ?? 0), 2, ',', '.') . ' €',
         ]);
     }
 
+    
     public function destroy(Request $request, Appointment $appointment)
     {
         $appointment->delete();
