@@ -285,10 +285,12 @@ class SettlementController extends Controller
         $payments = Payment::with(['appointment.professional', 'customer'])
             ->whereHas('appointment', function ($q) use ($rangeStart, $rangeEndExclusive) {
                 $q->where('start_time', '>=', $rangeStart)
-                  ->where('start_time', '<',  $rangeEndExclusive)
-                  ->whereNull('deleted_at');
+                ->where('start_time', '<',  $rangeEndExclusive)
+                ->whereNull('deleted_at')
+                ->where('company_id', '!=', 9);   // 👈 exclude company 9
             })
             ->get();
+
 
         $totalAmount = 0.0;
 

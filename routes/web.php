@@ -15,6 +15,7 @@ use App\Http\Controllers\AppointmentTrashController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\PriceItemController;
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CustomerReceiptController;
 
 
@@ -62,6 +63,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/customers/print', [CustomerController::class, 'printIndex'])
         ->name('customers.print');
 
+    Route::post('/companies', [CompanyController::class, 'store'])
+    ->name('companies.store');
+    
+    Route::delete('/companies/{company}', [CompanyController::class, 'destroy'])
+        ->name('companies.destroy');
 
     // Πελάτες / Επαγγελματίες / Ραντεβού
     Route::resource('customers', CustomerController::class);
@@ -173,8 +179,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/customers/{customer}/payments/tax-fix-oldest', [\App\Http\Controllers\CustomerController::class, 'taxFixOldestCashNoReceipt'])
     ->name('customers.payments.taxFixOldest');
 
-  
+   Route::post('/customers/{customer}/tax-fix-logs/{log}/update-amount', [CustomerController::class, 'updateTaxFixLogAmount'])
+    ->name('customers.taxFixLogs.updateAmount');
 
+  
     Route::post('/inline-update', [CustomerController::class, 'inlineUpdate'])
     ->name('inline.update');
 

@@ -84,15 +84,39 @@
                 </a>
 
                 @foreach(($companies ?? collect()) as $company)
-                    <a href="{{ route('customers.index', [
-                            'search' => request('search'),
-                            'company_id' => $company->id,
-                            'active' => $activeFilter,
-                        ]) }}"
-                       class="btn btn-sm {{ (string)$selectedCompany === (string)$company->id ? 'btn-primary' : 'btn-outline-primary' }}">
-                        {{ $company->name }}
-                    </a>
+                    <div class="btn-group" role="group">
+                        <a href="{{ route('customers.index', [
+                                'search' => request('search'),
+                                'company_id' => $company->id,
+                                'active' => $activeFilter,
+                            ]) }}"
+                        class="btn btn-sm {{ (string)$selectedCompany === (string)$company->id ? 'btn-primary' : 'btn-outline-primary' }}">
+                            {{ $company->name }}
+                        </a>
+
+                        {{-- delete button (opens modal) --}}
+                        @if($company->can_delete)
+                            <button type="button"
+                                class="btn btn-sm btn-outline-danger"
+                                title="Διαγραφή εταιρείας"
+                                data-bs-toggle="modal"
+                                data-bs-target="#deleteCompanyModal"
+                                data-company-id="{{ $company->id }}"
+                                data-company-name="{{ $company->name }}">
+                                🗑
+                            </button>
+                        @endif
+                    </div>
                 @endforeach
+
+                {{-- + Add Company button --}}
+                <button type="button"
+                        class="btn btn-sm btn-outline-success"
+                        data-bs-toggle="modal"
+                        data-bs-target="#createCompanyModal">
+                    + Τοποθεσία/Σχολείο
+                </button>
+
             </div>
 
             {{-- ✅ Active filter buttons (SAME COLORS as companies) --}}
@@ -323,6 +347,81 @@
         </div>
         --}}
     </div>
+        {{-- Create Company Modal --}}
+    <div class="modal fade" id="createCompanyModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+            <form method="POST" action="{{ route('companies.store', request()->query()) }}">
+                @csrf
+
+                <div class="modal-header">
+                <h5 class="modal-title">Νέα Εταιρεία</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Όνομα *</label>
+                    <input type="text" name="name" class="form-control" required
+                        value="{{ old('name') }}">
+                    @error('name')
+                    <div class="text-danger small mt-1">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Πόλη</label>
+                    <input type="text" name="city" class="form-control"
+                        value="{{ old('city') }}">
+                    @error('city')
+                    <div class="text-danger small mt-1">{{ $message }}</div>
+                    @enderror
+                </div>
+                </div>
+
+                <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Άκυρο</button>
+                <button type="submit" class="btn btn-success">Αποθήκευση</button>
+                </div>
+
+            </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- Delete Company Modal --}}
+    <div class="modal fade" id="deleteCompanyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+        <form id="deleteCompanyForm" method="POST" action="">
+            @csrf
+            @method('DELETE')
+
+            <div class="modal-header">
+            <h5 class="modal-title">Διαγραφή Εταιρείας</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+            <div class="alert alert-warning mb-0">
+                Θέλετε σίγουρα να διαγράψετε την εταιρεία
+                <strong id="deleteCompanyName">-</strong>;
+                <div class="small mt-2">
+                Η διαγραφή επιτρέπεται μόνο αν δεν υπάρχουν σχετικές εγγραφές (ραντεβού/πελάτες/έξοδα/εκκαθαρίσεις/θεραπευτές).
+                </div>
+            </div>
+            </div>
+
+            <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Άκυρο</button>
+            <button type="submit" class="btn btn-danger">Διαγραφή</button>
+            </div>
+        </form>
+        </div>
+    </div>
+    </div>
+
+
 @endsection
 @push('scripts')
 <script>
@@ -343,4 +442,23 @@ window.addEventListener("load", function () {
     window.history.replaceState({}, document.title, url.toString());
 });
 </script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modalEl = document.getElementById('deleteCompanyModal');
+    if (!modalEl) return;
+
+    modalEl.addEventListener('show.bs.modal', function (event) {
+        const btn = event.relatedTarget;
+        const id = btn.getAttribute('data-company-id');
+        const name = btn.getAttribute('data-company-name');
+
+        document.getElementById('deleteCompanyName').textContent = name || '-';
+
+        // build action url from route template
+        const action = "{{ route('companies.destroy', ['company' => '__ID__']) }}".replace('__ID__', id);
+        document.getElementById('deleteCompanyForm').action = action;
+    });
+});
+</script>
+
 @endpush

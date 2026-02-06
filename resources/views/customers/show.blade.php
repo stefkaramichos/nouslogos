@@ -250,7 +250,11 @@
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
                                         <strong>{{ $dateLabel }}</strong>
-                                        <span class="badge bg-primary ms-1">
+                                        <span class="badge bg-primary ms-1 tax-fix-log-edit"
+                                            data-log-id="{{ $log->id }}"
+                                            data-original="{{ number_format((float)$amount, 2, ',', '.') }}"
+                                            style="cursor:pointer;"
+                                            title="Διπλό κλικ για αλλαγή ποσού διόρθωσης">
                                             {{ number_format($amount, 2, ',', '.') }} €
                                         </span>
                                     </div>
@@ -383,17 +387,21 @@
 
                         <div class="modal-body">
                             <div class="row g-2">
-                                <div class="col-md-4">
-                                    <label class="form-label">Ποσό (€)</label>
-                                    <input type="number" step="0.01" min="0" name="amount" class="form-control" required>
-                                </div>
-
-                                <div class="col-8">
+                                <div class="col-9">
                                     <label class="form-label">Σχόλιο</label>
                                     <input type="text" name="comment" maxlength="1000" class="form-control" placeholder="προαιρετικό...">
                                 </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Ποσό (€)</label>
+                                    <input type="number" step="0.01" min="0" name="amount" class="form-control" >
+                                </div>
                                 
-                                <div class="col-md-4 d-flex align-items-end">
+                                <div class="col-md-9">
+                                    <label class="form-label">Ημερομηνία</label>
+                                    <input type="date" name="receipt_date" class="form-control" >
+                                </div>
+                                
+                                <div class="col-md-3 d-flex align-items-end">
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" value="1" id="is_issued_create" name="is_issued">
                                         <label class="form-check-label" for="is_issued_create">
@@ -403,10 +411,6 @@
                                 </div>
                                 
                                 
-                                <div class="col-md-4">
-                                    <label class="form-label">Ημερομηνία</label>
-                                    <input type="date" name="receipt_date" class="form-control" value="{{ now()->toDateString() }}">
-                                </div>
                             </div>
                         </div>
 
@@ -687,14 +691,30 @@
                     <tbody>
                     @forelse($appointments as $appointment)
                         @php
-                            $hasFixed = $appointment->payments->contains(fn($p) => (int)($p->is_tax_fixed ?? 0) === 1);
+                              $hasAddon = $appointment->payments->contains(function($p){
+                                    return is_string($p->notes ?? null) && str_contains($p->notes, '[TAX_FIX_ADDON]');
+                                });
                             $total     = (float) ($appointment->total_price ?? 0);
                             $paidTotal = (float) $appointment->payments->sum('amount');
+
+                            // old totals
                             $cashPaid  = (float) $appointment->payments->where('method','cash')->sum('amount');
                             $cardPaid  = (float) $appointment->payments->where('method','card')->sum('amount');
+
+                            // ✅ NEW: split cash by tax
+                            $cashPaidY = (float) $appointment->payments
+                                ->where('method','cash')
+                                ->where('tax','Y')
+                                ->sum('amount');
+
+                            $cashPaidN = (float) $appointment->payments
+                                ->where('method','cash')
+                                ->where('tax','N')
+                                ->sum('amount');
                         @endphp
 
-                        <tr class="{{ $hasFixed ? 'table-warning' : '' }}">
+
+                        <tr class="{{ $hasAddon ? 'table-warning' : '' }}">
                             <td class="text-center">
                                 <input type="checkbox" class="appointment-checkbox" value="{{ $appointment->id }}">
                             </td>
@@ -755,12 +775,16 @@
                                 {{ number_format($total, 2, ',', '.') }}
                             </td>
 
-                            {{-- Πληρωμή (ΣΩΣΤΟ για split) --}}
-                           {{-- Πληρωμή (με κανόνα: total_price <= 0 => ΠΛΗΡΩΜΕΝΟ) --}}
+                            @php
+                            $lastPay = $appointment->payments->sortByDesc('paid_at')->sortByDesc('id')->first();
+                            @endphp
                             <td class="appointment-paid-edit"
                                 data-appointment-id="{{ $appointment->id }}"
                                 data-original="{{ number_format($paidTotal, 2, ',', '.') }}"
+                                data-default-method="{{ $lastPay->method ?? 'cash' }}"
+                                data-default-tax="{{ $lastPay->tax ?? 'Y' }}"
                                 style="cursor:pointer;">
+
                                 {{-- το υπάρχον σου UI (badges/labels) ΜΕΣΑ εδώ όπως είναι --}}
                                 @php $isZeroPrice = $total <= 0; @endphp
 
@@ -782,10 +806,26 @@
                                         @endif
 
                                         <small class="text-muted d-block">
-                                            @if($cashPaid > 0) Μετρητά: {{ number_format($cashPaid, 2, ',', '.') }} € @endif
+                                            @if($cashPaid > 0)
+                                                Μετρητά:
+                                                @if($cashPaidY > 0)
+                                                    <span>ΜΑ</span> {{ number_format($cashPaidY, 2, ',', '.') }} €
+                                                @endif
+
+                                                @if($cashPaidY > 0 && $cashPaidN > 0) · @endif
+
+                                                @if($cashPaidN > 0)
+                                                    <span>ΧΑ</span> {{ number_format($cashPaidN, 2, ',', '.') }} €
+                                                @endif
+                                            @endif
+
                                             @if($cashPaid > 0 && $cardPaid > 0) · @endif
-                                            @if($cardPaid > 0) Κάρτα: {{ number_format($cardPaid, 2, ',', '.') }} € @endif
+
+                                            @if($cardPaid > 0)
+                                                Κάρτα: {{ number_format($cardPaid, 2, ',', '.') }} €
+                                            @endif
                                         </small>
+
                                     @endif
                                 @endif
                             </td>
@@ -1510,29 +1550,31 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 
-
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     if (!csrfToken) return;
 
-    let activeInput = null;
+    let active = null;
 
     document.addEventListener('dblclick', function (e) {
         const cell = e.target.closest('.appointment-paid-edit');
         if (!cell) return;
-        if (activeInput) return;
+        if (active) return;
 
         e.preventDefault();
 
         const appointmentId = cell.dataset.appointmentId;
         const originalHTML  = cell.innerHTML;
 
-        // πάρε paidTotal από data-original (ή κάνε parse από το DOM αν θες)
         const raw = (cell.dataset.original || '0')
             .replace(/[^\d,.-]/g,'')
             .replace('.', '')
             .replace(',', '.');
+
+        // --- UI elements
+        const wrap = document.createElement('div');
+        wrap.className = 'd-flex gap-2 align-items-center';
 
         const input = document.createElement('input');
         input.type = 'number';
@@ -1542,19 +1584,50 @@ document.addEventListener('DOMContentLoaded', function () {
         input.style.width = '120px';
         input.value = raw ? parseFloat(raw) : 0;
 
+        const select = document.createElement('select');
+        select.className = 'form-select form-select-sm';
+        select.style.width = '180px';
+        select.innerHTML = `
+            <option value="cash|Y">Μετρητά (ΜΑ)</option>
+            <option value="cash|N">Μετρητά (ΧΑ)</option>
+            <option value="card|Y">Κάρτα</option>
+        `;
+
+        // προεπιλογή: αν έχει data-default-method/tax (αν θες να τα βάλεις από blade), αλλιώς cash|Y
+        const defaultMethod = cell.dataset.defaultMethod || 'cash';
+        const defaultTax    = cell.dataset.defaultTax || 'Y';
+        select.value = `${defaultMethod}|${defaultTax}`;
+
+        const btnSave = document.createElement('button');
+        btnSave.type = 'button';
+        btnSave.className = 'btn btn-sm btn-success';
+        btnSave.textContent = 'OK';
+
+        const btnCancel = document.createElement('button');
+        btnCancel.type = 'button';
+        btnCancel.className = 'btn btn-sm btn-outline-secondary';
+        btnCancel.textContent = '✕';
+
+        wrap.appendChild(input);
+        wrap.appendChild(select);
+        wrap.appendChild(btnSave);
+        wrap.appendChild(btnCancel);
+
         cell.innerHTML = '';
-        cell.appendChild(input);
-        input.focus();
-        activeInput = input;
+        cell.appendChild(wrap);
+
+        active = { cell, input, select };
 
         const restore = () => {
             cell.innerHTML = originalHTML;
-            activeInput = null;
+            active = null;
         };
 
         const save = () => {
-            const newVal = input.value.trim();
+            const newVal = (input.value ?? '').toString().trim();
             if (newVal === '') return restore();
+
+            const [method, tax] = (select.value || 'cash|Y').split('|');
 
             cell.innerHTML = '<span class="text-muted">Αποθήκευση…</span>';
 
@@ -1565,17 +1638,18 @@ document.addEventListener('DOMContentLoaded', function () {
                     'X-CSRF-TOKEN': csrfToken,
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({ paid_total: newVal })
+                body: JSON.stringify({
+                    paid_total: newVal,
+                    method: method,
+                    tax: tax
+                })
             })
             .then(async res => {
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok || !data.success) throw data;
                 return data;
             })
-            .then(() => {
-                // πιο απλό/σίγουρο: reload για να ανανεωθούν badges + cash/card breakdown
-                window.location.reload();
-            })
+            .then(() => window.location.reload())
             .catch(err => {
                 console.error(err);
                 alert(err?.message || 'Σφάλμα αποθήκευσης.');
@@ -1583,13 +1657,120 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         };
 
-        input.addEventListener('blur', save);
+        btnCancel.addEventListener('click', restore);
+        btnSave.addEventListener('click', save);
+
+        input.focus();
         input.addEventListener('keydown', function (ev) {
-            if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+            if (ev.key === 'Enter') { ev.preventDefault(); save(); }
+            if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
+        });
+
+        select.addEventListener('keydown', function (ev) {
             if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
         });
     });
 });
 </script>
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (!csrfToken) return;
+
+    let active = null;
+
+    document.addEventListener('dblclick', function (e) {
+        const el = e.target.closest('.tax-fix-log-edit');
+        if (!el) return;
+        if (active) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const logId = el.dataset.logId;
+        const originalText = (el.textContent || '').trim();
+
+        const raw = (el.dataset.original || '0')
+            .replace(/[^\d,.-]/g,'')
+            .replace('.', '')
+            .replace(',', '.');
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.step = '5';
+        input.min = '0';
+        input.className = 'form-control form-control-sm d-inline-block';
+        input.style.width = '110px';
+        input.value = raw ? parseFloat(raw) : 0;
+
+        const wrap = document.createElement('span');
+        wrap.className = 'd-inline-flex gap-1 align-items-center';
+
+        const ok = document.createElement('button');
+        ok.type = 'button';
+        ok.className = 'btn btn-sm btn-success';
+        ok.textContent = 'OK';
+
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'btn btn-sm btn-outline-secondary';
+        cancel.textContent = '✕';
+
+        wrap.appendChild(input);
+        wrap.appendChild(ok);
+        wrap.appendChild(cancel);
+
+        el.innerHTML = '';
+        el.appendChild(wrap);
+        active = { el, input };
+
+        const restore = () => {
+            el.textContent = originalText;
+            active = null;
+        };
+
+        const save = () => {
+            const v = (input.value ?? '').toString().trim();
+            if (v === '') return restore();
+
+            el.innerHTML = '<span class="text-muted">Αποθήκευση…</span>';
+
+            fetch(`{{ route('customers.taxFixLogs.updateAmount', ['customer' => $customer->id, 'log' => '__LOG__']) }}`.replace('__LOG__', logId), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ fix_amount: v })
+            })
+            .then(async res => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) throw data;
+                return data;
+            })
+            .then(() => window.location.reload())
+            .catch(err => {
+                console.error(err);
+                alert(err?.message || 'Σφάλμα αποθήκευσης.');
+                restore();
+            });
+        };
+
+        cancel.addEventListener('click', restore);
+        ok.addEventListener('click', save);
+
+        input.focus();
+        input.addEventListener('keydown', function(ev){
+            if (ev.key === 'Enter') { ev.preventDefault(); save(); }
+            if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
+        });
+    });
+});
+</script>
+
 
 @endsection

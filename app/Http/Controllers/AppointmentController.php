@@ -727,10 +727,11 @@ class AppointmentController extends Controller
     {
         $data = $request->validate([
             'paid_total' => 'required|numeric|min:0',
+            'method'     => 'required|in:cash,card',
+            'tax'        => 'required|in:Y,N',
         ]);
 
         $newTotal = (float)$data['paid_total'];
-
         $totalPrice = (float)($appointment->total_price ?? 0);
 
         if ($newTotal > $totalPrice + 0.0001) {
@@ -740,12 +741,16 @@ class AppointmentController extends Controller
             ], 422);
         }
 
+        // ✅ rule: κάρτα πάντα με απόδειξη
+        if ($data['method'] === 'card') {
+            $data['tax'] = 'Y';
+        }
+
         $result = null;
 
-        DB::transaction(function () use ($appointment, $newTotal, &$result) {
+        DB::transaction(function () use ($appointment, $newTotal, $data, &$result) {
             $appointment->load('payments');
 
-            // lock payments του appointment
             $payments = Payment::where('appointment_id', $appointment->id)
                 ->orderByDesc('paid_at')
                 ->orderByDesc('id')
@@ -755,26 +760,21 @@ class AppointmentController extends Controller
             $currentTotal = (float)$payments->sum('amount');
             $delta = $newTotal - $currentTotal;
 
-            // ίδιο ποσό
             if (abs($delta) < 0.0001) {
                 $result = ['success' => true, 'paid_total' => $currentTotal];
                 return;
             }
 
-            // defaults από τελευταία πληρωμή
+            // defaults από τελευταία πληρωμή ΜΟΝΟ για paid_at/bank (όχι method/tax πλέον)
             $last = $payments->first();
-            $defaultMethod = $last?->method ?? 'cash';
-            $defaultTax    = $last?->tax ?? 'Y';
-            $defaultBank   = $last?->bank ?? null;
+            $defaultBank = $last?->bank ?? null;
 
-            // ✅ paid_at από τελευταία πληρωμή (όχι now)
-            $defaultPaidAt = $last?->paid_at; // μπορεί να είναι null
+            $defaultPaidAt = $last?->paid_at;
             if (!$defaultPaidAt) {
-                // fallback μόνο αν δεν υπάρχει προηγούμενη πληρωμή
                 $defaultPaidAt = now();
             }
 
-            // A) ΜΕΙΩΣΗ -> κόψε από τις πιο πρόσφατες πληρωμές
+            // A) ΜΕΙΩΣΗ -> κόψε από τις πιο πρόσφατες πληρωμές (όπως πριν)
             if ($delta < 0) {
                 $toRemove = abs($delta);
 
@@ -793,23 +793,23 @@ class AppointmentController extends Controller
                     }
                 }
             }
-            // B) ΑΥΞΗΣΗ -> φτιάξε νέα πληρωμή με τη διαφορά (με paid_at της τελευταίας)
+            // B) ΑΥΞΗΣΗ -> νέα πληρωμή με επιλογή χρήστη (method/tax)
             else {
                 Payment::create([
                     'appointment_id' => $appointment->id,
                     'customer_id'    => $appointment->customer_id,
                     'amount'         => $delta,
                     'is_full'        => 0,
-                    'paid_at'        => $defaultPaidAt, // ✅ εδώ
-                    'method'         => $defaultMethod,
-                    'tax'            => $defaultTax,
-                    'bank'           => $defaultBank,
-                    'notes'          => '[INLINE_EDIT] Update paid total from appointments table.',
+                    'paid_at'        => $defaultPaidAt,
+                    'method'         => $data['method'],
+                    'tax'            => $data['tax'],
+                    'bank'           => $data['method'] === 'card' ? $defaultBank : null,
+                    'notes'          => '[INLINE_EDIT] Update paid total + method/tax from appointments table.',
                     'created_by'     => Auth::id(),
                 ]);
             }
 
-            // recalc is_full για το appointment
+            // recalc is_full
             $appointment->load('payments');
             $total = (float)($appointment->total_price ?? 0);
             $paid  = (float)$appointment->payments->sum('amount');
@@ -832,11 +832,12 @@ class AppointmentController extends Controller
         });
 
         return response()->json([
-            'success'   => true,
-            'paid_total'=> (float)($result['paid_total'] ?? 0),
-            'formatted' => number_format((float)($result['paid_total'] ?? 0), 2, ',', '.') . ' €',
+            'success'    => true,
+            'paid_total' => (float)($result['paid_total'] ?? 0),
+            'formatted'  => number_format((float)($result['paid_total'] ?? 0), 2, ',', '.') . ' €',
         ]);
     }
+
 
     
     public function destroy(Request $request, Appointment $appointment)

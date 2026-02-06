@@ -13,8 +13,8 @@ class CustomerReceiptController extends Controller
     public function store(Request $request, Customer $customer)
     {
         $data = $request->validate([
-            'amount'       => 'required|numeric|min:0',
-            'comment'      => 'nullable|string|max:1000',
+            'amount'       => 'nullable|numeric|min:0',
+            'comment'      => 'required|string|max:1000',
             'receipt_date' => 'nullable|date',
             'is_issued'    => 'nullable|in:1', // checkbox
         ]);
