@@ -274,263 +274,299 @@ class ProfessionalController extends Controller
 
     public function show(Request $request, Professional $professional)
     {
-        // =========================
-        // 1) PERIOD FILTER (month/day/all + prev/next)
-        // =========================
-        $range = $request->input('range', 'month'); // ✅ default CURRENT MONTH
-        $nav   = $request->input('nav');
+            // =========================
+            // 1) PERIOD FILTER (month/day/all + prev/next)
+            // =========================
+            $range = $request->input('range', 'month'); // ✅ default CURRENT MONTH
+            $nav   = $request->input('nav');
 
-        $day   = $request->input('day');   // Y-m-d
-        $month = $request->input('month'); // Y-m
+            $day   = $request->input('day');   // Y-m-d
+            $month = $request->input('month'); // Y-m
 
-        if ($range === 'day') {
-            $day = $day ?: now()->toDateString();
-            $month = null;
-        } elseif ($range === 'month') {
-            $month = $month ?: now()->format('Y-m');
-            $day = null;
-        } else { // all
-            $day = null;
-            $month = null;
-        }
-
-        // prev/next navigation
-        if ($nav === 'prev' || $nav === 'next') {
             if ($range === 'day') {
-                $base = Carbon::parse($day ?: now()->toDateString());
-                $base = $nav === 'prev' ? $base->subDay() : $base->addDay();
-                $day  = $base->toDateString();
+                $day = $day ?: now()->toDateString();
+                $month = null;
             } elseif ($range === 'month') {
-                $base = Carbon::createFromFormat('Y-m', $month ?: now()->format('Y-m'))->startOfMonth();
-                $base = $nav === 'prev' ? $base->subMonth() : $base->addMonth();
-                $month = $base->format('Y-m');
-            }
-        }
-
-        // convert to from/to (Y-m-d) for filtering
-        $from = null;
-        $to   = null;
-
-        if ($range === 'day' && $day) {
-            $from = Carbon::parse($day)->toDateString();
-            $to   = Carbon::parse($day)->toDateString();
-        } elseif ($range === 'month' && $month) {
-            $m    = Carbon::createFromFormat('Y-m', $month);
-            $from = $m->copy()->startOfMonth()->toDateString();
-            $to   = $m->copy()->endOfMonth()->toDateString();
-        }
-
-        // Label για το view
-        $selectedLabel = 'Όλα';
-        if ($range === 'day' && $day) {
-            $selectedLabel = Carbon::parse($day)->locale('el')->translatedFormat('D d/m/Y');
-        } elseif ($range === 'month' && $month) {
-            $selectedLabel = Carbon::createFromFormat('Y-m', $month)->locale('el')->translatedFormat('F Y');
-        }
-
-        // prev/next URLs (κρατάμε και τα υπόλοιπα φίλτρα)
-        $prevUrl = null;
-        $nextUrl = null;
-
-        if ($range !== 'all') {
-            $baseQuery = $request->query();
-            unset($baseQuery['nav']);
-
-            $baseQuery['range'] = $range;
-            if ($range === 'day') {
-                $baseQuery['day'] = $day ?: now()->toDateString();
-                unset($baseQuery['month']);
-            } elseif ($range === 'month') {
-                $baseQuery['month'] = $month ?: now()->format('Y-m');
-                unset($baseQuery['day']);
+                $month = $month ?: now()->format('Y-m');
+                $day = null;
+            } else { // all
+                $day = null;
+                $month = null;
             }
 
-            $prevUrl = $request->url() . '?' . http_build_query(array_merge($baseQuery, ['nav' => 'prev']));
-            $nextUrl = $request->url() . '?' . http_build_query(array_merge($baseQuery, ['nav' => 'next']));
-        }
+            // prev/next navigation
+            if ($nav === 'prev' || $nav === 'next') {
+                if ($range === 'day') {
+                    $base = Carbon::parse($day ?: now()->toDateString());
+                    $base = $nav === 'prev' ? $base->subDay() : $base->addDay();
+                    $day  = $base->toDateString();
+                } elseif ($range === 'month') {
+                    $base = Carbon::createFromFormat('Y-m', $month ?: now()->format('Y-m'))->startOfMonth();
+                    $base = $nav === 'prev' ? $base->subMonth() : $base->addMonth();
+                    $month = $base->format('Y-m');
+                }
+            }
 
-        // =========================
-        // 2) OTHER FILTERS
-        // =========================
-        $customerName  = $request->input('customer');
+            // convert to from/to (Y-m-d) for filtering
+            $from = null;
+            $to   = null;
 
-        // κρατάω για συμβατότητα (αν δεν τα χρησιμοποιείς στο view, δεν πειράζει)
-        $paymentStatus = $request->input('payment_status'); // all/unpaid/partial/full
-        $paymentMethod = $request->input('payment_method'); // all/cash/card
+            if ($range === 'day' && $day) {
+                $from = Carbon::parse($day)->toDateString();
+                $to   = Carbon::parse($day)->toDateString();
+            } elseif ($range === 'month' && $month) {
+                $m    = Carbon::createFromFormat('Y-m', $month);
+                $from = $m->copy()->startOfMonth()->toDateString();
+                $to   = $m->copy()->endOfMonth()->toDateString();
+            }
 
-        // =========================
-        // 3) MAIN APPOINTMENTS (payments)
-        // =========================
-        $appointmentsCollection = $professional->appointments()
-            ->with(['customer', 'company', 'payments']) // ✅ split-safe
-            ->orderBy('start_time', 'desc')
-            ->get();
+            // Label για το view
+            $selectedLabel = 'Όλα';
+            if ($range === 'day' && $day) {
+                $selectedLabel = Carbon::parse($day)->locale('el')->translatedFormat('D d/m/Y');
+            } elseif ($range === 'month' && $month) {
+                $selectedLabel = Carbon::createFromFormat('Y-m', $month)->locale('el')->translatedFormat('F Y');
+            }
 
-        $filteredAppointments = $appointmentsCollection;
+            // prev/next URLs (κρατάμε και τα υπόλοιπα φίλτρα)
+            $prevUrl = null;
+            $nextUrl = null;
 
-        // apply period
-        if ($from && $to) {
-            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($from, $to) {
-                if (!$a->start_time) return false;
-                $d = $a->start_time->toDateString();
-                return $d >= $from && $d <= $to;
+            if ($range !== 'all') {
+                $baseQuery = $request->query();
+                unset($baseQuery['nav']);
+
+                $baseQuery['range'] = $range;
+                if ($range === 'day') {
+                    $baseQuery['day'] = $day ?: now()->toDateString();
+                    unset($baseQuery['month']);
+                } elseif ($range === 'month') {
+                    $baseQuery['month'] = $month ?: now()->format('Y-m');
+                    unset($baseQuery['day']);
+                }
+
+                $prevUrl = $request->url() . '?' . http_build_query(array_merge($baseQuery, ['nav' => 'prev']));
+                $nextUrl = $request->url() . '?' . http_build_query(array_merge($baseQuery, ['nav' => 'next']));
+            }
+
+            // =========================
+            // 2) OTHER FILTERS
+            // =========================
+            $customerName  = $request->input('customer');
+
+            // κρατάω για συμβατότητα (αν δεν τα χρησιμοποιείς στο view, δεν πειράζει)
+            $paymentStatus = $request->input('payment_status'); // all/unpaid/partial/full
+            $paymentMethod = $request->input('payment_method'); // all/cash/card
+
+            // =========================
+            // 3) MAIN APPOINTMENTS (payments)
+            // =========================
+            $appointmentsCollection = $professional->appointments()
+                ->with(['customer', 'company', 'payments']) // ✅ split-safe
+                ->orderBy('start_time', 'desc')
+                ->get();
+
+            $filteredAppointments = $appointmentsCollection;
+
+            // apply period
+            if ($from && $to) {
+                $filteredAppointments = $filteredAppointments->filter(function ($a) use ($from, $to) {
+                    if (!$a->start_time) return false;
+                    $d = $a->start_time->toDateString();
+                    return $d >= $from && $d <= $to;
+                });
+            }
+
+            // customer text filter
+            if ($customerName) {
+                $name = mb_strtolower($customerName);
+                $filteredAppointments = $filteredAppointments->filter(function ($a) use ($name) {
+                    if (!$a->customer) return false;
+
+                    $full    = mb_strtolower($a->customer->first_name . ' ' . $a->customer->last_name);
+                    $fullRev = mb_strtolower($a->customer->last_name . ' ' . $a->customer->first_name);
+
+                    return str_contains($full, $name) || str_contains($fullRev, $name);
+                });
+            }
+
+            // payment status (optional)
+            if ($paymentStatus && $paymentStatus !== 'all') {
+                $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentStatus) {
+                    $total = (float)($a->total_price ?? 0);
+                    $paid  = (float)$a->payments->sum('amount');
+
+                    return match ($paymentStatus) {
+                        'unpaid'  => $paid <= 0,
+                        'partial' => $paid > 0 && $paid < $total,
+                        'full'    => $total > 0 && $paid >= $total,
+                        default   => true,
+                    };
+                });
+            }
+
+            // payment method (optional)
+            if ($paymentMethod && $paymentMethod !== 'all') {
+                $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentMethod) {
+                    return $a->payments->contains(fn($p) => $p->method === $paymentMethod);
+                });
+            }
+
+            // =========================
+            // 4) STATS (on filtered)
+            // =========================
+            $appointmentsCount = $filteredAppointments->count();
+
+            $totalAmount = $filteredAppointments->sum(fn($a) => (float)($a->total_price ?? 0));
+
+            $professionalTotalCut = $filteredAppointments->sum(function ($a) use ($professional) {
+                return (float)($a->professional_amount ?? $professional->percentage_cut ?? 0);
             });
-        }
 
-        // customer text filter
-        if ($customerName) {
-            $name = mb_strtolower($customerName);
-            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($name) {
-                if (!$a->customer) return false;
+            $paidTotal = $filteredAppointments->sum(fn($a) => (float)$a->payments->sum('amount'));
+            $outstandingTotal = max($totalAmount - $paidTotal, 0);
 
-                $full    = mb_strtolower($a->customer->first_name . ' ' . $a->customer->last_name);
-                $fullRev = mb_strtolower($a->customer->last_name . ' ' . $a->customer->first_name);
-
-                return str_contains($full, $name) || str_contains($fullRev, $name);
-            });
-        }
-
-        // payment status (optional)
-        if ($paymentStatus && $paymentStatus !== 'all') {
-            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentStatus) {
+            $professionalPaid = $filteredAppointments->sum(function ($a) {
                 $total = (float)($a->total_price ?? 0);
                 $paid  = (float)$a->payments->sum('amount');
 
-                return match ($paymentStatus) {
-                    'unpaid'  => $paid <= 0,
-                    'partial' => $paid > 0 && $paid < $total,
-                    'full'    => $total > 0 && $paid >= $total,
-                    default   => true,
-                };
+                return ($total > 0 && $paid >= $total)
+                    ? (float)($a->professional_amount ?? 0)
+                    : 0.0;
             });
-        }
 
-        // payment method (optional)
-        if ($paymentMethod && $paymentMethod !== 'all') {
-            $filteredAppointments = $filteredAppointments->filter(function ($a) use ($paymentMethod) {
-                return $a->payments->contains(fn($p) => $p->method === $paymentMethod);
-            });
-        }
+            $professionalOutstanding = max($professionalTotalCut - $professionalPaid, 0);
 
-        // =========================
-        // 4) STATS (on filtered)
-        // =========================
-        $appointmentsCount = $filteredAppointments->count();
+            // =========================
+            // 5) THERAPIST APPOINTMENTS (match + missing) WITH SAME PERIOD
+            // =========================
+            $therapistQuery = TherapistAppointment::with('customer')
+                ->where('professional_id', $professional->id);
 
-        $totalAmount = $filteredAppointments->sum(fn($a) => (float)($a->total_price ?? 0));
+            if ($from) $therapistQuery->whereDate('start_time', '>=', $from);
+            if ($to)   $therapistQuery->whereDate('start_time', '<=', $to);
 
-        $professionalTotalCut = $filteredAppointments->sum(function ($a) use ($professional) {
-            return (float)($a->professional_amount ?? $professional->percentage_cut ?? 0);
-        });
-
-        $paidTotal = $filteredAppointments->sum(fn($a) => (float)$a->payments->sum('amount'));
-        $outstandingTotal = max($totalAmount - $paidTotal, 0);
-
-        $professionalPaid = $filteredAppointments->sum(function ($a) {
-            $total = (float)($a->total_price ?? 0);
-            $paid  = (float)$a->payments->sum('amount');
-
-            return ($total > 0 && $paid >= $total)
-                ? (float)($a->professional_amount ?? 0)
-                : 0.0;
-        });
-
-        $professionalOutstanding = max($professionalTotalCut - $professionalPaid, 0);
-
-        // =========================
-        // 5) THERAPIST APPOINTMENTS (match + missing) WITH SAME PERIOD
-        // =========================
-        $therapistQuery = TherapistAppointment::with('customer')
-            ->where('professional_id', $professional->id);
-
-        if ($from) $therapistQuery->whereDate('start_time', '>=', $from);
-        if ($to)   $therapistQuery->whereDate('start_time', '<=', $to);
-
-        if ($customerName) {
-            $name = mb_strtolower($customerName);
-            $therapistQuery->whereHas('customer', function ($q) use ($name) {
-                $q->whereRaw("LOWER(CONCAT(first_name,' ',last_name)) like ?", ["%{$name}%"])
-                ->orWhereRaw("LOWER(CONCAT(last_name,' ',first_name)) like ?", ["%{$name}%"]);
-            });
-        }
-
-        $therapistAppointments = $therapistQuery->get();
-
-        $mainKeys = [];
-        foreach ($filteredAppointments as $a) {
-            if ($a->customer_id && $a->start_time) {
-                $key = $a->customer_id . '|' . $a->start_time->toDateString();
-                $mainKeys[$key] = true;
+            if ($customerName) {
+                $name = mb_strtolower($customerName);
+                $therapistQuery->whereHas('customer', function ($q) use ($name) {
+                    $q->whereRaw("LOWER(CONCAT(first_name,' ',last_name)) like ?", ["%{$name}%"])
+                    ->orWhereRaw("LOWER(CONCAT(last_name,' ',first_name)) like ?", ["%{$name}%"]);
+                });
             }
-        }
 
-        $therapistMatches = [];
-        $therapistMissing = [];
+            $therapistAppointments = $therapistQuery->get();
 
-        foreach ($therapistAppointments as $ta) {
-            if (!$ta->start_time) continue;
-
-            $key = $ta->customer_id . '|' . $ta->start_time->toDateString();
-
-            if (isset($mainKeys[$key])) {
-                $therapistMatches[$key] = true;
-            } else {
-                $therapistMissing[] = $ta;
+            $mainKeys = [];
+            foreach ($filteredAppointments as $a) {
+                if ($a->customer_id && $a->start_time) {
+                    $key = $a->customer_id . '|' . $a->start_time->toDateString();
+                    $mainKeys[$key] = true;
+                }
             }
-        }
 
-        // =========================
-        // 6) PAGINATION
-        // =========================
-        $perPage = 25;
-        $currentPage = Paginator::resolveCurrentPage() ?: 1;
+            $therapistMatches = [];
+            $therapistMissing = [];
 
-        $currentItems = $filteredAppointments
-            ->values()
-            ->forPage($currentPage, $perPage);
+            foreach ($therapistAppointments as $ta) {
+                if (!$ta->start_time) continue;
 
-        $appointments = new LengthAwarePaginator(
-            $currentItems,
-            $filteredAppointments->count(),
-            $perPage,
-            $currentPage,
-            [
-                'path'  => $request->url(),
-                'query' => $request->query(),
-            ]
-        );
+                $key = $ta->customer_id . '|' . $ta->start_time->toDateString();
 
-        $filters = [
-            'range'          => $range,
-            'day'            => $day,
-            'month'          => $month,
+                if (isset($mainKeys[$key])) {
+                    $therapistMatches[$key] = true;
+                } else {
+                    $therapistMissing[] = $ta;
+                }
+            }
 
-            'customer'       => $customerName,
+            // =========================
+            // 6) PAGINATION
+            // =========================
+            $perPage = 25;
+            $currentPage = Paginator::resolveCurrentPage() ?: 1;
 
-            'payment_status' => $paymentStatus ?? 'all',
-            'payment_method' => $paymentMethod ?? 'all',
+            $currentItems = $filteredAppointments
+                ->values()
+                ->forPage($currentPage, $perPage);
+
+            $appointments = new LengthAwarePaginator(
+                $currentItems,
+                $filteredAppointments->count(),
+                $perPage,
+                $currentPage,
+                [
+                    'path'  => $request->url(),
+                    'query' => $request->query(),
+                ]
+            );
+
+            $filters = [
+                'range'          => $range,
+                'day'            => $day,
+                'month'          => $month,
+
+                'customer'       => $customerName,
+
+                'payment_status' => $paymentStatus ?? 'all',
+                'payment_method' => $paymentMethod ?? 'all',
+            ];
+
+            return view('professionals.show', compact(
+                'professional',
+                'appointments',
+
+                'appointmentsCount',
+                'totalAmount',
+                'professionalTotalCut',
+                'paidTotal',
+                'outstandingTotal',
+                'professionalPaid',
+                'professionalOutstanding',
+
+                'filters',
+                'therapistMatches',
+                'therapistMissing',
+
+                'prevUrl',
+                'nextUrl',
+                'selectedLabel'
+            ));
+    }
+
+     public function getDefaults(Request $request)
+    {
+        $id = (int)$request->query('professional_id');
+        if (!$id) return response()->json(['found' => false]);
+
+        $p = Professional::find($id);
+        if (!$p) return response()->json(['found' => false]);
+
+        // 🔧 ΚΑΝΟΝΕΣ ΑΝΤΙΣΤΟΙΧΙΣΗΣ (ρύθμισέ τους όπως θες)
+        // option values είναι αυτά που έχεις στο select: logotherapia, psixotherapia, ergotherapia, omadiki, eidikos, aksiologisi
+        $defaults = [];
+
+        // Αν έχεις πεδίο eidikotita στο professionals (το έχεις) κάνε map:
+        $map = [
+            'Λογοθεραπευτής'       => ['logotherapia'],
+            'Ψυχοθεραπευτής'       => ['psixotherapia'],
+            'Εργοθεραπευτής'       => ['ergotherapia'],
+            'Ειδικός παιδαγωγός'   => ['eidikos'],
         ];
 
-        return view('professionals.show', compact(
-            'professional',
-            'appointments',
+        if (!empty($p->eidikotita) && isset($map[$p->eidikotita])) {
+            $defaults = $map[$p->eidikotita];
+        }
 
-            'appointmentsCount',
-            'totalAmount',
-            'professionalTotalCut',
-            'paidTotal',
-            'outstandingTotal',
-            'professionalPaid',
-            'professionalOutstanding',
+        // fallback: αν δεν έχει eidikotita βάλε π.χ. λογοθεραπεία
+        if (empty($defaults)) {
+            $defaults = ['logotherapia'];
+        }
 
-            'filters',
-            'therapistMatches',
-            'therapistMissing',
-
-            'prevUrl',
-            'nextUrl',
-            'selectedLabel'
-        ));
-}
+        return response()->json([
+            'found' => true,
+            'company_id' => (int)$p->company_id,     // για να συνεχίσει να δουλεύει και το auto company
+            'status' => $defaults,                   // array από values για multi-select
+        ]);
+    }
 
 }

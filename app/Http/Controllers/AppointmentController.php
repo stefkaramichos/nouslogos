@@ -852,4 +852,6 @@ class AppointmentController extends Controller
 
         return redirect()->route('appointments.index')->with('success', 'Το ραντεβού διαγράφηκε επιτυχώς.');
     }
+
+   
 }

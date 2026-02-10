@@ -69,6 +69,9 @@ Route::middleware('auth')->group(function () {
     Route::delete('/companies/{company}', [CompanyController::class, 'destroy'])
         ->name('companies.destroy');
 
+    Route::get('/professionals/defaults', [ProfessionalController::class, 'getDefaults'])
+        ->name('professionals.getDefaults');
+
     // Πελάτες / Επαγγελματίες / Ραντεβού
     Route::resource('customers', CustomerController::class);
     Route::resource('professionals', ProfessionalController::class);
@@ -192,6 +195,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/appointments/{appointment}/update-paid-total', [AppointmentController::class, 'updatePaidTotal'])
     ->name('appointments.updatePaidTotal');
 
+    
 
     Route::post('/customers/{customer}/receipts', [CustomerReceiptController::class, 'store'])
         ->name('customers.receipts.store');

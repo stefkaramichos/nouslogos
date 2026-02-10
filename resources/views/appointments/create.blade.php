@@ -161,7 +161,7 @@ $(function () {
     if (window.__multiAppointmentInit) return;
     window.__multiAppointmentInit = true;
 
-    const professionalCompanyUrl = "{{ route('professionals.getCompany') }}";
+    const professionalDefaultsUrl = "{{ route('professionals.getDefaults') }}";
     const lastAppointmentUrl     = "{{ route('customers.lastAppointment') }}";
 
     let rowIndex = 0;
@@ -217,23 +217,36 @@ $(function () {
         }
     }
 
-    function autoFillCompany($row) {
+    function autoFillCompanyAndStatus($row) {
         const profId = $row.find('.professional_select').val();
+
         if (!profId) {
             $row.find('.company_select').val(null).trigger('change');
+            $row.find('.status_select').val(null).trigger('change');
             return;
         }
 
-        $.getJSON(professionalCompanyUrl, { professional_id: profId })
+        $.getJSON(professionalDefaultsUrl, { professional_id: profId })
             .done(function (data) {
-                if (data && data.found) {
-                    $row.find('.company_select').val(data.company_id).trigger('change');
+                if (!data || !data.found) return;
+
+                // company
+                if (data.company_id) {
+                    $row.find('.company_select').val(String(data.company_id)).trigger('change');
+                }
+
+                // status (multi)
+                // ✅ ΜΗΝ overwrite αν ο χρήστης έχει ήδη βάλει κάτι
+                const current = $row.find('.status_select').val() || [];
+                if (current.length === 0 && Array.isArray(data.status)) {
+                    $row.find('.status_select').val(data.status.map(String)).trigger('change');
                 }
             })
             .fail(function (err) {
-                console.error("Σφάλμα στο fetch εταιρείας επαγγελματία:", err);
+                console.error("Σφάλμα στο fetch defaults επαγγελματία:", err);
             });
     }
+
 
     function getFirstRow() {
         return $('#rowsContainer .appointment-row').first();
@@ -252,7 +265,7 @@ $(function () {
 
         $row.on('change', '.professional_select', function () {
             toggleProfessionalAmount($row);
-            autoFillCompany($row);
+            autoFillCompanyAndStatus($row);
         });
 
         toggleProfessionalAmount($row);
