@@ -675,6 +675,11 @@ class CustomerController extends Controller
             $nextUrl = $request->url() . '?' . http_build_query(array_merge($baseQuery, ['nav' => 'next']));
         }
 
+        $issuedReceipts = $receipts->where('is_issued', 1);
+
+        $issuedReceiptsCount = $issuedReceipts->count();
+        $issuedReceiptsTotal = (float) $issuedReceipts->sum('amount');
+
         $prepayment = \App\Models\CustomerPrepayment::where('customer_id', $customer->id)->first();
 
         $selectedLabel = 'Όλα';
@@ -716,6 +721,8 @@ class CustomerController extends Controller
             'prepayment',
             'taxFixLogs',
             'receipts',
+            'issuedReceiptsCount',
+            'issuedReceiptsTotal',
         ));
     }
 

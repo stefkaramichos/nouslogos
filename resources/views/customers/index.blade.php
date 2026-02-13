@@ -223,7 +223,7 @@
                             <td>
                                 @if($customer->informations)
                                     <span title="{{ $customer->informations }}" style="cursor: help;">
-                                        {{ Str::limit($customer->informations, 100) }}
+                                        {{ Str::limit($customer->informations, 30) }}
                                     </span>
                                 @else
                                     <span class="text-muted">-</span>
@@ -241,23 +241,23 @@
                                         <span class="text-muted">-</span>
                                     @else
                                         <div class="d-flex flex-column" style="line-height:1.1;">
-                                            <span class="badge bg-warning text-dark align-self-start">
-                                                {{ $unissuedCount }} ΟΧΙ
-                                            </span>
-
-                                            <small class="text-muted">
-                                                {{ number_format($unissuedSum, 2, ',', '.') }} €
-                                            </small>
-
-                                            <small class="text-muted">
+                                                 <small class="text-muted">
                                                 {{-- δείξε μέχρι 2-3 σχόλια για “preview” --}}
                                                 @foreach($unissued->take(2) as $r)
-                                                    {{ \Illuminate\Support\Str::limit($r->comment ?? 'χωρίς σχόλιο', 100) }}@if(!$loop->last), @endif
+                                                    {{ \Illuminate\Support\Str::limit($r->comment ?? 'χωρίς σχόλιο', 100) }}@if(!$loop->last), @endif <br>
                                                 @endforeach
                                                 @if($unissuedCount > 2)
                                                     …
                                                 @endif
-                                            </small>
+                                            </small><br>
+                                            {{-- <small class="text-muted">
+                                                {{ number_format($unissuedSum, 2, ',', '.') }} €
+                                            </small> --}}
+                                            <span class="badge bg-warning text-dark align-self-start">
+                                                {{ $unissuedCount }} ΟΧΙ
+                                            </span>
+
+                                       
                                         </div>
                                     @endif
                                 </td>

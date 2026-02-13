@@ -280,12 +280,25 @@
                     {{-- ===================== ΑΠΟΔΕΙΞΕΙΣ (ΝΕΟ BOX) ===================== --}}
                     <div class="border rounded p-2" style="background:#f8f9fa;">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <strong>Αποδείξεις</strong>
+                            <div>
+                                <strong>Αποδείξεις</strong>
+
+                                <div class="mt-1" style="font-size:0.85rem;">
+                                    <span class="badge bg-success">
+                                        Κομμένες: {{ $issuedReceiptsCount ?? 0 }}
+                                    </span>
+
+                                    <span class="badge bg-primary">
+                                        Σύνολο κομμένων: {{ number_format((float)($issuedReceiptsTotal ?? 0), 2, ',', '.') }} €
+                                    </span>
+                                </div>
+                            </div>
 
                             <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#receiptCreateModal">
                                 + Νέα Απόδειξη
                             </button>
                         </div>
+
 
                         <div class="table-responsive" style="max-height: 180px; overflow-y:auto; font-size:0.85rem;">
                             <table class="table table-sm table-striped align-middle mb-0">
