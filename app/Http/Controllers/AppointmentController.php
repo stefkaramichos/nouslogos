@@ -34,7 +34,7 @@ class AppointmentController extends Controller
                     'is_full'        => 1,
                     'paid_at'        => now(),
                     'method'         => null,
-                    'tax'            => null,
+                    'tax'            => 'N',
                     'bank'           => null,
                     'notes'          => '[AUTO_ZERO] Μηδενική χρέωση - αυτόματη εξόφληση.',
                     'created_by'     => Auth::id(),
