@@ -1414,250 +1414,240 @@ class CustomerController extends Controller
         );
     }
 
-    public function taxFixOldestCashNoReceipt(Request $request, Customer $customer)
-    {
-        $anchor = $request->input('_anchor', 'tax-fix-oldest');
+    
+public function taxFixOldestCashNoReceipt(Request $request, Customer $customer)
+{
+    $anchor = $request->input('_anchor', 'tax-fix-oldest');
 
-        $data = $request->validate([
-            'fix_amount' => ['required','integer','min:5', function ($attr, $value, $fail) {
-                if ($value % 5 !== 0) $fail('Το ποσό πρέπει να είναι πολλαπλάσιο του 5 (5,10,15...).');
-            }],
-            'run_at'  => 'required|date',
-            'method'  => 'required|in:cash,card',
-            'comment' => 'nullable|string|max:1000',
-        ]);
+    $data = $request->validate([
+        'fix_amount' => ['required','integer','min:5', function ($attr, $value, $fail) {
+            if ($value % 5 !== 0) $fail('Το ποσό πρέπει να είναι πολλαπλάσιο του 5 (5,10,15...).');
+        }],
+        'run_at'  => 'required|date',
+        'method'  => 'required|in:cash,card',
+        'comment' => 'nullable|string|max:1000',
+    ]);
 
-        $requestedFixAmount = (int)$data['fix_amount'];
-        $requestedX = (int)($requestedFixAmount / 5);
+    $requestedFixAmount = (int)$data['fix_amount'];
+    $requestedX = (int)($requestedFixAmount / 5);
 
-        if ($requestedX <= 0) {
-            return redirect()->back()
-                ->withFragment($anchor)
-                ->with('error', 'Μη έγκυρη τιμή.');
+    if ($requestedX <= 0) {
+        return redirect()->back()
+            ->withFragment($anchor)
+            ->with('error', 'Μη έγκυρη τιμή.');
+    }
+
+    $runAt  = Carbon::parse($data['run_at'])->startOfDay();
+    $method = $data['method']; // cash | card
+
+    $changedPayments = 0;
+    $createdAddons   = 0;
+    $changedAppointments = 0;
+
+    $actualX = 0;
+    $actualFixAmount = 0;
+
+    DB::transaction(function () use (
+        $customer, $requestedX, $runAt, $method, $data,
+        &$changedPayments, &$createdAddons, &$changedAppointments,
+        &$actualX, &$actualFixAmount
+    ) {
+
+        // 1) Φέρνουμε eligible payments (oldest first) και κρατάμε 1 payment ανά appointment
+        $paymentsRaw = Payment::query()
+            ->where('customer_id', $customer->id)
+            ->where('method', 'cash')     // παλιές cash
+            ->where('tax', 'N')           // χωρίς απόδειξη
+            ->whereNotNull('appointment_id')
+            ->whereHas('appointment', function ($q) {
+                $q->where('status', '!=', 'aksiologisi')
+                  ->whereRaw('COALESCE(total_price,0) <> 35.00');
+            })
+            ->with(['appointment:id,status,total_price'])
+            ->orderByRaw('paid_at IS NULL DESC')
+            ->orderBy('paid_at', 'asc')
+            ->orderBy('id', 'asc')
+            ->limit($requestedX * 10)     // “χώρος” για distinct appointments
+            ->lockForUpdate()
+            ->get();
+
+        $payments = $paymentsRaw
+            ->unique('appointment_id')
+            ->values()
+            ->take($requestedX);
+
+        if ($payments->isEmpty()) {
+            return;
         }
 
-        $runAt  = Carbon::parse($data['run_at'])->startOfDay();
-        $method = $data['method'];
+        $actualX = $payments->count();
+        $actualFixAmount = $actualX * 5;
 
-        $changedPayments = 0;
-        $createdAddons   = 0;
-        $changedAppointments = 0;
+        $appointmentIds = $payments->pluck('appointment_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
 
-        // ✅ actual (μόνο eligible)
-        $actualX = 0;
-        $actualFixAmount = 0;
-
-        DB::transaction(function () use (
-            $customer, $requestedX, $runAt, $method, $data,
-            &$changedPayments, &$createdAddons, &$changedAppointments,
-            &$actualX, &$actualFixAmount
-        ) {
-
-            /**
-             * ✅ Παίρνουμε ΜΟΝΟ τις παλιές cash tax=N πληρωμές
-             * που ανήκουν σε ραντεβού:
-             * - ΟΧΙ aksiologisi
-             * - ΟΧΙ total_price = 35
-             *
-             * Άρα ό,τι ΔΕΝ είναι eligible δεν το “πιάνουμε” καθόλου:
-             * - δεν γίνεται tax_fix
-             * - δεν γίνεται addon
-             * - δεν κιτρινίζει
-             * - δεν μπαίνει στο ποσό/log
-             */
-            $payments = Payment::query()
-                ->where('customer_id', $customer->id)
-                ->where('method', 'cash')
-                ->where('tax', 'N')
-                ->whereNotNull('appointment_id')
-                ->whereHas('appointment', function ($q) {
-                    $q->where('status', '!=', 'aksiologisi')
-                    ->whereRaw('COALESCE(total_price,0) <> 35.00');
-                })
-                ->with(['appointment:id,status,total_price'])
-                ->orderByRaw('paid_at IS NULL DESC')
-                ->orderBy('paid_at', 'asc')
-                ->orderBy('id', 'asc')
-                ->limit($requestedX)
-                ->lockForUpdate()
-                ->get();
-
-            // ✅ Αν δεν υπάρχει κανένα eligible
-            if ($payments->isEmpty()) {
-                return;
-            }
-
-            $paymentIds = $payments->pluck('id')->all();
-
-            // ✅ actual = πόσα eligible βρήκαμε
-            $actualX = $payments->count();
-            $actualFixAmount = $actualX * 5;
-
-            // ✅ appointments που όντως θα πάρουν +5 (ίδια με τα eligible)
-            $appointmentIds = $payments->pluck('appointment_id')
-                ->filter()
-                ->unique()
-                ->values()
-                ->all();
-
-            // ✅ 1) ΜΟΝΟ αυτά γίνονται tax fixed (άρα μόνο αυτά κιτρινίζουν)
-            $changedPayments = Payment::whereIn('id', $paymentIds)->update([
+        // 2) ✅ Μετατροπή όλων των “χωρίς απόδειξη” (tax=N) στα affected appointments
+        //    ώστε να μην είναι ανακατεμένα.
+        $changedPayments = Payment::where('customer_id', $customer->id)
+            ->whereIn('appointment_id', $appointmentIds)
+            ->where('tax', 'N')
+            // συνήθως “χωρίς απόδειξη” είναι cash. Αν θες να πιάνει και άλλα, βγάλε το where('method','cash')
+            ->where('method', 'cash')
+            ->update([
                 'tax'          => 'Y',
+                'method'       => $method,   // ✅ cash ή card
+                'bank'         => null,      // δεν έχεις επιλογή bank εδώ
                 'is_tax_fixed' => 1,
                 'tax_fixed_at' => $runAt,
                 'updated_at'   => now(),
             ]);
 
-            // ✅ 2) Create NEW payment +5€ για ΚΑΘΕ eligible
-            foreach ($payments as $p) {
-                Payment::create([
-                    'appointment_id' => $p->appointment_id,
-                    'customer_id'    => $customer->id,
-                    'amount'         => 5.00,
-                    'is_full'        => 0,
-                    'paid_at'        => $runAt,
-                    'method'         => $method,
-                    'tax'            => 'Y',
-                    'bank'           => null,
-                    'notes'          => '[TAX_FIX_ADDON] +5€ για διόρθωση παλαιού cash χωρίς απόδειξη.'
-                                    . (!empty($data['comment']) ? ' ' . $data['comment'] : ''),
-                    'created_by'     => Auth::id(),
-                ]);
-
-                $createdAddons++;
-            }
-
-            // ✅ 3) Increase total_price by +5 ΜΟΝΟ στα eligible ραντεβού
-            if (!empty($appointmentIds)) {
-                $changedAppointments = Appointment::whereIn('id', $appointmentIds)->update([
-                    'total_price' => DB::raw('COALESCE(total_price,0) + 5.00'),
-                    'updated_at'  => now(),
-                ]);
-
-                // ✅ 4) recalc is_full μόνο εκεί που άλλαξε
-                $this->recalcIsFullForAppointments($appointmentIds);
-            }
-
-            // ✅ 5) Log με ACTUAL ποσό (eligible μόνο)
-            DB::table('customer_tax_fix_logs')->insert([
-                'customer_id' => $customer->id,
-                'created_by'  => Auth::id(),
-
-                // ✅ γράφουμε ό,τι όντως έγινε
-                'fix_amount'  => (int)$actualFixAmount, // π.χ. 15
-                'x_payments'  => (int)$actualX,         // π.χ. 3
-
-                'old_amount'  => 0.00,
-                'new_amount'  => 5.00,
-
-                'changed_payments'     => (int)$changedPayments,
-                'changed_appointments' => (int)$changedAppointments,
-
-                'run_at'  => $runAt,
-                'comment' => $data['comment'] ?? null,
-
-                'payment_ids'     => json_encode($paymentIds, JSON_UNESCAPED_UNICODE),
-                'appointment_ids' => json_encode($appointmentIds, JSON_UNESCAPED_UNICODE),
-
-                'created_at' => now(),
-                'updated_at' => now(),
+        // 3) Create addon +5€ (1 ανά appointment)
+        foreach ($appointmentIds as $apptId) {
+            Payment::create([
+                'appointment_id' => $apptId,
+                'customer_id'    => $customer->id,
+                'amount'         => 5.00,
+                'is_full'        => 0,
+                'paid_at'        => $runAt,
+                'method'         => $method,
+                'tax'            => 'Y',
+                'bank'           => null,
+                'notes'          => '[TAX_FIX_ADDON] +5€ για διόρθωση παλαιού cash χωρίς απόδειξη.'
+                                . (!empty($data['comment']) ? ' ' . $data['comment'] : ''),
+                'created_by'     => Auth::id(),
             ]);
-        });
-
-        // Αν δεν βρέθηκαν eligible μέσα στο transaction
-        if ($actualX <= 0) {
-            return redirect()->back()
-                ->withFragment($anchor)
-                ->with('error', 'Δεν βρέθηκαν eligible πληρωμές για διόρθωση (εξαιρούνται: total=35 ή status=aksiologisi).');
+            $createdAddons++;
         }
 
-        return redirect()->back()
-            ->withFragment($anchor)
-            ->with(
-                'success',
-                "Ολοκληρώθηκε: βρέθηκαν {$actualX} eligible εγγραφές. "
-                . "Καταγράφηκε ποσό {$actualFixAmount}€ και κιτρινίστηκαν μόνο αυτά τα ραντεβού. "
-                . "Δημιουργήθηκαν {$createdAddons} νέα payments των 5€."
-            );
-    }
-
-
-    public function updateTaxFixLogAmount(Request $request, Customer $customer, $logId)
-    {
-        $data = $request->validate([
-            'fix_amount' => ['required','integer','min:0', function ($attr, $value, $fail) {
-                if ($value % 5 !== 0) $fail('Το ποσό πρέπει να είναι πολλαπλάσιο του 5 (5,10,15...).');
-            }],
+        // 4) Increase total_price +5 μόνο στα affected appointments
+        $changedAppointments = Appointment::whereIn('id', $appointmentIds)->update([
+            'total_price' => DB::raw('COALESCE(total_price,0) + 5.00'),
+            'updated_at'  => now(),
         ]);
 
-        $newAmount = (int)$data['fix_amount'];
+        $this->recalcIsFullForAppointments($appointmentIds);
 
-        // βρες log
-        $log = DB::table('customer_tax_fix_logs')
-            ->where('id', (int)$logId)
-            ->where('customer_id', $customer->id)
-            ->lockForUpdate()
-            ->first();
+        // 5) Log
+        DB::table('customer_tax_fix_logs')->insert([
+            'customer_id' => $customer->id,
+            'created_by'  => Auth::id(),
 
-        if (!$log) {
-            return response()->json(['success' => false, 'message' => 'Το log δεν βρέθηκε.'], 404);
-        }
+            'fix_amount'  => (int)$actualFixAmount,
+            'x_payments'  => (int)$actualX,
 
-        $oldAmount = (int)($log->fix_amount ?? 0);
+            'old_amount'  => 0.00,
+            'new_amount'  => 5.00,
 
-        if ($newAmount === $oldAmount) {
-            return response()->json(['success' => true]);
-        }
+            'changed_payments'     => (int)$changedPayments,
+            'changed_appointments' => (int)$changedAppointments,
 
-        $delta = $newAmount - $oldAmount;
-        if ($delta % 5 !== 0) {
-            return response()->json(['success' => false, 'message' => 'Διαφορά ποσού μη έγκυρη.'], 422);
-        }
+            'run_at'  => $runAt,
+            'comment' => $data['comment'] ?? null,
 
-        $runAt = $log->run_at ? Carbon::parse($log->run_at)->startOfDay() : now()->startOfDay();
+            // προαιρετικά: εδώ πια δεν έχει νόημα paymentIds (γιατί αλλάζεις πολλά).
+            // κρατάμε appointments για audit
+            'payment_ids'     => json_encode([], JSON_UNESCAPED_UNICODE),
+            'appointment_ids' => json_encode($appointmentIds, JSON_UNESCAPED_UNICODE),
 
-        $changedPayments = 0;
-        $createdAddons   = 0;
-        $deletedAddons   = 0;
-        $changedAppointments = 0;
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    });
 
-        $newPaymentIds = [];
-        $affectedAppointmentIds = [];
+    if ($actualX <= 0) {
+        return redirect()->back()
+            ->withFragment($anchor)
+            ->with('error', 'Δεν βρέθηκαν eligible πληρωμές για διόρθωση (εξαιρούνται: total=35 ή status=aksiologisi).');
+    }
 
-        DB::transaction(function () use (
-            $customer, $log, $newAmount, $oldAmount, $delta, $runAt,
-            &$changedPayments, &$createdAddons, &$deletedAddons, &$changedAppointments,
-            &$newPaymentIds, &$affectedAppointmentIds
-        ) {
+    return redirect()->back()
+        ->withFragment($anchor)
+        ->with(
+            'success',
+            "Ολοκληρώθηκε: βρέθηκαν {$actualX} eligible ραντεβού. "
+            . "Καταγράφηκε ποσό {$actualFixAmount}€ και διορθώθηκαν όλα τα tax=N στα ραντεβού αυτά. "
+            . "Δημιουργήθηκαν {$createdAddons} νέα payments των 5€."
+        );
+}
 
-           // --- ΠΕΡΙΠΤΩΣΗ Α: ΑΥΞΗΣΗ (μοιράζουμε το delta σε chunks των 5€ ανά appointment, 1 payment ανά appointment)
+
+
+public function updateTaxFixLogAmount(Request $request, Customer $customer, $logId)
+{
+    $data = $request->validate([
+        'fix_amount' => ['required','integer','min:0', function ($attr, $value, $fail) {
+            if ($value % 5 !== 0) $fail('Το ποσό πρέπει να είναι πολλαπλάσιο του 5 (5,10,15...).');
+        }],
+    ]);
+
+    $newAmount = (int)$data['fix_amount'];
+
+    $log = DB::table('customer_tax_fix_logs')
+        ->where('id', (int)$logId)
+        ->where('customer_id', $customer->id)
+        ->lockForUpdate()
+        ->first();
+
+    if (!$log) {
+        return response()->json(['success' => false, 'message' => 'Το log δεν βρέθηκε.'], 404);
+    }
+
+    $oldAmount = (int)($log->fix_amount ?? 0);
+
+    if ($newAmount === $oldAmount) {
+        return response()->json(['success' => true]);
+    }
+
+    $delta = $newAmount - $oldAmount;
+    if ($delta % 5 !== 0) {
+        return response()->json(['success' => false, 'message' => 'Διαφορά ποσού μη έγκυρη.'], 422);
+    }
+
+    $runAt = $log->run_at ? Carbon::parse($log->run_at)->startOfDay() : now()->startOfDay();
+
+    $changedPayments = 0;
+    $createdAddons   = 0;
+    $deletedAddons   = 0;
+    $changedAppointments = 0;
+
+    $newPaymentIds = [];
+    $affectedAppointmentIds = [];
+
+    DB::transaction(function () use (
+        $customer, $log, $newAmount, $oldAmount, $delta, $runAt,
+        &$changedPayments, &$createdAddons, &$deletedAddons, &$changedAppointments,
+        &$newPaymentIds, &$affectedAppointmentIds
+    ) {
+
+        // =========================
+        // A) ΑΥΞΗΣΗ
+        // =========================
         if ($delta > 0) {
 
-            $remaining = (int)$delta; // πάντα πολλαπλάσιο του 5
+            $remaining = (int)$delta; // πολλαπλάσιο του 5
 
-            // candidate appointment_ids από τα payment_ids που έχει το log (παλιά fixed payments).
-            $paymentIds = json_decode($log->payment_ids ?? '[]', true) ?: [];
-
-            $candidateAppointmentIds = Payment::whereIn('id', $paymentIds)
-                ->whereNotNull('appointment_id')
-                ->pluck('appointment_id')
-                ->unique()
-                ->values()
-                ->all();
-
-            if (empty($candidateAppointmentIds)) {
-                return;
-            }
-
-            // Eligible appointments: όχι aksiologisi + total_price < 35
-            // (κλειδώνουμε appointments για να μην τρέξει άλλο update παράλληλα)
-            $eligibleAppointments = Appointment::whereIn('id', $candidateAppointmentIds)
+            /**
+             * ✅ ΝΕΟ: Δεν περιοριζόμαστε στο log->payment_ids.
+             * Παίρνουμε ΟΠΟΙΟΔΗΠΟΤΕ appointment του customer που:
+             * - όχι aksiologisi
+             * - total_price < 35
+             * - έχει τουλάχιστον 1 cash tax=N payment
+             */
+            $eligibleAppointments = Appointment::query()
                 ->where('customer_id', $customer->id)
                 ->where(function ($q) {
                     $q->whereNull('status')->orWhere('status', '!=', 'aksiologisi');
                 })
                 ->whereRaw('COALESCE(total_price,0) < 35')
-                ->orderBy('start_time', 'asc')
+                ->whereHas('payments', function ($q) {
+                    $q->where('method', 'cash')
+                      ->where('tax', 'N');
+                })
+                ->orderBy('start_time', 'asc') // oldest first
                 ->lockForUpdate()
                 ->get();
 
@@ -1668,81 +1658,75 @@ class CustomerController extends Controller
             foreach ($eligibleAppointments as $appt) {
                 if ($remaining <= 0) break;
 
-                // πόσο "χωράει" μέχρι 35
                 $currentTotalPrice = (float)($appt->total_price ?? 0);
-                $room = (int) floor(max(0, 35 - $currentTotalPrice));
+                $room = (float)(35 - $currentTotalPrice);
+                if ($room < 5.0) continue;
 
-                if ($room < 5) continue;
+                // ✅ 1) ΚΑΝΕ ΟΛΑ ΤΑ cash tax=N -> cash tax=Y (ώστε να μην μείνει μίξη)
+                $changedPayments += Payment::where('customer_id', $customer->id)
+                    ->where('appointment_id', $appt->id)
+                    ->where('method', 'cash')
+                    ->where('tax', 'N')
+                    ->update([
+                        'tax'          => 'Y',
+                        'is_tax_fixed' => 1,
+                        'tax_fixed_at' => $runAt,
+                        'updated_at'   => now(),
+                    ]);
 
-                // chunk = min(remaining, room) σε πολλαπλάσια του 5
-                $chunk = min($remaining, $room);
-                $chunk = (int)(floor($chunk / 5) * 5);
-                if ($chunk < 5) continue;
-
-                /**
-                 * ✅ “σαν updatePaidTotal” για αυτό το appointment:
-                 * - Lock payments του appointment
-                 * - Βρίσκουμε last paid_at/bank (default)
-                 * - Δημιουργούμε 1 νέα πληρωμή amount=$chunk (cash, tax=Y)
-                 */
-                $payments = Payment::where('appointment_id', $appt->id)
+                // ✅ 2) paid_at default από τελευταία πληρωμή
+                $last = Payment::where('appointment_id', $appt->id)
                     ->orderByDesc('paid_at')
                     ->orderByDesc('id')
                     ->lockForUpdate()
-                    ->get();
+                    ->first();
 
-                $last = $payments->first();
-                $defaultPaidAt = $last?->paid_at ?: $runAt; // αν δεν έχει, πάμε με runAt
-                $defaultBank = $last?->bank ?? null;
+                $defaultPaidAt = $last?->paid_at ?: $runAt;
 
+                // ✅ 3) +5 addon (1 ανά appointment)
                 $p = Payment::create([
                     'appointment_id' => $appt->id,
                     'customer_id'    => $customer->id,
-                    'amount'         => (float)$chunk,
+                    'amount'         => 5.00,
                     'is_full'        => 0,
                     'paid_at'        => $defaultPaidAt,
                     'method'         => 'cash',
                     'tax'            => 'Y',
-                    'bank'           => null, // cash => null
-                    'notes'          => '[TAX_FIX_ADDON] +' . $chunk . '€ (EDIT LOG) από αλλαγή ποσού διόρθωσης.',
+                    'bank'           => null,
+                    'notes'          => '[TAX_FIX_ADDON] +5€ (EDIT LOG) από αλλαγή ποσού διόρθωσης.',
                     'created_by'     => Auth::id(),
                 ]);
 
                 $newPaymentIds[] = $p->id;
                 $affectedAppointmentIds[] = $appt->id;
 
-                // Μετράμε “μονάδες των 5”
-                $createdAddons += (int)($chunk / 5);
+                $createdAddons += 1;
+                $remaining -= 5;
 
-                // ανεβάζουμε total_price αντίστοιχα (μέχρι 35)
+                // ✅ 4) total_price +5 μέχρι 35
                 Appointment::where('id', $appt->id)->update([
-                    'total_price' => DB::raw('LEAST(COALESCE(total_price,0) + ' . (float)$chunk . ', 35)'),
+                    'total_price' => DB::raw('LEAST(COALESCE(total_price,0) + 5.00, 35)'),
                     'updated_at'  => now(),
                 ]);
-
-                $remaining -= $chunk;
             }
 
             $affectedAppointmentIds = array_values(array_unique(array_filter($affectedAppointmentIds)));
 
             if (!empty($affectedAppointmentIds)) {
-                // recalc is_full (έτσι όπως το έχεις υλοποιήσει ήδη)
                 $this->recalcIsFullForAppointments($affectedAppointmentIds);
 
-                // πόσο όντως εφαρμόστηκε (μπορεί να μην βρήκε αρκετό room μέχρι 35)
                 $actuallyApplied = (int)$delta - (int)$remaining;
 
-                // counts
                 $changedAppointments = count($affectedAppointmentIds);
-                $changedPayments = count($newPaymentIds);
 
                 DB::table('customer_tax_fix_logs')
                     ->where('id', $log->id)
                     ->update([
-                        'fix_amount'            => $oldAmount + $actuallyApplied,
-                        'x_payments'            => (int)(($oldAmount + $actuallyApplied) / 5),
-                        'changed_payments'      => (int)($log->changed_payments ?? 0) + (int)$changedPayments,
-                        'changed_appointments'  => (int)($log->changed_appointments ?? 0) + (int)$changedAppointments,
+                        'fix_amount'           => $oldAmount + $actuallyApplied,
+                        'x_payments'           => (int)(($oldAmount + $actuallyApplied) / 5),
+
+                        'changed_payments'     => (int)($log->changed_payments ?? 0) + (int)count($newPaymentIds),
+                        'changed_appointments' => (int)($log->changed_appointments ?? 0) + (int)$changedAppointments,
 
                         'appointment_ids' => json_encode(array_values(array_unique(array_merge(
                             json_decode($log->appointment_ids ?? '[]', true) ?: [],
@@ -1761,98 +1745,83 @@ class CustomerController extends Controller
             return;
         }
 
+        // =========================
+        // B) ΜΕΙΩΣΗ (ΟΠΩΣ ΕΙΝΑΙ / δουλεύει)
+        // =========================
+        if ($delta < 0) {
+            $x = (int)(abs($delta) / 5);
 
+            $addons = Payment::where('customer_id', $customer->id)
+                ->whereNotNull('appointment_id')
+                ->where('amount', 5.00)
+                ->where('tax', 'Y')
+                ->where(function($q){
+                    $q->where('notes','like','[TAX_FIX_ADDON]%')
+                      ->orWhere('notes','like','%[TAX_FIX_ADDON]%');
+                })
+                ->orderByDesc('paid_at')
+                ->orderByDesc('id')
+                ->limit($x)
+                ->lockForUpdate()
+                ->get();
 
-            // --- ΠΕΡΙΠΤΩΣΗ Β: ΜΕΙΩΣΗ (αφαιρούμε |x| addons των 5)
-            if ($delta < 0) {
-                $x = (int)(abs($delta) / 5);
-
-                // βρίσκουμε τα πιο πρόσφατα addons payments αυτού του customer
-                $addons = Payment::where('customer_id', $customer->id)
-                    ->whereNotNull('appointment_id')
-                    ->where('amount', 5.00)
-                    ->where('tax', 'Y')
-                    ->where(function($q){
-                        $q->where('notes','like','[TAX_FIX_ADDON]%')
-                        ->orWhere('notes','like','%[TAX_FIX_ADDON]%');
-                    })
-                    ->orderByDesc('paid_at')
-                    ->orderByDesc('id')
-                    ->limit($x)
-                    ->lockForUpdate()
-                    ->get();
-
-                if ($addons->isEmpty()) {
-                    return;
-                }
-
-                foreach ($addons as $p) {
-                    $affectedAppointmentIds[] = $p->appointment_id;
-                    $p->delete();
-                    $deletedAddons++;
-                }
-
-                $affectedAppointmentIds = array_values(array_unique(array_filter($affectedAppointmentIds)));
-
-                if (!empty($affectedAppointmentIds)) {
-                    // μειώνουμε total_price
-                    $changedAppointments = Appointment::whereIn('id', $affectedAppointmentIds)->update([
-                        'total_price' => DB::raw('GREATEST(COALESCE(total_price,0) - 5.00, 0)'),
-                        'updated_at'  => now(),
-                    ]);
-
-                    $this->recalcIsFullForAppointments($affectedAppointmentIds);
-
-                    /**
-                     * ✅ ΝΕΟ (όπως ζήτησες):
-                     * Όταν επιστρέφουν τα ραντεβού στα 30€, γύρνα και την κύρια πληρωμή 30€
-                     * από "cash με απόδειξη" (tax='Y') σε "cash χωρίς απόδειξη" (tax='N').
-                     *
-                     * (Στο table σου το method είναι 'cash' και η απόδειξη/όχι φαίνεται από το tax Y/N)
-                     */
-                    $backTo30Ids = Appointment::whereIn('id', $affectedAppointmentIds)
-                        ->whereRaw('COALESCE(total_price,0) = 30')
-                        ->pluck('id')
-                        ->all();
-
-                    if (!empty($backTo30Ids)) {
-                        $changedPayments = Payment::where('customer_id', $customer->id)
-                            ->whereIn('appointment_id', $backTo30Ids)
-                            ->where('amount', 30.00)
-                            ->where('method', 'cash')
-                            ->where('tax', 'Y')
-                            ->lockForUpdate()
-                            ->update([
-                                'tax'          => 'N',
-                                'is_tax_fixed' => 0,
-                                'tax_fixed_at' => null,
-                                'notes'        => DB::raw("CONCAT(COALESCE(notes,''), ' [EDIT_LOG] cash: Y->N (χωρίς απόδειξη) λόγω επιστροφής στα 30€')"),
-                                'updated_at'   => now(),
-                            ]);
-                    }
-                }
-
-                $actuallyRemoved = $deletedAddons * 5;
-
-                DB::table('customer_tax_fix_logs')
-                    ->where('id', $log->id)
-                    ->update([
-                        'fix_amount' => max($oldAmount - $actuallyRemoved, 0),
-                        'x_payments' => (int)(max($oldAmount - $actuallyRemoved, 0) / 5),
-
-                        'changed_appointments' => (int)($log->changed_appointments ?? 0) + (int)$changedAppointments,
-                        'changed_payments'     => (int)($log->changed_payments ?? 0) + (int)$changedPayments,
-
-                        // προαιρετικά: δεν “καθαρίζω” appointment_ids/payment_ids για να μη χαθεί ιστορικό
-                        'updated_at' => now(),
-                    ]);
-
+            if ($addons->isEmpty()) {
                 return;
             }
-        });
 
-        return response()->json(['success' => true]);
-    }
+            foreach ($addons as $p) {
+                $affectedAppointmentIds[] = $p->appointment_id;
+                $p->delete();
+                $deletedAddons++;
+            }
+
+            $affectedAppointmentIds = array_values(array_unique(array_filter($affectedAppointmentIds)));
+
+            if (!empty($affectedAppointmentIds)) {
+                $changedAppointments = Appointment::whereIn('id', $affectedAppointmentIds)->update([
+                    'total_price' => DB::raw('GREATEST(COALESCE(total_price,0) - 5.00, 0)'),
+                    'updated_at'  => now(),
+                ]);
+
+                $this->recalcIsFullForAppointments($affectedAppointmentIds);
+
+                $backTo30Ids = Appointment::whereIn('id', $affectedAppointmentIds)
+                    ->whereRaw('COALESCE(total_price,0) = 30')
+                    ->pluck('id')
+                    ->all();
+
+                if (!empty($backTo30Ids)) {
+                    Payment::where('customer_id', $customer->id)
+                        ->whereIn('appointment_id', $backTo30Ids)
+                        ->where('method', 'cash')
+                        ->where('tax', 'Y')
+                        ->lockForUpdate()
+                        ->update([
+                            'tax'          => 'N',
+                            'is_tax_fixed' => 0,
+                            'tax_fixed_at' => null,
+                            'updated_at'   => now(),
+                        ]);
+                }
+            }
+
+            $actuallyRemoved = $deletedAddons * 5;
+
+            DB::table('customer_tax_fix_logs')
+                ->where('id', $log->id)
+                ->update([
+                    'fix_amount' => max($oldAmount - $actuallyRemoved, 0),
+                    'x_payments' => (int)(max($oldAmount - $actuallyRemoved, 0) / 5),
+                    'changed_appointments' => (int)($log->changed_appointments ?? 0) + (int)$changedAppointments,
+                    'updated_at' => now(),
+                ]);
+
+            return;
+        }
+    });
+
+    return response()->json(['success' => true]);
+}
 
 
 
