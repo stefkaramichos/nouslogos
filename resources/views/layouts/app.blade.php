@@ -249,11 +249,11 @@
                     <a href="{{ route('appointments.recycle') }}" class="btn btn-outline-secondary" title="Recycle Ραντεβού">
                         <i class="bi bi-trash"></i>
                     </a>
-
+                @endif
                     <a href="{{ route('documents.index') }}" class="btn btn-outline-success" title="Αρχεία">
                         <i class="bi bi-folder2-open"></i>
                     </a>
-
+                @if($user && in_array($user->role, ['owner', 'grammatia']))
                     {{-- Notifications Bell (MOBILE) --}}
                     <div class="position-relative">
                         <button type="button" id="notifBellBtnMobile" class="btn btn-outline-primary position-relative" title="Ειδοποιήσεις">
@@ -385,11 +385,11 @@
                             <a href="{{ route('appointments.recycle') }}" class="btn btn-outline-secondary" title="Recycle Ραντεβού">
                                 <i class="bi bi-trash"></i>
                             </a>
-
+                        @endif
                             <a href="{{ route('documents.index') }}" class="btn btn-outline-success" title="Αρχεία">
                                 <i class="bi bi-folder2-open"></i>
                             </a>
-
+                        @if($user && in_array($user->role, ['owner', 'grammatia']))
                             {{-- Notifications Bell (DESKTOP) --}}
                             <div class="position-relative">
                                 <button type="button" id="notifBellBtn" class="btn btn-outline-primary position-relative" title="Ειδοποιήσεις">

@@ -12,23 +12,33 @@ class BlockTherapistsFromSystem
     {
         $user = Auth::user();
 
-        // Αν είναι therapist → επιτρέπουμε ΜΟΝΟ συγκεκριμένα routes
+        // ✅ Αν είναι therapist → επιτρέπουμε μόνο whitelist routes
         if ($user && $user->role === 'therapist') {
 
             $allowedRoutes = [
                 'dashboard',
+
+                // therapist appointments
                 'therapist_appointments.index',
                 'therapist_appointments.create',
                 'therapist_appointments.store',
                 'therapist_appointments.edit',
                 'therapist_appointments.update',
                 'therapist_appointments.destroy',
+
+                // ✅ documents (για να βλέπουν/κατεβάζουν όσα επιτρέπονται από canBeViewedBy)
+                'documents.index',
+                'documents.view',
+                'documents.download',
+
+                // auth
                 'logout',
             ];
 
             $currentRouteName = $request->route()?->getName();
 
-            if (!in_array($currentRouteName, $allowedRoutes, true)) {
+            // ✅ Αν route δεν έχει όνομα, μην αφήνεις therapist να περάσει (ασφάλεια)
+            if (!$currentRouteName || !in_array($currentRouteName, $allowedRoutes, true)) {
                 abort(403, 'Δεν έχετε πρόσβαση σε αυτή τη σελίδα.');
             }
         }
