@@ -883,7 +883,7 @@
 
 
 
-                            <td style="white-space: pre-wrap;">
+                            <td >
                                 <span class="inline-edit"
                                     data-model="appointment"
                                     data-id="{{ $appointment->id }}"

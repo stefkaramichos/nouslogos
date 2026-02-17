@@ -411,8 +411,11 @@ class CustomerController extends Controller
         ]);
 
         $receipts = $customer->receipts()
-            ->orderByDesc('id')
-            ->get();
+    ->orderByRaw('receipt_date IS NULL')   // πρώτα όσα έχουν ημερομηνία, μετά τα NULL
+    ->orderBy('receipt_date', 'asc')       // ✅ οι πιο παλιές πρώτες
+    ->orderBy('id', 'asc')                 // σταθερό tie-breaker
+    ->get();
+
 
         $taxFixLogs = DB::table('customer_tax_fix_logs')
             ->where('customer_id', $customer->id)

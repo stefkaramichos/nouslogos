@@ -723,120 +723,131 @@ class AppointmentController extends Controller
         });
     }
 
-    public function updatePaidTotal(Request $request, Appointment $appointment)
-    {
-        $data = $request->validate([
-            'paid_total' => 'required|numeric|min:0',
-            'method'     => 'required|in:cash,card',
-            'tax'        => 'required|in:Y,N',
+    
+public function updatePaidTotal(Request $request, Appointment $appointment)
+{
+    $data = $request->validate([
+        'paid_total' => 'required|numeric|min:0',
+        'method'     => 'required|in:cash,card',
+        'tax'        => 'required|in:Y,N',
+    ]);
+
+    $newTotal   = (float)$data['paid_total'];
+    $totalPrice = (float)($appointment->total_price ?? 0);
+
+    if ($newTotal > $totalPrice + 0.0001) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Το ποσό πληρωμής δεν μπορεί να είναι μεγαλύτερο από το ποσό του ραντεβού.',
+        ], 422);
+    }
+
+    // ✅ rule: κάρτα πάντα με απόδειξη
+    if ($data['method'] === 'card') {
+        $data['tax'] = 'Y';
+    }
+
+    $result = null;
+
+    DB::transaction(function () use ($appointment, $newTotal, $data, &$result) {
+
+        // lock όλα τα payments του appointment
+        $payments = Payment::where('appointment_id', $appointment->id)
+            ->orderByDesc('paid_at')
+            ->orderByDesc('id')
+            ->lockForUpdate()
+            ->get();
+
+        $currentTotal = (float)$payments->sum('amount');
+        $delta = $newTotal - $currentTotal;
+
+        // defaults για paid_at/bank από τελευταία πληρωμή
+        $last = $payments->first();
+        $defaultPaidAt = $last?->paid_at ?: now();
+        $defaultBank   = $last?->bank ?? null;
+
+        // =========================
+        // A) ΜΕΙΩΣΗ
+        // =========================
+        if ($delta < -0.0001) {
+            $toRemove = abs($delta);
+
+            foreach ($payments as $p) {
+                if ($toRemove <= 0) break;
+
+                $amt = (float)$p->amount;
+
+                if ($amt <= $toRemove + 0.0001) {
+                    $toRemove -= $amt;
+                    $p->delete();
+                } else {
+                    $p->amount = $amt - $toRemove;
+                    $p->save();
+                    $toRemove = 0;
+                }
+            }
+        }
+
+        // =========================
+        // B) ΑΥΞΗΣΗ
+        // =========================
+        if ($delta > 0.0001) {
+            Payment::create([
+                'appointment_id' => $appointment->id,
+                'customer_id'    => $appointment->customer_id,
+                'amount'         => $delta,
+                'is_full'        => 0,
+                'paid_at'        => $defaultPaidAt,
+                'method'         => $data['method'],
+                'tax'            => $data['tax'],
+                'bank'           => $data['method'] === 'card' ? $defaultBank : null,
+                'notes'          => '[INLINE_EDIT] Update paid total + method/tax from appointments table.',
+                'created_by'     => Auth::id(),
+            ]);
+        }
+
+        // =========================
+        // ✅ ΝΕΟ: ΕΦΑΡΜΟΓΗ METHOD/TAX ΑΚΟΜΑ ΚΑΙ ΑΝ ΔΕΝ ΑΛΛΑΞΕ ΤΟ ΠΟΣΟ (delta≈0)
+        // ή μετά από μείωση/αύξηση για να μη μένουν "μείξεις"
+        // =========================
+        $bankToSet = ($data['method'] === 'card') ? $defaultBank : null;
+
+        Payment::where('appointment_id', $appointment->id)->update([
+            'method'     => $data['method'],
+            'tax'        => $data['tax'],
+            'bank'       => $bankToSet,
+            'updated_at' => now(),
         ]);
 
-        $newTotal = (float)$data['paid_total'];
-        $totalPrice = (float)($appointment->total_price ?? 0);
+        // recalc is_full
+        $appointment->load('payments');
 
-        if ($newTotal > $totalPrice + 0.0001) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Το ποσό πληρωμής δεν μπορεί να είναι μεγαλύτερο από το ποσό του ραντεβού.',
-            ], 422);
-        }
+        $total = (float)($appointment->total_price ?? 0);
+        $paid  = (float)$appointment->payments->sum('amount');
 
-        // ✅ rule: κάρτα πάντα με απόδειξη
-        if ($data['method'] === 'card') {
-            $data['tax'] = 'Y';
-        }
+        Payment::where('appointment_id', $appointment->id)->update(['is_full' => 0]);
 
-        $result = null;
-
-        DB::transaction(function () use ($appointment, $newTotal, $data, &$result) {
-            $appointment->load('payments');
-
-            $payments = Payment::where('appointment_id', $appointment->id)
+        if ($total > 0 && $paid >= $total) {
+            $lastPay = Payment::where('appointment_id', $appointment->id)
                 ->orderByDesc('paid_at')
                 ->orderByDesc('id')
-                ->lockForUpdate()
-                ->get();
+                ->first();
 
-            $currentTotal = (float)$payments->sum('amount');
-            $delta = $newTotal - $currentTotal;
-
-            if (abs($delta) < 0.0001) {
-                $result = ['success' => true, 'paid_total' => $currentTotal];
-                return;
+            if ($lastPay) {
+                $lastPay->is_full = 1;
+                $lastPay->save();
             }
+        }
 
-            // defaults από τελευταία πληρωμή ΜΟΝΟ για paid_at/bank (όχι method/tax πλέον)
-            $last = $payments->first();
-            $defaultBank = $last?->bank ?? null;
+        $result = ['success' => true, 'paid_total' => $paid];
+    });
 
-            $defaultPaidAt = $last?->paid_at;
-            if (!$defaultPaidAt) {
-                $defaultPaidAt = now();
-            }
-
-            // A) ΜΕΙΩΣΗ -> κόψε από τις πιο πρόσφατες πληρωμές (όπως πριν)
-            if ($delta < 0) {
-                $toRemove = abs($delta);
-
-                foreach ($payments as $p) {
-                    if ($toRemove <= 0) break;
-
-                    $amt = (float)$p->amount;
-
-                    if ($amt <= $toRemove + 0.0001) {
-                        $toRemove -= $amt;
-                        $p->delete();
-                    } else {
-                        $p->amount = $amt - $toRemove;
-                        $p->save();
-                        $toRemove = 0;
-                    }
-                }
-            }
-            // B) ΑΥΞΗΣΗ -> νέα πληρωμή με επιλογή χρήστη (method/tax)
-            else {
-                Payment::create([
-                    'appointment_id' => $appointment->id,
-                    'customer_id'    => $appointment->customer_id,
-                    'amount'         => $delta,
-                    'is_full'        => 0,
-                    'paid_at'        => $defaultPaidAt,
-                    'method'         => $data['method'],
-                    'tax'            => $data['tax'],
-                    'bank'           => $data['method'] === 'card' ? $defaultBank : null,
-                    'notes'          => '[INLINE_EDIT] Update paid total + method/tax from appointments table.',
-                    'created_by'     => Auth::id(),
-                ]);
-            }
-
-            // recalc is_full
-            $appointment->load('payments');
-            $total = (float)($appointment->total_price ?? 0);
-            $paid  = (float)$appointment->payments->sum('amount');
-
-            Payment::where('appointment_id', $appointment->id)->update(['is_full' => 0]);
-
-            if ($total > 0 && $paid >= $total) {
-                $lastPay = Payment::where('appointment_id', $appointment->id)
-                    ->orderByDesc('paid_at')
-                    ->orderByDesc('id')
-                    ->first();
-
-                if ($lastPay) {
-                    $lastPay->is_full = 1;
-                    $lastPay->save();
-                }
-            }
-
-            $result = ['success' => true, 'paid_total' => $paid];
-        });
-
-        return response()->json([
-            'success'    => true,
-            'paid_total' => (float)($result['paid_total'] ?? 0),
-            'formatted'  => number_format((float)($result['paid_total'] ?? 0), 2, ',', '.') . ' €',
-        ]);
-    }
+    return response()->json([
+        'success'    => true,
+        'paid_total' => (float)($result['paid_total'] ?? 0),
+        'formatted'  => number_format((float)($result['paid_total'] ?? 0), 2, ',', '.') . ' €',
+    ]);
+}
 
 
     
