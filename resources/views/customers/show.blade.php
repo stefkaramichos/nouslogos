@@ -121,16 +121,26 @@
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
-                                        <strong>{{ $dateLabel }}</strong>
-                                        <span
+                                        <strong
+                                            class="payment-day-date-edit"
+                                            data-day-key="{{ $dateKey === 'Χωρίς ημερομηνία' ? 'no-date' : $dateKey }}"
+                                            data-customer-id="{{ $customer->id }}"
+                                            style="cursor:pointer;"
+                                            title="Διπλό κλικ για αλλαγή ημερομηνίας"
+                                            >
+                                            {{ $dateLabel }}
+                                            </strong>
+
+                                            <span
                                             class="badge bg-primary ms-1 payment-day-total-edit"
                                             data-day-key="{{ $dateKey === 'Χωρίς ημερομηνία' ? 'no-date' : $dateKey }}"
                                             data-customer-id="{{ $customer->id }}"
                                             style="cursor:pointer;"
                                             title="Διπλό κλικ για αλλαγή ημερήσιου συνόλου"
-                                        >
+                                            >
                                             {{ number_format($dayTotal, 2, ',', '.') }} €
-                                        </span>
+                                            </span>
+
                                     </div>
 
                                     <form method="POST"
@@ -188,12 +198,29 @@
 
                     @if($hasPrepay)
                         <div class="border rounded p-2 mb-2"
-                            style="font-size:0.8rem; background:#f8f9fa;">
+                            style="font-size:0.8rem; background:#f8f9fa;"
+                            id="prepayment">
                             <div class="d-flex justify-content-between align-items-center">
                                 <strong>Προπληρωμή</strong>
-                                <span class="badge bg-primary">
-                                    {{ number_format($prepayTotal, 2, ',', '.') }} €
-                                </span>
+
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-primary">
+                                        {{ number_format($prepayTotal, 2, ',', '.') }} €
+                                    </span>
+
+                                    {{-- ✅ Delete prepayment --}}
+                                    <form method="POST"
+                                        action="{{ route('customers.prepayment.destroy', $customer) }}"
+                                        class="m-0"
+                                        onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε ΟΛΗ την προπληρωμή;');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <input type="hidden" name="_anchor" value="prepayment">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">
+                                            Διαγραφή
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
 
                             <div class="text-muted" style="font-size:0.75rem;">
@@ -212,7 +239,6 @@
                                     {{ number_format((float)$prepayment->card_balance, 2, ',', '.') }} €
                                 @endif
                             </div>
-
                         </div>
                     @endif
                     </div>
@@ -226,7 +252,7 @@
                     $logs = $taxFixLogs ?? collect();
                 @endphp
 
-                @if($logs->count() > 0)
+               @if($logs->count() > 0)
                     <div class="border rounded col-md-4 p-2"
                         style="max-height: 240px; overflow-y:auto; font-size:0.8rem; background:#f8f9fa;">
                         <div class="d-flex justify-content-between align-items-center mb-1">
@@ -240,16 +266,28 @@
                                     ? \Carbon\Carbon::parse($log->run_at)->format('d/m/Y')
                                     : '-';
 
-                                // ποσό που μας ενδιαφέρει: fix_amount (π.χ. 15€)
                                 $amount = (float)($log->fix_amount ?? 0);
-
                                 $comment = $log->comment ?? null;
+
+                                // για το date input
+                                $dateOriginal = $log->run_at
+                                    ? \Carbon\Carbon::parse($log->run_at)->format('Y-m-d')
+                                    : '';
                             @endphp
 
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
-                                        <strong>{{ $dateLabel }}</strong>
+                                        {{-- ✅ ΔΙΠΛΟ ΚΛΙΚ: ΗΜΕΡΟΜΗΝΙΑ --}}
+                                        <strong class="tax-fix-log-date-edit"
+                                            data-log-id="{{ $log->id }}"
+                                            data-original="{{ $dateOriginal }}"
+                                            style="cursor:pointer;"
+                                            title="Διπλό κλικ για αλλαγή ημερομηνίας">
+                                            {{ $dateLabel }}
+                                        </strong>
+
+                                        {{-- ✅ ΔΙΠΛΟ ΚΛΙΚ: ΠΟΣΟ (όπως το έχεις ήδη) --}}
                                         <span class="badge bg-primary ms-1 tax-fix-log-edit"
                                             data-log-id="{{ $log->id }}"
                                             data-original="{{ number_format((float)$amount, 2, ',', '.') }}"
@@ -260,21 +298,21 @@
                                     </div>
                                 </div>
 
-                                @if($comment)
-                                    <div class="text-muted" style="font-size:0.75rem;">
-                                        {{ $comment }}
-                                    </div>
-                                @else
-                                    <div class="text-muted" style="font-size:0.75rem;">
-                                        -
-                                    </div>
-                                @endif
+                                {{-- ✅ ΔΙΠΛΟ ΚΛΙΚ: ΣΧΟΛΙΟ --}}
+                                <div class="text-muted tax-fix-log-comment-edit"
+                                    data-log-id="{{ $log->id }}"
+                                    data-original="{{ $comment ?? '' }}"
+                                    style="font-size:0.75rem; cursor:pointer;"
+                                    title="Διπλό κλικ για αλλαγή σχολίου">
+                                    {{ $comment ? $comment : '-' }}
+                                </div>
                             </div>
 
                             <hr class="my-1">
                         @endforeach
                     </div>
                 @endif
+
 
                 <div class="col-md-8">
                     {{-- ===================== ΑΠΟΔΕΙΞΕΙΣ (ΝΕΟ BOX) ===================== --}}
@@ -1782,6 +1820,242 @@ document.addEventListener('DOMContentLoaded', function () {
             if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
         });
     });
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (!csrfToken) return;
+
+    let active = null;
+    let saving = false;
+
+    document.addEventListener('dblclick', function (e) {
+        const el = e.target.closest('.payment-day-date-edit');
+        if (!el) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (active || saving) return;
+
+        const customerId   = el.dataset.customerId;
+        const dayKey       = el.dataset.dayKey; // "YYYY-MM-DD" ή "no-date"
+        const originalText = (el.textContent || '').trim();
+
+        // default value for input
+        const originalDate = (dayKey === 'no-date') ? '' : dayKey;
+
+        const input = document.createElement('input');
+        input.type = 'date';
+        input.className = 'form-control form-control-sm d-inline-block';
+        input.style.width = '150px';
+        input.value = originalDate;
+
+        el.innerHTML = '';
+        el.appendChild(input);
+        input.focus();
+        active = input;
+
+        const restore = () => {
+            el.textContent = originalText;
+            active = null;
+            saving = false;
+        };
+
+        const endpoint = "{{ route('customers.payments.updateDayDate', ['customer' => '__ID__']) }}"
+            .replace('__ID__', customerId);
+
+        const save = () => {
+            if (saving) return;
+            saving = true;
+
+            const newDate = (input.value ?? '').toString().trim(); // "" ή "YYYY-MM-DD"
+
+            el.innerHTML = '<span class="text-muted">Αποθήκευση…</span>';
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    day_key: dayKey,
+                    new_date: newDate // "" => χωρίς ημερομηνία (NULL)
+                })
+            })
+            .then(async res => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) throw data;
+                return data;
+            })
+            .then(() => window.location.reload())
+            .catch(err => {
+                console.error(err);
+                alert(err?.message || 'Σφάλμα αποθήκευσης.');
+                restore();
+            });
+        };
+
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+            if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
+        });
+    });
+});
+</script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (!csrfToken) return;
+
+    let active = null;
+
+    // -----------------------------
+    // ✅ EDIT RUN_AT (DATE)
+    // -----------------------------
+    document.addEventListener('dblclick', function (e) {
+        const el = e.target.closest('.tax-fix-log-date-edit');
+        if (!el) return;
+        if (active) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const logId = el.dataset.logId;
+        const originalText = (el.textContent || '').trim();
+        const originalVal  = el.dataset.original || '';
+
+        const input = document.createElement('input');
+        input.type = 'date';
+        input.className = 'form-control form-control-sm d-inline-block';
+        input.style.width = '150px';
+        input.value = originalVal;
+
+        el.innerHTML = '';
+        el.appendChild(input);
+        input.focus();
+        active = { el, input };
+
+        const restore = () => {
+            el.textContent = originalText || '-';
+            active = null;
+        };
+
+        const save = () => {
+            const v = (input.value ?? '').toString().trim();
+            if (!v) return restore();
+
+            el.innerHTML = '<span class="text-muted">Αποθήκευση…</span>';
+
+            fetch(`{{ route('customers.taxFixLogs.updateRunAt', ['customer' => $customer->id, 'log' => '__LOG__']) }}`.replace('__LOG__', logId), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ run_at: v })
+            })
+            .then(async res => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) throw data;
+                return data;
+            })
+            .then((data) => {
+                // ενημέρωση label χωρίς reload
+                el.textContent = data.label || originalText;
+                el.dataset.original = data.value || v;
+                active = null;
+            })
+            .catch(err => {
+                console.error(err);
+                alert(err?.message || 'Σφάλμα αποθήκευσης.');
+                restore();
+            });
+        };
+
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', function(ev){
+            if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+            if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
+        });
+    });
+
+    // -----------------------------
+    // ✅ EDIT COMMENT (TEXT)
+    // -----------------------------
+    document.addEventListener('dblclick', function (e) {
+        const el = e.target.closest('.tax-fix-log-comment-edit');
+        if (!el) return;
+        if (active) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const logId = el.dataset.logId;
+        const originalText = (el.textContent || '').trim();
+        const originalVal  = el.dataset.original || '';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'form-control form-control-sm';
+        input.style.width = '100%';
+        input.value = originalVal;
+
+        el.innerHTML = '';
+        el.appendChild(input);
+        input.focus();
+        active = { el, input };
+
+        const restore = () => {
+            el.textContent = originalText || '-';
+            active = null;
+        };
+
+        const save = () => {
+            const v = (input.value ?? '').toString();
+
+            el.innerHTML = '<span class="text-muted">Αποθήκευση…</span>';
+
+            fetch(`{{ route('customers.taxFixLogs.updateComment', ['customer' => $customer->id, 'log' => '__LOG__']) }}`.replace('__LOG__', logId), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ comment: v })
+            })
+            .then(async res => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) throw data;
+                return data;
+            })
+            .then((data) => {
+                el.textContent = data.label ?? '-';
+                el.dataset.original = (data.value ?? '');
+                active = null;
+            })
+            .catch(err => {
+                console.error(err);
+                alert(err?.message || 'Σφάλμα αποθήκευσης.');
+                restore();
+            });
+        };
+
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', function(ev){
+            if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+            if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
+        });
+    });
+
 });
 </script>
 

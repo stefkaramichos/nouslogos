@@ -182,6 +182,20 @@ Route::middleware('auth')->group(function () {
     Route::post('/customers/{customer}/payments/tax-fix-oldest', [\App\Http\Controllers\CustomerController::class, 'taxFixOldestCashNoReceipt'])
     ->name('customers.payments.taxFixOldest');
 
+    Route::post('/customers/{customer}/payments/update-day-date', [CustomerController::class, 'updateDayDate'])
+    ->name('customers.payments.updateDayDate');
+
+    // Prepayment delete
+    Route::delete('/customers/{customer}/prepayment', [CustomerController::class, 'destroyPrepayment'])
+        ->name('customers.prepayment.destroy');
+
+    Route::post('/customers/{customer}/tax-fix-logs/{log}/update-run-at', [CustomerController::class, 'updateTaxFixLogRunAt'])
+        ->name('customers.taxFixLogs.updateRunAt');
+
+    Route::post('/customers/{customer}/tax-fix-logs/{log}/update-comment', [CustomerController::class, 'updateTaxFixLogComment'])
+        ->name('customers.taxFixLogs.updateComment');
+
+
    Route::post('/customers/{customer}/tax-fix-logs/{log}/update-amount', [CustomerController::class, 'updateTaxFixLogAmount'])
     ->name('customers.taxFixLogs.updateAmount');
 
