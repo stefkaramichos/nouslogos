@@ -1085,13 +1085,22 @@ class CustomerController extends Controller
         ]);
     }
 
-    /**
+        /**
      * ✅ ΠΛΗΡΩΝΕΙ ΟΛΑ ΤΑ ΧΡΩΣΤΟΥΜΕΝΑ (ΧΩΡΙΣ ΗΜΕΡΟΜΗΝΙΕΣ)
      * ✅ split μετρητών: cash Y + cash N + card
+     *
+     * ✅ Κανόνες allocation:
+     * - Μετρητά (ΜΑ / tax=Y): ΜΟΝΟ total_price == 35
+     * - Μετρητά (ΧΑ / tax=N): ΜΟΝΟ total_price <= 30
+     *      ✅ ΕΞΑΙΡΕΣΗ: αν status == aksiologisi => επιτρέπεται και > 30
+     * - Κάρτα (tax=Y):
+     *      - γενικά: ΜΟΝΟ total_price == 35
+     *      ✅ ΕΞΑΙΡΕΣΗ: αν status == aksiologisi => επιτρέπεται ΜΟΝΟ αν total_price >= 35
+     *
+     * Ό,τι περισσέψει (λόγω κανόνων ή επειδή δεν υπάρχουν eligible due) => προπληρωμή.
      */
     public function payOutstandingSplit(Request $request, Customer $customer)
     {
-        // ✅ anchor που στέλνει η φόρμα (π.χ. pay-outstanding)
         $anchor = $request->input('_anchor', 'pay-outstanding');
 
         $data = $request->validate([
@@ -1108,9 +1117,9 @@ class CustomerController extends Controller
             'paid_at.required' => 'Πρέπει να επιλέξετε ημερομηνία/ώρα πληρωμής.',
         ]);
 
-        $cashY = (float)($data['cash_y_amount'] ?? 0); // ✅ Με απόδειξη
-        $cashN = (float)($data['cash_n_amount'] ?? 0); // ✅ Χωρίς απόδειξη
-        $card  = (float)($data['card_amount'] ?? 0);   // ✅ (θεωρείται με απόδειξη)
+        $cashY = (float)($data['cash_y_amount'] ?? 0); // Με απόδειξη
+        $cashN = (float)($data['cash_n_amount'] ?? 0); // Χωρίς απόδειξη
+        $card  = (float)($data['card_amount'] ?? 0);   // Κάρτα (πάντα tax=Y)
 
         if ($cashY <= 0 && $cashN <= 0 && $card <= 0) {
             return redirect()->back()
@@ -1118,7 +1127,7 @@ class CustomerController extends Controller
                 ->with('error', 'Βάλτε ποσό σε τουλάχιστον ένα πεδίο (Μετρητά με/χωρίς απόδειξη ή Κάρτα).');
         }
 
-        $paidAt = Carbon::parse($data['paid_at']);
+        $paidAt   = Carbon::parse($data['paid_at']);
         $incoming = $cashY + $cashN + $card;
 
         // ✅ Φέρνουμε ΟΛΑ τα ραντεβού + payments (για due)
@@ -1137,7 +1146,7 @@ class CustomerController extends Controller
             $dueTotal += max(0, $total - $paid);
         }
 
-        // Αν ΔΕΝ υπάρχουν καθόλου χρωστούμενα -> όλα σε προπληρωμή (όπως είχες)
+        // ✅ Αν δεν υπάρχουν χρωστούμενα -> όλα σε προπληρωμή
         if ($dueTotal <= 0.0001) {
             DB::transaction(function () use ($customer, $cashY, $cashN, $card, $data, $paidAt) {
                 $prepay = CustomerPrepayment::where('customer_id', $customer->id)
@@ -1230,39 +1239,51 @@ class CustomerController extends Controller
                 return $remaining;
             };
 
-            // ✅ Κανόνες:
-            // - Με απόδειξη (tax=Y): ΜΟΝΟ total_price == 35
-            // - Χωρίς απόδειξη (tax=N): ΜΟΝΟ total_price <= 30
+            // ✅ RULES
 
-            $eligibleReceipt = function ($appt, float $total) {
+            // Μετρητά (ΜΑ): μόνο 35€
+            $eligibleReceiptCashY = function ($appt, float $total) {
                 return abs($total - 35.0) < 0.0001;
             };
 
+            // Μετρητά (ΧΑ): <=30€ ή aksiologisi (και >30)
             $eligibleNoReceipt = function ($appt, float $total) {
+                $status = (string)($appt->status ?? '');
+                if ($status === 'aksiologisi') return true;
                 return $total <= 30.0 + 0.0001;
             };
 
-            // 1) Allocate CASH Y -> ΜΟΝΟ 35€
+            // Κάρτα:
+            // - γενικά: μόνο 35€
+            // - aksiologisi: μόνο αν total >= 35€
+            $eligibleReceiptCard = function ($appt, float $total) {
+                $status = (string)($appt->status ?? '');
+                if ($status === 'aksiologisi') {
+                    return $total >= 35.0 - 0.0001;
+                }
+                return abs($total - 35.0) < 0.0001;
+            };
+
+            // 1) Allocate CASH Y
             $leftCashY = 0.0;
             if ($cashY > 0) {
-                $leftCashY = $allocateToDueFiltered($cashY, 'cash', 'Y', null, $eligibleReceipt);
+                $leftCashY = $allocateToDueFiltered($cashY, 'cash', 'Y', null, $eligibleReceiptCashY);
             }
 
-            // 2) Allocate CASH N -> ΜΟΝΟ <=30€
+            // 2) Allocate CASH N
             $leftCashN = 0.0;
             if ($cashN > 0) {
                 $leftCashN = $allocateToDueFiltered($cashN, 'cash', 'N', null, $eligibleNoReceipt);
             }
 
-            // 3) Allocate CARD (tax=Y) -> ΜΟΝΟ 35€
+            // 3) Allocate CARD (tax=Y)
             $leftCard = 0.0;
             if ($card > 0) {
                 $bank = $data['card_bank'] ?? null;
-                $leftCard = $allocateToDueFiltered($card, 'card', 'Y', $bank, $eligibleReceipt);
+                $leftCard = $allocateToDueFiltered($card, 'card', 'Y', $bank, $eligibleReceiptCard);
             }
 
-            // 4) ✅ Update is_full σε ΟΛΑ τα appointments που επηρεάστηκαν (safe approach: όλα του customer)
-            //    (αν θες optimization να κρατάμε affected IDs, το κάνουμε μετά)
+            // 4) ✅ Update is_full (safe)
             foreach ($appointments as $a) {
                 $total = (float)($a->total_price ?? 0);
                 if ($total <= 0) continue;
@@ -1301,7 +1322,7 @@ class CustomerController extends Controller
                         'card_bank'       => $data['card_bank'] ?? null,
                         'last_paid_at'    => $paidAt,
                         'created_by'      => Auth::id(),
-                        'notes'           => 'Αυτόματη προπληρωμή από φόρμα χρωστούμενων (λόγω κανόνων 35€/<=30€).',
+                        'notes'           => 'Αυτόματη προπληρωμή από φόρμα χρωστούμενων (λόγω κανόνων 35€/<=30€ + aksiologisi exceptions).',
                     ]);
                 }
 
@@ -1319,12 +1340,14 @@ class CustomerController extends Controller
             }
         });
 
-        // ✅ Μήνυμα επιτυχίας
-        // (Εδώ δεν βασιζόμαστε στο dueTotal γιατί μπορεί να άφησες χρωστούμενα λόγω κανόνων)
         return redirect()->back()
             ->withFragment($anchor)
-            ->with('success', 'Η πληρωμή καταχωρήθηκε. (Με απόδειξη → μόνο 35€, Χωρίς απόδειξη → μόνο ≤30€. Ό,τι περίσσεψε πήγε σε προπληρωμή.)');
+            ->with(
+                'success',
+                'Η πληρωμή καταχωρήθηκε. (ΜΑ→μόνο 35€, ΧΑ→μόνο ≤30€ εκτός aksiologisi, Κάρτα→μόνο 35€ εκτός aksiologisi όπου απαιτείται ≥35€. Ό,τι περίσσεψε πήγε σε προπληρωμή.)'
+            );
     }
+
 
 
 
