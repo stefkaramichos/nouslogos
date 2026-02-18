@@ -411,7 +411,7 @@ class CustomerController extends Controller
         ]);
 
         $receipts = $customer->receipts()
-            ->orderByRaw('receipt_date IS NULL')   // πρώτα όσα έχουν ημερομηνία, μετά τα NULL
+            ->orderByRaw('receipt_date IS NULL DESC')   // πρώτα όσα έχουν ημερομηνία, μετά τα NULL
             ->orderBy('receipt_date', 'desc')       // ✅ οι πιο παλιές πρώτες
             ->orderBy('id', 'desc')                 // σταθερό tie-breaker
             ->get();
