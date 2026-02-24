@@ -28,9 +28,9 @@ class AppointmentTrashController extends Controller
             ->orderByDesc('deleted_at');
 
         // Αν θες περιορισμό ανά company (προαιρετικό αλλά καλό)
-        if (!empty($user->company_id)) {
-            $q->where('company_id', $user->company_id);
-        }
+        // if (!empty($user->company_id)) {
+        //     $q->where('company_id', $user->company_id);
+        // }
 
         if ($from) $q->whereDate('deleted_at', '>=', $from);
         if ($to)   $q->whereDate('deleted_at', '<=', $to);

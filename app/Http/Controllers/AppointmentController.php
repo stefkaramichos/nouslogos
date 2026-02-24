@@ -853,15 +853,64 @@ public function updatePaidTotal(Request $request, Appointment $appointment)
     
     public function destroy(Request $request, Appointment $appointment)
     {
-        $appointment->delete();
+        DB::transaction(function () use ($appointment) {
+            // Φόρτωσε τις πληρωμές πριν διαγράψεις το ραντεβού
+            $appointment->load('payments');
+
+            $payments = $appointment->payments;
+
+            if ($payments->count() > 0) {
+                // Βρες ή δημιούργησε prepayment record
+                $prepay = CustomerPrepayment::where('customer_id', $appointment->customer_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$prepay) {
+                    $prepay = CustomerPrepayment::create([
+                        'customer_id'      => $appointment->customer_id,
+                        'cash_y_balance'   => 0,
+                        'cash_n_balance'   => 0,
+                        'card_balance'     => 0,
+                        'last_paid_at'     => now(),
+                    ]);
+                }
+
+                // Ομαδοποίησε πληρωμές ανά method/tax και πρόσθεσε στο prepayment
+                foreach ($payments as $payment) {
+                    $amount = (float)$payment->amount;
+
+                    if ($payment->method === 'cash') {
+                        if ($payment->tax === 'Y') {
+                            $prepay->cash_y_balance += $amount;
+                        } else {
+                            $prepay->cash_n_balance += $amount;
+                        }
+                    } elseif ($payment->method === 'card') {
+                        $prepay->card_balance += $amount;
+                        if ($payment->bank) {
+                            $prepay->card_bank = $payment->bank;
+                        }
+                    }
+                }
+
+                $prepay->last_paid_at = now();
+                $prepay->save();
+
+                // Διάγραψε όλες τις πληρωμές του ραντεβού
+                Payment::where('appointment_id', $appointment->id)->delete();
+            }
+
+            // Διάγραψε το ραντεβού
+            $appointment->delete();
+        });
 
         $redirectTo = $request->input('redirect_to');
 
         if ($redirectTo) {
-            return redirect($redirectTo)->with('success', 'Το ραντεβού διαγράφηκε επιτυχώς.');
+            return redirect($redirectTo)->with('success', 'Το ραντεβού διαγράφηκε και τα ποσά επιστράφηκαν στην προπληρωμή.');
         }
 
-        return redirect()->route('appointments.index')->with('success', 'Το ραντεβού διαγράφηκε επιτυχώς.');
+        return redirect()->route('appointments.index')->with('success', 'Το ραντεβού διαγράφηκε και τα ποσά επιστράφηκαν στην προπληρωμή.');
     }
 
    
