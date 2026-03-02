@@ -143,6 +143,16 @@ class CustomerController extends Controller
             $active = 'all';
         }
 
+        // Parse print_fields from query string
+        $printFieldsStr = $request->input('print_fields', '');
+        $printFields = [];
+        if (!empty($printFieldsStr)) {
+            $printFields = array_filter(
+                array_map('trim', explode(',', $printFieldsStr)),
+                fn($field) => in_array($field, ['name', 'phone', 'email', 'company', 'informations', 'professionals', 'status', 'unissued_receipts'], true)
+            );
+        }
+
         $customers = Customer::query()
             ->with([
                 // ✅ only unissued receipts
@@ -151,6 +161,9 @@ class CustomerController extends Controller
                     ->orderByDesc('receipt_date')
                     ->orderByDesc('id');
                 },
+                // Load professionals if needed
+                'professionals',
+                'company',
             ])
             ->when($companyId, fn($q) => $q->where('company_id', $companyId))
             ->when($active !== 'all', fn($q) => $q->where('is_active', (int)$active))
@@ -173,6 +186,7 @@ class CustomerController extends Controller
             'search'    => $search,
             'companyId' => $companyId,
             'active'    => $active,
+            'printFields' => $printFields,
         ]);
     }
 

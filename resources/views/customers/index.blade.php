@@ -36,11 +36,12 @@
                 </div>
             
                 <div class="d-flex justify-content-end gap-2 col-md-4">
-                    <a href="{{ route('customers.print', request()->query()) }}"
-                        target="_blank"
-                        class="btn btn-outline-secondary btn-sm">
+                    <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#printOptionsModal">
                             🖨 Εκτύπωση Λίστας
-                    </a>
+                    </button>
                     <a href="{{ route('customers.create') }}" class="btn btn-primary btn-sm">
                         + Προσθήκη Περιστατικού
                     </a>
@@ -421,6 +422,76 @@
     </div>
     </div>
 
+    {{-- Print Options Modal --}}
+    <div class="modal fade" id="printOptionsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Επιλογή Πεδίων Εκτύπωσης</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="text-muted small mb-3">Επιλέξτε ποια πεδία θέλετε να εμφανιστούν στην εκτύπωση:</p>
+                
+                <div class="form-check">
+                    <input class="form-check-input print-field" type="checkbox" id="field_name" value="name" checked>
+                    <label class="form-check-label" for="field_name">
+                        Ονοματεπώνυμο
+                    </label>
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input print-field" type="checkbox" id="field_phone" value="phone" checked>
+                    <label class="form-check-label" for="field_phone">
+                        Τηλέφωνο
+                    </label>
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input print-field" type="checkbox" id="field_company" value="company">
+                    <label class="form-check-label" for="field_company">
+                        Εταιρεία/Τοποθεσία
+                    </label>
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input print-field" type="checkbox" id="field_informations" value="informations">
+                    <label class="form-check-label" for="field_informations">
+                        Πληροφορίες
+                    </label>
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input print-field" type="checkbox" id="field_professionals" value="professionals">
+                    <label class="form-check-label" for="field_professionals">
+                        Θεραπευτές
+                    </label>
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input print-field" type="checkbox" id="field_status" value="status">
+                    <label class="form-check-label" for="field_status">
+                        Κατάσταση (Ενεργός/Απενεργοποιημένος)
+                    </label>
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input print-field" type="checkbox" id="field_unissued_receipts" value="unissued_receipts">
+                    <label class="form-check-label" for="field_unissued_receipts">
+                        Αποδείξεις (Όχι Κομμένες)
+                    </label>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Άκυρο</button>
+                <button type="button" class="btn btn-primary" id="printBtn">🖨 Εκτύπωση</button>
+            </div>
+        </div>
+    </div>
+    </div>
+
 
 @endsection
 @push('scripts')
@@ -457,6 +528,42 @@ document.addEventListener('DOMContentLoaded', function () {
         // build action url from route template
         const action = "{{ route('companies.destroy', ['company' => '__ID__']) }}".replace('__ID__', id);
         document.getElementById('deleteCompanyForm').action = action;
+    });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const printBtn = document.getElementById('printBtn');
+    
+    if (!printBtn) return;
+
+    printBtn.addEventListener('click', function () {
+        // Συλλέγουμε τα επιλεγμένα πεδία
+        const checkedFields = Array.from(document.querySelectorAll('.print-field:checked'))
+            .map(checkbox => checkbox.value)
+            .join(',');
+
+        // Παίρνουμε τα τρέχοντα query parameters
+        const url = new URL('{{ route("customers.print") }}', window.location.origin);
+        
+        // Διατηρούμε τα υπάρχοντα filters
+        const currentParams = new URLSearchParams(window.location.search);
+        for (const [key, value] of currentParams) {
+            url.searchParams.append(key, value);
+        }
+
+        // Προσθέτουμε τα επιλεγμένα πεδία
+        url.searchParams.set('print_fields', checkedFields);
+
+        // Ανοίγουμε το url σε νέο παράθυρο
+        window.open(url.toString(), '_blank');
+
+        // Κλείνουμε το modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('printOptionsModal'));
+        if (modal) {
+            modal.hide();
+        }
     });
 });
 </script>
