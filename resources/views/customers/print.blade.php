@@ -6,18 +6,19 @@
     <title>Εκτύπωση Περιστατικών</title>
 
     <style>
-        body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; }
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
         h1 { font-size: 16px; margin: 0 0 10px; }
         .meta { color: #555; margin-bottom: 12px; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th, td { border: 1px solid #ccc; padding: 4px 6px; vertical-align: top; word-wrap: break-word; }
-        th { background: #f2f2f2; text-align: left; font-size: 10px; }
-        .muted { color: #777; font-size: 10px; }
+        th, td { border: 1px solid #ccc; padding: 4px 6px; vertical-align: top; word-wrap: break-word; font-size: 12px; }
+        th { background: #f2f2f2; text-align: left; font-size: 12px; }
+        .muted { color: #777; font-size: 12px; }
         .nowrap { white-space: nowrap; }
         .compact { line-height: 1.3; }
         @media print {
             .no-print { display: none; }
-            body { margin: 0; font-size: 10px; }
+            body { margin: 0; font-size: 12px; }
+            th, td { font-size: 12px; }
         }
     </style>
 </head>
@@ -83,9 +84,9 @@
         <tr>
             @if(in_array('name', $printFields))
                 <td class="compact">
-                    <strong style="font-size: 11px;">{{ $c->last_name }} {{ $c->first_name }}</strong>
+                    <strong>{{ $c->last_name }} {{ $c->first_name }}</strong>
                     @if(!$isActive)
-                        <div class="muted" style="font-size: 9px;">Απενεργ.</div>
+                        <div class="muted">Απενεργ.</div>
                     @endif
                 </td>
             @endif
@@ -122,7 +123,7 @@
             @if(in_array('informations', $printFields))
                 <td class="compact">
                     @if(!empty($c->informations))
-                        <div style="font-size: 10px; line-height: 1.3;">{{ $c->informations }}</div>
+                        <div>{{ $c->informations }}</div>
                     @else
                         <span class="muted">-</span>
                     @endif
@@ -134,7 +135,7 @@
                     @if($unissued->isEmpty())
                         <span class="muted">-</span>
                     @else
-                        <div style="font-size: 9px; line-height: 1.3;">
+                        <div>
                             <strong>Σύνολο:</strong> {{ number_format($sum, 2, ',', '.') }} € | 
                             <strong>Πλήθος:</strong> {{ $unissued->count() }} | 
                             @foreach($unissued as $r)
