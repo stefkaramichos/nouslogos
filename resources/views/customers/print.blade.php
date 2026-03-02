@@ -6,17 +6,18 @@
     <title>Εκτύπωση Περιστατικών</title>
 
     <style>
-        body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; }
         h1 { font-size: 16px; margin: 0 0 10px; }
         .meta { color: #555; margin-bottom: 12px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #ccc; padding: 6px; vertical-align: top; }
-        th { background: #f2f2f2; text-align: left; }
-        .muted { color: #777; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th, td { border: 1px solid #ccc; padding: 4px 6px; vertical-align: top; word-wrap: break-word; }
+        th { background: #f2f2f2; text-align: left; font-size: 10px; }
+        .muted { color: #777; font-size: 10px; }
         .nowrap { white-space: nowrap; }
+        .compact { line-height: 1.3; }
         @media print {
             .no-print { display: none; }
-            body { margin: 0; }
+            body { margin: 0; font-size: 10px; }
         }
     </style>
 </head>
@@ -49,25 +50,25 @@
     <thead>
     <tr>
         @if(in_array('name', $printFields))
-            <th style="width: 20%;">Ονοματεπώνυμο</th>
+            <th style="width: 10%;">Ονοματεπώνυμο</th>
         @endif
         @if(in_array('phone', $printFields))
-            <th style="width: 15%;">Τηλέφωνο</th>
+            <th style="width: 10%;">Τηλέφωνο</th>
         @endif
         @if(in_array('company', $printFields))
-            <th style="width: 15%;">Εταιρεία/Τοποθεσία</th>
+            <th style="width: 12%;">Εταιρεία</th>
         @endif
         @if(in_array('professionals', $printFields))
-            <th style="width: 15%;">Θεραπευτές</th>
+            <th style="width: 12%;">Θεραπευτές</th>
         @endif
         @if(in_array('status', $printFields))
-            <th style="width: 10%;">Κατάσταση</th>
+            <th style="width: 8%;">Κατάσταση</th>
         @endif
         @if(in_array('informations', $printFields))
-            <th style="width: 25%;">Πληροφορίες</th>
+            <th style="width: 20%;">Πληροφορίες</th>
         @endif
         @if(in_array('unissued_receipts', $printFields))
-            <th style="width: 30%;">Αποδείξεις (ΟΧΙ κομμένες)</th>
+            <th style="width: 28%;">Αποδείξεις (ΟΧΙ κομμένες)</th>
         @endif
     </tr>
     </thead>
@@ -81,28 +82,28 @@
 
         <tr>
             @if(in_array('name', $printFields))
-                <td>
-                    <strong>{{ $c->last_name }} {{ $c->first_name }}</strong>
+                <td class="compact">
+                    <strong style="font-size: 11px;">{{ $c->last_name }} {{ $c->first_name }}</strong>
                     @if(!$isActive)
-                        <div class="muted">Απενεργοποιημένος</div>
+                        <div class="muted" style="font-size: 9px;">Απενεργ.</div>
                     @endif
                 </td>
             @endif
 
             @if(in_array('phone', $printFields))
-                <td>
+                <td class="compact">
                     {{ $c->phone ?? '-' }}
                 </td>
             @endif
 
             @if(in_array('company', $printFields))
-                <td>
+                <td class="compact">
                     {{ $c->company->name ?? '-' }}
                 </td>
             @endif
 
             @if(in_array('professionals', $printFields))
-                <td>
+                <td class="compact">
                     @php $pros = $c->professionals ?? collect(); @endphp
                     @if($pros->isEmpty())
                         <span class="muted">-</span>
@@ -113,15 +114,15 @@
             @endif
 
             @if(in_array('status', $printFields))
-                <td>
-                    {{ $isActive ? 'Ενεργός' : 'Απενεργοποιημένος' }}
+                <td class="compact">
+                    {{ $isActive ? 'Ενεργός' : 'Απενεργ.' }}
                 </td>
             @endif
 
             @if(in_array('informations', $printFields))
-                <td>
+                <td class="compact">
                     @if(!empty($c->informations))
-                        {!! nl2br(e($c->informations)) !!}
+                        <div style="font-size: 10px; line-height: 1.3;">{{ $c->informations }}</div>
                     @else
                         <span class="muted">-</span>
                     @endif
@@ -129,21 +130,17 @@
             @endif
 
             @if(in_array('unissued_receipts', $printFields))
-                <td>
+                <td class="compact">
                     @if($unissued->isEmpty())
                         <span class="muted">-</span>
                     @else
-                        <div><strong>Σύνολο:</strong> {{ number_format($sum, 2, ',', '.') }} €</div>
-                        <div><strong>Πλήθος:</strong> {{ $unissued->count() }}</div>
-                        <div style="margin-top:6px;">
+                        <div style="font-size: 9px; line-height: 1.3;">
+                            <strong>Σύνολο:</strong> {{ number_format($sum, 2, ',', '.') }} € | 
+                            <strong>Πλήθος:</strong> {{ $unissued->count() }} | 
                             @foreach($unissued as $r)
-                                <div style="margin-bottom:4px;">
-                                    • {{ $r->receipt_date ? \Carbon\Carbon::parse($r->receipt_date)->format('d/m/Y') : '-' }}
-                                    — {{ number_format((float)$r->amount, 2, ',', '.') }} €
-                                    @if(!empty($r->comment))
-                                        <div class="muted">{{ $r->comment }}</div>
-                                    @endif
-                                </div>
+                                {{ $r->receipt_date ? \Carbon\Carbon::parse($r->receipt_date)->format('d/m/Y') : '-' }} — {{ number_format((float)$r->amount, 2, ',', '.') }} €
+                                @if(!empty($r->comment)) ({{ \Illuminate\Support\Str::limit($r->comment, 40) }})@endif
+                                @if(!$loop->last) • @endif
                             @endforeach
                         </div>
                     @endif
