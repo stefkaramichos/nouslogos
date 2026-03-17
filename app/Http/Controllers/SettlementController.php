@@ -287,7 +287,7 @@ class SettlementController extends Controller
                 $q->where('start_time', '>=', $rangeStart)
                 ->where('start_time', '<',  $rangeEndExclusive)
                 ->whereNull('deleted_at')
-                ->where('company_id', '!=', 9);   // 👈 exclude company 9
+                ->where('company_id', '!=', 11);   // 👈 exclude company 9
             })
             ->get();
 
