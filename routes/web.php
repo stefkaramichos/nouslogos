@@ -206,6 +206,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/customers/{customer}/toggle-completed', [CustomerController::class, 'toggleCompleted'])
     ->name('customers.toggleCompleted');
 
+    Route::post('/customers/toggle-completed-bulk', [CustomerController::class, 'toggleCompletedBulk'])
+    ->name('customers.toggleCompletedBulk');
+
     Route::post('/appointments/{appointment}/update-paid-total', [AppointmentController::class, 'updatePaidTotal'])
     ->name('appointments.updatePaidTotal');
 

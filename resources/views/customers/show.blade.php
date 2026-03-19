@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="mb-3">
-        <a href="{{ route('customers.index') }}" class="btn btn-secondary btn-sm">← Πίσω στη λίστα περιστατικών</a>
+        <a href="{{ route('customers.index') }}#customer_row_{{ $customer->id }}" class="btn btn-secondary btn-sm">← Πίσω στη λίστα περιστατικών</a>
     </div>
 
     {{-- Στοιχεία Πελάτη + Οικονομική εικόνα --}}

@@ -156,7 +156,12 @@
                 <table class="table table-striped mb-0 align-middle">
                     <thead>
                     <tr>
-                        <th class="text-center">✓</th>
+                        <th class="text-center">
+                            <input type="checkbox"
+                                   id="select_all_completed"
+                                   class="form-check-input"
+                                   title="Επιλογή/αποεπιλογή όλων">
+                        </th>
                         <th>Ονοματεπώνυμο</th>
                         <th>Τηλέφωνο</th>
                         {{-- <th>Θεραπευτές</th> --}}
@@ -185,14 +190,11 @@
                                     @csrf
 
                                     <div class="form-check m-0 d-inline-flex align-items-center justify-content-center">
-                                        <input class="form-check-input"
+                                        <input class="form-check-input customer-completed-checkbox"
                                             type="checkbox"
                                             id="cust_completed_{{ $customer->id }}"
                                             {{ $isCompleted ? 'checked' : '' }}
-                                            onchange="
-                                                this.form.querySelector('input[name=completed]').value = this.checked ? 1 : 0;
-                                                this.form.submit();
-                                            ">
+                                            data-customer-id="{{ $customer->id }}">
                                         <input type="hidden" name="completed" value="{{ $isCompleted ? 1 : 0 }}">
                                     </div>
                                 </form>
@@ -348,6 +350,13 @@
         </div>
         --}}
     </div>
+
+    <form id="bulkCompletedForm" method="POST" action="{{ route('customers.toggleCompletedBulk') }}" class="d-none">
+        @csrf
+        <input type="hidden" name="completed" id="bulk_completed_value" value="0">
+        <div id="bulk_completed_ids"></div>
+    </form>
+
         {{-- Create Company Modal --}}
     <div class="modal fade" id="createCompanyModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
@@ -529,6 +538,82 @@ document.addEventListener('DOMContentLoaded', function () {
         const action = "{{ route('companies.destroy', ['company' => '__ID__']) }}".replace('__ID__', id);
         document.getElementById('deleteCompanyForm').action = action;
     });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const master = document.getElementById('select_all_completed');
+    const checkboxes = Array.from(document.querySelectorAll('.customer-completed-checkbox'));
+    const bulkForm = document.getElementById('bulkCompletedForm');
+    const bulkIds = document.getElementById('bulk_completed_ids');
+    const bulkValue = document.getElementById('bulk_completed_value');
+
+    if (!master || checkboxes.length === 0) return;
+
+    function refreshMasterState() {
+        const total = checkboxes.length;
+        const checked = checkboxes.filter(cb => cb.checked).length;
+
+        master.checked = total > 0 && checked === total;
+        master.indeterminate = checked > 0 && checked < total;
+    }
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', function () {
+            const targetChecked = this.checked;
+            const msg = targetChecked
+                ? 'Σίγουρα θέλετε να επιλέξετε το περιστατικό ως ολοκληρωμένο;'
+                : 'Σίγουρα θέλετε να το αποεπιλέξετε από ολοκληρωμένο;';
+
+            if (!confirm(msg)) {
+                this.checked = !targetChecked;
+                refreshMasterState();
+                return;
+            }
+
+            const form = this.closest('form');
+            const hidden = form?.querySelector('input[name="completed"]');
+            if (!form || !hidden) return;
+
+            hidden.value = targetChecked ? '1' : '0';
+            form.submit();
+        });
+    });
+
+    master.addEventListener('change', function () {
+        const targetChecked = this.checked;
+        const ids = checkboxes.map(cb => cb.dataset.customerId).filter(Boolean);
+
+        if (ids.length === 0) {
+            refreshMasterState();
+            return;
+        }
+
+        const bulkMsg = targetChecked
+            ? 'Σίγουρα θέλετε να επιλέξετε ΟΛΑ τα περιστατικά ως ολοκληρωμένα;'
+            : 'Σίγουρα θέλετε να αποεπιλέξετε ΟΛΑ τα περιστατικά από ολοκληρωμένα;';
+
+        if (!confirm(bulkMsg)) {
+            refreshMasterState();
+            return;
+        }
+
+        bulkValue.value = targetChecked ? '1' : '0';
+        bulkIds.innerHTML = '';
+
+        ids.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'customer_ids[]';
+            input.value = id;
+            bulkIds.appendChild(input);
+        });
+
+        bulkForm.submit();
+    });
+
+    refreshMasterState();
 });
 </script>
 

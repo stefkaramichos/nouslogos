@@ -1377,6 +1377,25 @@ class CustomerController extends Controller
         return back()->with('success', 'Ενημερώθηκε η κατάσταση Completed.');
     }
 
+    public function toggleCompletedBulk(Request $request)
+    {
+        $data = $request->validate([
+            'customer_ids'   => 'required|array|min:1',
+            'customer_ids.*' => 'integer|exists:customers,id',
+            'completed'      => 'required|in:0,1',
+        ]);
+
+        $ids = array_values(array_unique(array_map('intval', $data['customer_ids'])));
+        $completed = (int)$data['completed'];
+
+        Customer::whereIn('id', $ids)->update([
+            'completed'  => $completed,
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('success', 'Η μαζική ενημέρωση ολοκληρώθηκε.');
+    }
+
 
     /**
      * ✅ Διαγραφή πληρωμών grouped ανά ημέρα (paid_at)

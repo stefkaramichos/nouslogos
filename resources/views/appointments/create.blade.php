@@ -236,14 +236,15 @@ $(function () {
                 }
 
                 // status (multi)
-                // ✅ ΜΗΝ overwrite αν ο χρήστης έχει ήδη βάλει κάτι
-                const current = $row.find('.status_select').val() || [];
-                if (current.length === 0 && Array.isArray(data.status)) {
+                // ✅ όταν αλλάζει θεραπευτής, ενημέρωσε πάντα την υπηρεσία από τα defaults του
+                if (Array.isArray(data.status)) {
                     $row.find('.status_select').val(data.status.map(String)).trigger('change');
+                } else {
+                    $row.find('.status_select').val(null).trigger('change');
                 }
             })
-            .fail(function (err) {
-                console.error("Σφάλμα στο fetch defaults επαγγελματία:", err);
+            .fail(function (err) { 
+                console.error("Σφάλμα στο fetch defaults επαγγελματία:", err); 
             });
     }
 
