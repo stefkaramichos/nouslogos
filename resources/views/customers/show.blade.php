@@ -803,8 +803,8 @@
 
                     <div class="col-md-12 d-flex gap-2 justify-content-start">
                         @if($range !== 'all')
-                            <a href="{{ $prevUrl }}" class="btn btn-outline-secondary">← Προηγούμενο</a>
-                            <a href="{{ $nextUrl }}" class="btn btn-outline-secondary">Επόμενο →</a>
+                            <a href="{{ $prevUrl }}#appointments-section" class="btn btn-outline-secondary">← Προηγούμενο</a>
+                            <a href="{{ $nextUrl }}#appointments-section" class="btn btn-outline-secondary">Επόμενο →</a>
                         @endif
                     </div>
                 </div>
