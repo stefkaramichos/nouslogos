@@ -29,7 +29,7 @@
         'ergotherapia' => 'ΕΡΓΟΘΕΡΑΠΕΙΑ',
         'omadiki'      => 'ΟΜΑΔΙΚΗ',
         'eidikos'      => 'ΕΙΔΙΚΟΣ ΠΑΙΔΑΓΩΓΟΣ',
-        'aksiologisi'  => 'ΑΞΙΟΛΟΓΗΣΗ',
+        'aksiologisi'  => 'ΑΞΙΟΛΟΓΗΣΗ / ΤΗΛ. ΕΠΙΚΟΙΝΩΝΙΑ / ΕΝΗΜΕΡΩΤΙΚΟ',
     ];
 
     // weekDays MUST come from controller (for correct week header)

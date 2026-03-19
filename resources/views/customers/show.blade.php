@@ -3,6 +3,12 @@
 @section('title', 'Περιστατικό: ' . $customer->last_name . ' ' . $customer->first_name)
 
 @section('content')
+    <style>
+        tr.tax-fix-colored-row td {
+            background-color: var(--tax-fix-color) !important;
+        }
+    </style>
+
     <div class="mb-3">
         <a href="{{ route('customers.index') }}#customer_row_{{ $customer->id }}" class="btn btn-secondary btn-sm">← Πίσω στη λίστα περιστατικών</a>
     </div>
@@ -54,7 +60,7 @@
                             data-id="{{ $customer->id }}"
                             data-field="informations"
                             data-type="textarea"
-                            style="white-space: pre-wrap; display:inline-block; width:100%;">{{ $customer->informations ?? '-' }}</span>
+                            style="white-space: pre-wrap; display:inline-block; width:100%; max-height:150px; overflow-y:auto; border:1px solid #ced4da; border-radius:0.25rem; padding:0.375rem 0.75rem;">{{ $customer->informations ?? '-' }}</span>
                     </p>
                 </div>
 
@@ -181,69 +187,174 @@
                         @endforelse
                     </div>
 
-                    {{-- ✅ Προπληρωμή (εμφάνιση μόνο αν υπάρχει υπόλοιπο) --}}
+                    {{-- ✅ Προπληρωμές: ξεχωριστές εγγραφές με ημερομηνία --}}
                     <div class="mt-2">
                     @php
-                        $hasPrepay = isset($prepayment) && (
-                            (float)($prepayment->cash_y_balance ?? 0) > 0 ||
-                            (float)($prepayment->cash_n_balance ?? 0) > 0 ||
-                            (float)($prepayment->card_balance ?? 0) > 0
-                        );
-
-                        $prepayTotal =
-                            (float)($prepayment->cash_y_balance ?? 0) +
-                            (float)($prepayment->cash_n_balance ?? 0) +
-                            (float)($prepayment->card_balance ?? 0);
+                        $prepayList = ($prepayments ?? collect())->filter(function ($p) {
+                            return ((float)($p->cash_y_balance ?? 0)
+                                + (float)($p->cash_n_balance ?? 0)
+                                + (float)($p->card_balance ?? 0)) > 0;
+                        });
                     @endphp
 
-                    @if($hasPrepay)
+                    @if($prepayList->isNotEmpty())
                         <div class="border rounded p-2 mb-2"
                             style="font-size:0.8rem; background:#f8f9fa;"
                             id="prepayment">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <strong>Προπληρωμή</strong>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong>Προπληρωμές</strong>
 
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="badge bg-primary">
-                                        {{ number_format($prepayTotal, 2, ',', '.') }} €
+                                        {{ number_format((float)($prepaymentTotal ?? 0), 2, ',', '.') }} €
                                     </span>
 
-                                    {{-- ✅ Delete prepayment --}}
                                     <form method="POST"
                                         action="{{ route('customers.prepayment.destroy', $customer) }}"
                                         class="m-0"
-                                        onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε ΟΛΗ την προπληρωμή;');">
+                                        onsubmit="return confirm('Σίγουρα θέλετε να διαγράψετε ΟΛΕΣ τις εγγραφές προπληρωμής;');">
                                         @csrf
                                         @method('DELETE')
                                         <input type="hidden" name="_anchor" value="prepayment">
                                         <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">
-                                            Διαγραφή
+                                            Διαγραφή όλων
                                         </button>
                                     </form>
                                 </div>
                             </div>
 
-                            <div class="text-muted" style="font-size:0.75rem;">
-                                @if((float)($prepayment->cash_y_balance ?? 0) > 0)
-                                    Μετρητά (με απόδειξη): {{ number_format((float)$prepayment->cash_y_balance, 2, ',', '.') }} €
-                                    <br>
-                                @endif
-
-                                @if((float)($prepayment->cash_n_balance ?? 0) > 0)
-                                    Μετρητά (χωρίς απόδειξη): {{ number_format((float)$prepayment->cash_n_balance, 2, ',', '.') }} €
-                                    <br>
-                                @endif
-
-                                @if((float)($prepayment->card_balance ?? 0) > 0)
-                                    Κάρτα{{ $prepayment->card_bank ? ' · '.$prepayment->card_bank : '' }}:
-                                    {{ number_format((float)$prepayment->card_balance, 2, ',', '.') }} €
-                                @endif
+                            <div class="border rounded bg-white p-2" style="max-height: 130px; overflow-y:auto;">
+                                @foreach($prepayList as $pp)
+                                    @php
+                                        $rowTotal = (float)($pp->cash_y_balance ?? 0)
+                                            + (float)($pp->cash_n_balance ?? 0)
+                                            + (float)($pp->card_balance ?? 0);
+                                        $dateLabel = $pp->last_paid_at
+                                            ? \Carbon\Carbon::parse($pp->last_paid_at)->format('d/m/Y')
+                                            : optional($pp->created_at)->format('d/m/Y');
+                                    @endphp
+                                    <div class="mb-2 pb-2 border-bottom">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="text-muted prepayment-date-edit"
+                                                  style="cursor:pointer"
+                                                  title="Διπλό κλικ για αλλαγή ημερομηνίας"
+                                                  data-customer-id="{{ $customer->id }}"
+                                                  data-prepayment-id="{{ $pp->id }}"
+                                                  data-original="{{ $pp->last_paid_at ? \Carbon\Carbon::parse($pp->last_paid_at)->toDateString() : optional($pp->created_at)->toDateString() }}">{{ $dateLabel ?: '-' }}</span>
+                                            <span class="badge bg-secondary prepayment-amount-edit"
+                                                  style="cursor:pointer"
+                                                  title="Διπλό κλικ για αλλαγή ποσού"
+                                                  data-customer-id="{{ $customer->id }}"
+                                                  data-prepayment-id="{{ $pp->id }}"
+                                                  data-original="{{ number_format($rowTotal, 2, '.', '') }}">{{ number_format($rowTotal, 2, ',', '.') }} €</span>
+                                        </div>
+                                        <div class="text-muted" style="font-size:0.75rem;">
+                                            @if((float)($pp->cash_y_balance ?? 0) > 0)
+                                                Μετρητά (με απόδειξη): {{ number_format((float)$pp->cash_y_balance, 2, ',', '.') }} €
+                                                <br>
+                                            @endif
+                                            @if((float)($pp->cash_n_balance ?? 0) > 0)
+                                                Μετρητά (χωρίς απόδειξη): {{ number_format((float)$pp->cash_n_balance, 2, ',', '.') }} €
+                                                <br>
+                                            @endif
+                                            @if((float)($pp->card_balance ?? 0) > 0)
+                                                Κάρτα{{ $pp->card_bank ? ' · '.$pp->card_bank : '' }}:
+                                                {{ number_format((float)$pp->card_balance, 2, ',', '.') }} €
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
                             </div>
                         </div>
                     @endif
                     </div>
                 </div>
             </div>
+
+            <hr>
+
+            {{-- ===================== OUTSTANDING SPLIT PAYMENT (NO DATES) ===================== --}}
+            <div id="pay-outstanding" class="border rounded p-3 mb-3" style="background:#f8f9fa">
+                <h6 class="mb-2">💶 Πληρωμή όλων των χρωστούμενων ραντεβού</h6>
+
+                {{-- Preview box (server-side) --}}
+                <div class="border rounded p-3 mb-3 bg-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-muted small">
+                            Χρωστούμενα ραντεβού: <strong>{{ $outstandingCount ?? 0 }}</strong>
+                        </div>
+                        <div class="fs-5 fw-bold">
+                            Υπόλοιπο: <span>{{ number_format($outstandingAmount ?? 0, 2, ',', '.') }} €</span>
+                        </div>
+                    </div>
+                    @if(($outstandingAmount ?? 0) <= 0)
+                        <div class="text-muted small mt-2">
+                            Δεν υπάρχουν χρωστούμενα.
+                        </div>
+                    @endif
+                </div>
+
+                <form method="POST" action="{{ route('customers.payOutstandingSplit', $customer) }}">
+                    @csrf
+
+                    <div class="row g-2 align-items-end">
+                        {{-- CASH WITH RECEIPT --}}
+                        <div class="col-md-2">
+                            <label class="form-label">Μετρητά (ΜΑ) €</label>
+                            <input type="number" step="0.01" min="0" name="cash_y_amount"
+                                class="form-control" placeholder="0.00">
+                        </div>
+
+                        {{-- CASH WITHOUT RECEIPT --}}
+                        <div class="col-md-2">
+                            <label class="form-label">Μετρητά (ΧΑ) €</label>
+                            <input type="number" step="0.01" min="0" name="cash_n_amount"
+                                class="form-control" placeholder="0.00">
+                        </div>
+
+                        {{-- CARD --}}
+                        <div class="col-md-2">
+                            <label class="form-label">Κάρτα/Τράπεζα €</label>
+                            <input type="number" step="0.01" min="0" name="card_amount"
+                                class="form-control" placeholder="0.00">
+                        </div>
+
+                        {{-- <div class="col-md-2">
+                            <label class="form-label">Τράπεζα (Κάρτα)</label>
+                            <input type="text" name="card_bank" class="form-control" maxlength="255"
+                                placeholder="π.χ. Alpha">
+                        </div> --}}
+
+                        <div class="col-md-4">
+                            <label class="form-label">Ημερομηνία Πληρωμής</label>
+                            <input
+                                type="date"
+                                name="paid_at"
+                                class="form-control"
+                                value="{{ now()->toDateString() }}"
+                                required
+                            >
+                        </div>
+
+
+                        {{-- <div class="col-md-9 mt-2">
+                            <label class="form-label">Σημείωση (προαιρετικό)</label>
+                            <input type="text" name="notes" class="form-control" maxlength="1000"
+                                placeholder="π.χ. Πληρωμή χρωστούμενων (split).">
+                        </div> --}}
+
+                        <div class="col-md-2 mt-2 text-end">
+                            <button type="submit"
+                                    class="btn btn-success w-100"
+                                    onclick="return confirm('Θέλετε να καταχωρήσετε αυτή την πληρωμή σε ΟΛΑ τα χρωστούμενα ραντεβού;');">
+                                💶 Καταχώρηση Πληρωμής
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            {{-- ===================== /OUTSTANDING SPLIT PAYMENT ===================== --}}
+
             <hr>
 
             <div class="row mt-2 mb-3">
@@ -278,6 +389,12 @@
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
+                                        <span class="badge me-1"
+                                              title="Χρώμα αυτής της διόρθωσης"
+                                              style="background: {{ $taxFixLogColors[(int)$log->id] ?? 'rgba(255,193,7,.28)' }}; color:#212529; border:1px solid rgba(0,0,0,.15);">
+                                            ●
+                                        </span>
+
                                         {{-- ✅ ΔΙΠΛΟ ΚΛΙΚ: ΗΜΕΡΟΜΗΝΙΑ --}}
                                         <strong class="tax-fix-log-date-edit"
                                             data-log-id="{{ $log->id }}"
@@ -613,7 +730,7 @@
  
 
     {{-- ===================== ΡΑΝΤΕΒΟΥ ===================== --}}
-    <div class="card">
+     <div class="card" id="appointments-section">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>Ραντεβού Περιστατικού</span>
 
@@ -625,7 +742,7 @@
 
         <div class="card-body">
             {{-- Filters --}}
-            <form method="GET" action="{{ route('customers.show', $customer) }}" class="mb-2">
+             <form method="GET" action="{{ route('customers.show', $customer) }}#appointments-section" class="mb-2">
                 @php
                     $range = $filters['range'] ?? 'month';
                     $day   = $filters['day'] ?? now()->format('Y-m-d');
@@ -668,7 +785,7 @@
 
                         <div class="form-text">
                             Ctrl (Windows) / Cmd (Mac) για πολλαπλή επιλογή.
-                            <a href="{{ route('customers.show', $customer, array_merge(request()->query(), ['professional_ids' => []])) }}"
+                           <a href="{{ route('customers.show', $customer, array_merge(request()->query(), ['professional_ids' => []])) }}#appointments-section"
                             class="ms-2">Καθαρισμός</a>
                         </div>
                     </div>
@@ -745,6 +862,7 @@
                               $hasAddon = $appointment->payments->contains(function($p){
                                     return is_string($p->notes ?? null) && str_contains($p->notes, '[TAX_FIX_ADDON]');
                                 });
+                            $fixColor = $taxFixAppointmentColors[(int)$appointment->id] ?? null;
                             $total     = (float) ($appointment->total_price ?? 0);
                             $paidTotal = (float) $appointment->payments->sum('amount');
 
@@ -765,7 +883,8 @@
                         @endphp
 
 
-                        <tr class="{{ $hasAddon ? 'table-warning' : '' }}">
+                        <tr class="{{ $fixColor ? 'tax-fix-colored-row' : ($hasAddon ? 'table-warning' : '') }}"
+                            @if($fixColor) style="--tax-fix-color: {{ $fixColor }};" @endif>
                             <td class="text-center">
                                 <input type="checkbox" class="appointment-checkbox" value="{{ $appointment->id }}">
                             </td>
@@ -809,7 +928,7 @@
                                         'ergotherapia'  => 'ΕΡΓΟΘΕΡΑΠΕΙΑ',
                                         'omadiki'       => 'ΟΜΑΔΙΚΗ',
                                         'eidikos'       => 'ΕΙΔΙΚΟΣ ΠΑΙΔΑΓΩΓΟΣ',
-                                        'aksiologisi'   => 'ΑΞΙΟΛΟΓΗΣΗ',
+                                        'aksiologisi'   => 'ΑΞΙΟΛΟΓΗΣΗ / ΤΗΛ. ΕΠΙΚΟΙΝΩΝΙΑ / ΕΝΗΜΕΡΩΤΙΚΟ',
                                         default         => mb_strtoupper($appointment->status ?? '-', 'UTF-8'),
                                     };
                                 @endphp
@@ -925,87 +1044,7 @@
                 </table>
             </div>
 
-            {{-- ===================== OUTSTANDING SPLIT PAYMENT (NO DATES) ===================== --}}
-            <div id="pay-outstanding" class="border rounded p-3 mb-3" style="background:#f8f9fa">
-                <h6 class="mb-2">💶 Πληρωμή όλων των χρωστούμενων ραντεβού</h6>
-
-                {{-- Preview box (server-side) --}}
-                <div class="border rounded p-3 mb-3 bg-white">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="text-muted small">
-                            Χρωστούμενα ραντεβού: <strong>{{ $outstandingCount ?? 0 }}</strong>
-                        </div>
-                        <div class="fs-5 fw-bold">
-                            Υπόλοιπο: <span>{{ number_format($outstandingAmount ?? 0, 2, ',', '.') }} €</span>
-                        </div>
-                    </div>
-                    @if(($outstandingAmount ?? 0) <= 0)
-                        <div class="text-muted small mt-2">
-                            Δεν υπάρχουν χρωστούμενα.
-                        </div>
-                    @endif
-                </div>
-
-                <form method="POST" action="{{ route('customers.payOutstandingSplit', $customer) }}">
-                    @csrf
-
-                    <div class="row g-2 align-items-end">
-                        {{-- CASH WITH RECEIPT --}}
-                        <div class="col-md-2">
-                            <label class="form-label">Μετρητά (ΜΑ) €</label>
-                            <input type="number" step="0.01" min="0" name="cash_y_amount"
-                                class="form-control" placeholder="0.00">
-                        </div>
-
-                        {{-- CASH WITHOUT RECEIPT --}}
-                        <div class="col-md-2">
-                            <label class="form-label">Μετρητά (ΧΑ) €</label>
-                            <input type="number" step="0.01" min="0" name="cash_n_amount"
-                                class="form-control" placeholder="0.00">
-                        </div>
-
-                        {{-- CARD --}}
-                        <div class="col-md-2">
-                            <label class="form-label">Κάρτα €</label>
-                            <input type="number" step="0.01" min="0" name="card_amount"
-                                class="form-control" placeholder="0.00">
-                        </div>
-
-                        {{-- <div class="col-md-2">
-                            <label class="form-label">Τράπεζα (Κάρτα)</label>
-                            <input type="text" name="card_bank" class="form-control" maxlength="255"
-                                placeholder="π.χ. Alpha">
-                        </div> --}}
-
-                        <div class="col-md-4">
-                            <label class="form-label">Ημερομηνία Πληρωμής</label>
-                            <input
-                                type="date"
-                                name="paid_at"
-                                class="form-control"
-                                value="{{ now()->toDateString() }}"
-                                required
-                            >
-                        </div>
-
-
-                        {{-- <div class="col-md-9 mt-2">
-                            <label class="form-label">Σημείωση (προαιρετικό)</label>
-                            <input type="text" name="notes" class="form-control" maxlength="1000"
-                                placeholder="π.χ. Πληρωμή χρωστούμενων (split).">
-                        </div> --}}
-
-                        <div class="col-md-2 mt-2 text-end">
-                            <button type="submit"
-                                    class="btn btn-success w-100"
-                                    onclick="return confirm('Θέλετε να καταχωρήσετε αυτή την πληρωμή σε ΟΛΑ τα χρωστούμενα ραντεβού;');">
-                                💶 Καταχώρηση Πληρωμής
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            {{-- ===================== /OUTSTANDING SPLIT PAYMENT ===================== --}}
+            
 
 
 
@@ -2056,6 +2095,146 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (!csrfToken) return;
+
+    let active = null;
+
+    document.addEventListener('dblclick', function (e) {
+        const el = e.target.closest('.prepayment-amount-edit');
+        if (!el || active) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const customerId = el.dataset.customerId;
+        const prepaymentId = el.dataset.prepaymentId;
+        const originalText = (el.textContent || '').trim();
+        const originalVal = el.dataset.original || '0';
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.step = '0.01';
+        input.min = '0';
+        input.className = 'form-control form-control-sm d-inline-block';
+        input.style.width = '110px';
+        input.value = parseFloat(originalVal) || 0;
+
+        el.innerHTML = '';
+        el.appendChild(input);
+        input.focus();
+        active = { el, input };
+
+        const restore = () => {
+            el.textContent = originalText;
+            active = null;
+        };
+
+        const save = () => {
+            const v = (input.value ?? '').toString().trim();
+            if (v === '') return restore();
+
+            el.innerHTML = '<span class="text-muted">Αποθήκευση…</span>';
+
+            fetch(`{{ route('customers.prepayments.updateAmount', ['customer' => $customer->id, 'prepayment' => '__PREPAY__']) }}`.replace('__PREPAY__', prepaymentId), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ amount: v })
+            })
+            .then(async res => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) throw data;
+                return data;
+            })
+            .then(() => window.location.reload())
+            .catch(err => {
+                console.error(err);
+                alert(err?.message || 'Σφάλμα αποθήκευσης.');
+                restore();
+            });
+        };
+
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+            if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
+        });
+    });
+
+    document.addEventListener('dblclick', function (e) {
+        const el = e.target.closest('.prepayment-date-edit');
+        if (!el || active) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const prepaymentId = el.dataset.prepaymentId;
+        const originalText = (el.textContent || '').trim();
+        const originalVal = el.dataset.original || '';
+
+        const input = document.createElement('input');
+        input.type = 'date';
+        input.className = 'form-control form-control-sm d-inline-block';
+        input.style.width = '145px';
+        input.value = originalVal;
+
+        el.innerHTML = '';
+        el.appendChild(input);
+        input.focus();
+        active = { el, input };
+
+        const restore = () => {
+            el.textContent = originalText || '-';
+            active = null;
+        };
+
+        const save = () => {
+            const v = (input.value ?? '').toString().trim();
+            if (!v) return restore();
+
+            el.innerHTML = '<span class="text-muted">Αποθήκευση…</span>';
+
+            fetch(`{{ route('customers.prepayments.updateDate', ['customer' => $customer->id, 'prepayment' => '__PREPAY__']) }}`.replace('__PREPAY__', prepaymentId), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ paid_at: v })
+            })
+            .then(async res => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) throw data;
+                return data;
+            })
+            .then((data) => {
+                el.textContent = data.label || originalText;
+                el.dataset.original = data.value || v;
+                active = null;
+            })
+            .catch(err => {
+                console.error(err);
+                alert(err?.message || 'Σφάλμα αποθήκευσης.');
+                restore();
+            });
+        };
+
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+            if (ev.key === 'Escape') { ev.preventDefault(); restore(); }
+        });
+    });
 });
 </script>
 

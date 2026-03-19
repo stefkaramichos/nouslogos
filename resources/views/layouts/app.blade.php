@@ -245,11 +245,7 @@
             @endif
 
             <div class="d-flex justify-content-start gap-3 icon-actions">
-                @if($user && in_array($user->role, ['owner', 'grammatia']))
-                    <a href="{{ route('appointments.recycle') }}" class="btn btn-outline-secondary" title="Recycle Ραντεβού">
-                        <i class="bi bi-trash"></i>
-                    </a>
-                @endif
+              
                     <a href="{{ route('documents.index') }}" class="btn btn-outline-success" title="Αρχεία">
                         <i class="bi bi-folder2-open"></i>
                     </a>
@@ -284,6 +280,11 @@
                         <i class="bi bi-box-arrow-right"></i>
                     </button>
                 </form>
+                  @if($user && in_array($user->role, ['owner', 'grammatia']))
+                    <a href="{{ route('appointments.recycle') }}" class="btn btn-outline-secondary" title="Recycle Ραντεβού">
+                        <i class="bi bi-trash"></i>
+                    </a>
+                @endif
             </div>
         </div>
     </div>
@@ -381,11 +382,7 @@
                     @endif
 
                     <div class="d-flex justify-content-start gap-3 icon-actions" id="sidebarBottomActions">
-                        @if($user && in_array($user->role, ['owner', 'grammatia']))
-                            <a href="{{ route('appointments.recycle') }}" class="btn btn-outline-secondary" title="Recycle Ραντεβού">
-                                <i class="bi bi-trash"></i>
-                            </a>
-                        @endif
+                      
                             <a href="{{ route('documents.index') }}" class="btn btn-outline-success" title="Αρχεία">
                                 <i class="bi bi-folder2-open"></i>
                             </a>
@@ -420,6 +417,11 @@
                                 <i class="bi bi-box-arrow-right"></i>
                             </button>
                         </form>
+                          @if($user && in_array($user->role, ['owner', 'grammatia']))
+                            <a href="{{ route('appointments.recycle') }}" class="btn btn-outline-secondary" title="Recycle Ραντεβού">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        @endif
                     </div>
                 </div>
             </div>

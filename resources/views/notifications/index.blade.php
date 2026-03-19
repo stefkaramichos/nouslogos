@@ -14,30 +14,28 @@
 
     <div class="card-body">
 
-        <form method="GET" class="row g-3 mb-3">
-            <div class="col-md-3">
-                <label class="form-label">Από</label>
-                <input type="date" name="from" value="{{ $from }}" class="form-control">
-            </div>
-
-            <div class="col-md-3">
-                <label class="form-label">Έως</label>
-                <input type="date" name="to" value="{{ $to }}" class="form-control">
-            </div>
-
-            <div class="col-md-3 d-flex align-items-end">
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" name="unread" value="1" id="unread"
-                           {{ $onlyUnread ? 'checked' : '' }}>
-                    <label class="form-check-label" for="unread">Μόνο αδιάβαστες</label>
-                </div>
-            </div>
-
-            <div class="col-md-3 d-flex align-items-end gap-2">
-                <button class="btn btn-outline-primary w-100">Φιλτράρισμα</button>
-                <a href="{{ route('notifications.index') }}" class="btn btn-outline-secondary">Καθαρισμός</a>
-            </div>
-        </form>
+        {{-- Quick filter buttons --}}
+        @php
+            $quickFilter = request('quick', 'today');
+        @endphp
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            @php
+                $filters = [
+                    'all'      => ['label' => 'Όλες',             'color' => 'secondary'],
+                    'today'    => ['label' => 'Σήμερα',           'color' => 'primary'],
+                    'tomorrow' => ['label' => 'Αύριο',            'color' => 'info'],
+                    'week'     => ['label' => 'Αυτή την εβδομάδα','color' => 'success'],
+                    'past'     => ['label' => 'Παρελθοντικές',    'color' => 'warning'],
+                    'future'   => ['label' => 'Μελλοντικές',      'color' => 'danger'],
+                ];
+            @endphp
+            @foreach($filters as $key => $f)
+                <a href="{{ route('notifications.index', ['quick' => $key]) }}"
+                   class="btn btn-sm btn-{{ $quickFilter === $key ? '' : 'outline-' }}{{ $f['color'] }}">
+                    {{ $f['label'] }}
+                </a>
+            @endforeach
+        </div>
 
         <div class="table-responsive">
             <table class="table table-hover align-middle">
@@ -76,11 +74,17 @@
 
 
                         <td>
-                            @if($n->is_read)
-                                <span class="badge bg-success">Διαβασμένη</span>
-                            @else
-                                <span class="badge bg-warning text-dark">Αδιάβαστη</span>
-                            @endif
+                            <span class="status-badge"
+                                  data-id="{{ $n->id }}"
+                                  data-is-read="{{ $n->is_read ? '1' : '0' }}"
+                                  style="cursor:pointer;"
+                                  title="Διπλό κλικ για αλλαγή κατάστασης">
+                                @if($n->is_read)
+                                    <span class="badge bg-success">Διαβασμένη</span>
+                                @else
+                                    <span class="badge bg-warning text-dark">Αδιάβαστη</span>
+                                @endif
+                            </span>
                         </td>
 
                         <td class="text-end">
@@ -153,6 +157,49 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+    // ✅ Double-click status toggle
+    document.querySelectorAll('.status-badge').forEach(el => {
+        // Σταμάτα το click να φτάσει στο row (ώστε να μη ανοίγει το modal)
+        el.addEventListener('click', function (e) {
+            e.stopPropagation();
+        });
+
+        el.addEventListener('dblclick', function (e) {
+            e.stopPropagation();
+
+            const id = this.dataset.id;
+            const url = '{{ route("notifications.toggleRead", ["notification" => "__ID__"]) }}'.replace('__ID__', id);
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.ok) return;
+
+                this.dataset.isRead = data.is_read ? '1' : '0';
+
+                if (data.is_read) {
+                    this.innerHTML = '<span class="badge bg-success">Διαβασμένη</span>';
+                } else {
+                    this.innerHTML = '<span class="badge bg-warning text-dark">Αδιάβαστη</span>';
+                }
+
+                // ενημέρωσε και το data-status στο row για το modal
+                const row = this.closest('tr');
+                if (row) row.dataset.status = data.label;
+            })
+            .catch(err => console.error(err));
+        });
+    });
+
     const modalEl = document.getElementById('notificationModal');
     const modal = new bootstrap.Modal(modalEl);
 

@@ -117,12 +117,12 @@
             <div class="col-md-6">
                 <label class="form-label">Υπηρεσία</label>
                 <select name="rows[__INDEX__][status][]" class="form-select select2 status_select" multiple>
-                    <option value="logotherapia">Λογοθεραπεία</option>
-                    <option value="psixotherapia">Ψυχοθεραπεία</option>
-                    <option value="ergotherapia">Εργοθεραπεία</option>
-                    <option value="omadiki">Ομαδική</option>
-                    <option value="eidikos">Ειδικός παιδαγωγός</option>
-                    <option value="aksiologisi">Αξιολόγηση / Τηλ. Επικοινωνία / Ενημερωτικό</option>
+                    <option value="logotherapia">ΛΟΓΟΘΕΡΑΠΕΙΑ</option>
+                    <option value="psixotherapia">ΨΥΧΟΘΕΡΑΠΕΙΑ</option>
+                    <option value="ergotherapia">ΕΡΓΟΘΕΡΑΠΕΙΑ</option>
+                    <option value="omadiki">ΟΜΑΔΙΚΗ</option>
+                    <option value="eidikos">ΕΙΔΙΚΟΣ ΠΑΙΔΑΓΩΓΟΣ</option>
+                    <option value="aksiologisi">ΑΞΙΟΛΟΓΗΣΗ / ΤΗΛ. ΕΠΙΚΟΙΝΩΝΙΑ / ΕΝΗΜΕΡΩΤΙΚΟ</option>
                 </select>
                 <small class="text-muted">Μπορείς να επιλέξεις πάνω από μία.</small>
             </div>

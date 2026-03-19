@@ -25,10 +25,10 @@
                     <label class="form-label">Ειδικότητα</label>
                     <select name="eidikotita" class="form-select">
                         <option value="">-- Επιλέξτε ειδικότητα --</option>
-                        <option value="Λογοθεραπευτής" @selected(old('eidikotita') == 'Λογοθεραπευτής')>Λογοθεραπευτής</option>
-                        <option value="Ειδικός παιδαγωγός" @selected(old('eidikotita') == 'Ειδικός παιδαγωγός')>Ειδικός παιδαγωγός</option>
-                        <option value="Εργοθεραπευτής" @selected(old('eidikotita') == 'Εργοθεραπευτής')>Εργοθεραπευτής</option>
-                        <option value="Ψυχοθεραπευτής" @selected(old('eidikotita') == 'Ψυχοθεραπευτής')>Ψυχοθεραπευτής</option>
+                        <option value="Λογοθεραπευτής" @selected(old('eidikotita') == 'Λογοθεραπευτής')>ΛΟΓΟΘΕΡΑΠΕΥΤΗΣ</option>
+                        <option value="Ειδικός παιδαγωγός" @selected(old('eidikotita') == 'Ειδικός παιδαγωγός')>ΕΙΔΙΚΟΣ ΠΑΙΔΑΓΩΓΟΣ</option>
+                        <option value="Εργοθεραπευτής" @selected(old('eidikotita') == 'Εργοθεραπευτής')>ΕΡΓΟΘΕΡΑΠΕΥΤΗΣ</option>
+                        <option value="Ψυχοθεραπευτής" @selected(old('eidikotita') == 'Ψυχοθεραπευτής')>ΨΥΧΟΘΕΡΑΠΕΥΤΗΣ</option>
                     </select>
                 </div>
 

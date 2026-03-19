@@ -42,7 +42,6 @@
             <table class="table table-hover align-middle">
                 <thead>
                 <tr>
-                    <th>#</th>
                     <th>Περιστατικό</th>
                     <th>Επαγγελματίας</th>
                     <th>Ημερομηνία Ραντεβού</th>
@@ -54,7 +53,6 @@
                 <tbody>
                 @forelse($appointments as $a)
                     <tr>
-                        <td>{{ $a->id }}</td>
 
                         <td>
                             @if($a->customer)

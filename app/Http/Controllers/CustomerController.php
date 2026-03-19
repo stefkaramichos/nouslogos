@@ -14,11 +14,26 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Models\CustomerPrepayment;
 use App\Models\CustomerReceipt;
 
 class CustomerController extends Controller
 {
+    private function taxFixPalette(): array
+    {
+        return [
+            '#ffe8a3', // pale amber
+            '#bfefff', // pale cyan
+            '#c8f2d7', // pale green
+            '#f8c9cf', // pale red
+            '#dccbff', // pale purple
+            '#ffd9b3', // pale orange
+            '#bff3ea', // pale teal
+            '#d8dde3', // pale gray
+        ];
+    }
+
     /* =========================================================
      |  FILES
      ========================================================= */
@@ -438,6 +453,39 @@ class CustomerController extends Controller
             ->orderByDesc('id')
             ->get();
 
+        // ✅ Χρώμα ανά διόρθωση + χρώμα ανά ραντεβού (η πιο πρόσφατη διόρθωση υπερισχύει)
+        $taxFixPalette = $this->taxFixPalette();
+        $hasLogColorColumn = Schema::hasColumn('customer_tax_fix_logs', 'log_color');
+
+        $taxFixLogColors = [];
+        $taxFixAppointmentColors = [];
+
+        foreach ($taxFixLogs as $idx => $log) {
+            $fallback = $taxFixPalette[$idx % count($taxFixPalette)];
+            $color = $hasLogColorColumn && !empty($log->log_color)
+                ? (string)$log->log_color
+                : $fallback;
+
+            $taxFixLogColors[(int)$log->id] = $color;
+
+            $appointmentIds = json_decode($log->appointment_ids ?? '[]', true);
+            if (!is_array($appointmentIds)) {
+                continue;
+            }
+
+            foreach ($appointmentIds as $aid) {
+                $aid = (int)$aid;
+                if ($aid <= 0) {
+                    continue;
+                }
+
+                // επειδή τα logs είναι DESC, το πρώτο που βρίσκουμε είναι το πιο πρόσφατο
+                if (!isset($taxFixAppointmentColors[$aid])) {
+                    $taxFixAppointmentColors[$aid] = $color;
+                }
+            }
+        }
+
         /**
          * 🔹 Ιστορικό πληρωμών (ομαδοποίηση ανά paid_at)
          * (μένει όπως ήταν: αφορά ΟΛΕΣ τις πληρωμές του πελάτη)
@@ -698,7 +746,16 @@ class CustomerController extends Controller
         $issuedReceiptsCount = $issuedReceipts->count();
         $issuedReceiptsTotal = (float) $issuedReceipts->sum('amount');
 
-        $prepayment = \App\Models\CustomerPrepayment::where('customer_id', $customer->id)->first();
+        $prepayments = \App\Models\CustomerPrepayment::where('customer_id', $customer->id)
+            ->orderByDesc('last_paid_at')
+            ->orderByDesc('id')
+            ->get();
+
+        $prepaymentTotal = (float) $prepayments->sum(function ($p) {
+            return (float)($p->cash_y_balance ?? 0)
+                + (float)($p->cash_n_balance ?? 0)
+                + (float)($p->card_balance ?? 0);
+        });
 
         $selectedLabel = 'Όλα';
         if ($range === 'day' && $day) {
@@ -736,8 +793,11 @@ class CustomerController extends Controller
             'outstandingAmount',
 
             'appointmentProfessionals',
-            'prepayment',
+            'prepayments',
+            'prepaymentTotal',
             'taxFixLogs',
+            'taxFixLogColors',
+            'taxFixAppointmentColors',
             'receipts',
             'issuedReceiptsCount',
             'issuedReceiptsTotal',
@@ -1163,33 +1223,16 @@ class CustomerController extends Controller
         // ✅ Αν δεν υπάρχουν χρωστούμενα -> όλα σε προπληρωμή
         if ($dueTotal <= 0.0001) {
             DB::transaction(function () use ($customer, $cashY, $cashN, $card, $data, $paidAt) {
-                $prepay = CustomerPrepayment::where('customer_id', $customer->id)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (!$prepay) {
-                    $prepay = CustomerPrepayment::create([
-                        'customer_id'     => $customer->id,
-                        'cash_y_balance'  => 0,
-                        'cash_n_balance'  => 0,
-                        'card_balance'    => 0,
-                        'card_bank'       => $data['card_bank'] ?? null,
-                        'last_paid_at'    => $paidAt,
-                        'created_by'      => Auth::id(),
-                        'notes'           => 'Χειροκίνητη προπληρωμή (χωρίς χρωστούμενα).',
-                    ]);
-                }
-
-                $prepay->cash_y_balance += (float)$cashY;
-                $prepay->cash_n_balance += (float)$cashN;
-                $prepay->card_balance   += (float)$card;
-
-                if (!empty($data['card_bank'])) {
-                    $prepay->card_bank = $data['card_bank'];
-                }
-
-                $prepay->last_paid_at = $paidAt;
-                $prepay->save();
+                CustomerPrepayment::create([
+                    'customer_id'     => $customer->id,
+                    'cash_y_balance'  => (float)$cashY,
+                    'cash_n_balance'  => (float)$cashN,
+                    'card_balance'    => (float)$card,
+                    'card_bank'       => $data['card_bank'] ?? null,
+                    'last_paid_at'    => $paidAt,
+                    'created_by'      => Auth::id(),
+                    'notes'           => 'Χειροκίνητη προπληρωμή (χωρίς χρωστούμενα).',
+                ]);
             });
 
             return redirect()->back()
@@ -1323,34 +1366,16 @@ class CustomerController extends Controller
             $extraTotal = (float)$leftCashY + (float)$leftCashN + (float)$leftCard;
 
             if ($extraTotal > 0.0001) {
-                $prepay = CustomerPrepayment::where('customer_id', $customer->id)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (!$prepay) {
-                    $prepay = CustomerPrepayment::create([
-                        'customer_id'     => $customer->id,
-                        'cash_y_balance'  => 0,
-                        'cash_n_balance'  => 0,
-                        'card_balance'    => 0,
-                        'card_bank'       => $data['card_bank'] ?? null,
-                        'last_paid_at'    => $paidAt,
-                        'created_by'      => Auth::id(),
-                        'notes'           => 'Αυτόματη προπληρωμή από φόρμα χρωστούμενων (λόγω κανόνων 35€/<=30€ + aksiologisi exceptions).',
-                    ]);
-                }
-
-                $prepay->cash_y_balance += (float)$leftCashY;
-                $prepay->cash_n_balance += (float)$leftCashN;
-                $prepay->card_balance   += (float)$leftCard;
-
-                if (!empty($data['card_bank'])) {
-                    $prepay->card_bank = $data['card_bank'];
-                }
-
-                $prepay->last_paid_at = $paidAt;
-                $prepay->updated_at   = now();
-                $prepay->save();
+                CustomerPrepayment::create([
+                    'customer_id'     => $customer->id,
+                    'cash_y_balance'  => (float)$leftCashY,
+                    'cash_n_balance'  => (float)$leftCashN,
+                    'card_balance'    => (float)$leftCard,
+                    'card_bank'       => $data['card_bank'] ?? null,
+                    'last_paid_at'    => $paidAt,
+                    'created_by'      => Auth::id(),
+                    'notes'           => 'Αυτόματη προπληρωμή από φόρμα χρωστούμενων (λόγω κανόνων 35€/<=30€ + aksiologisi exceptions).',
+                ]);
             }
         });
 
@@ -1541,6 +1566,7 @@ class CustomerController extends Controller
         $changedPayments = 0;
         $createdAddons   = 0;
         $changedAppointments = 0;
+        $createdPaymentIds = [];
 
         $actualX = 0;
         $actualFixAmount = 0;
@@ -1605,7 +1631,7 @@ class CustomerController extends Controller
 
             // 3) Create addon +5€ (1 ανά appointment)
             foreach ($appointmentIds as $apptId) {
-                Payment::create([
+                $created = Payment::create([
                     'appointment_id' => $apptId,
                     'customer_id'    => $customer->id,
                     'amount'         => 5.00,
@@ -1618,6 +1644,7 @@ class CustomerController extends Controller
                                     . (!empty($data['comment']) ? ' ' . $data['comment'] : ''),
                     'created_by'     => Auth::id(),
                 ]);
+                $createdPaymentIds[] = (int)$created->id;
                 $createdAddons++;
             }
 
@@ -1630,7 +1657,7 @@ class CustomerController extends Controller
             $this->recalcIsFullForAppointments($appointmentIds);
 
             // 5) Log
-            DB::table('customer_tax_fix_logs')->insert([
+            $insertData = [
                 'customer_id' => $customer->id,
                 'created_by'  => Auth::id(),
 
@@ -1648,12 +1675,23 @@ class CustomerController extends Controller
 
                 // προαιρετικά: εδώ πια δεν έχει νόημα paymentIds (γιατί αλλάζεις πολλά).
                 // κρατάμε appointments για audit
-                'payment_ids'     => json_encode([], JSON_UNESCAPED_UNICODE),
+                'payment_ids'     => json_encode(array_values(array_unique($createdPaymentIds)), JSON_UNESCAPED_UNICODE),
                 'appointment_ids' => json_encode($appointmentIds, JSON_UNESCAPED_UNICODE),
 
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ];
+
+            if (Schema::hasColumn('customer_tax_fix_logs', 'log_color')) {
+                $palette = $this->taxFixPalette();
+                $existingCount = DB::table('customer_tax_fix_logs')
+                    ->where('customer_id', $customer->id)
+                    ->count();
+
+                $insertData['log_color'] = $palette[$existingCount % count($palette)];
+            }
+
+            DB::table('customer_tax_fix_logs')->insert($insertData);
         });
 
         if ($actualX <= 0) {
@@ -1849,19 +1887,44 @@ class CustomerController extends Controller
             if ($delta < 0) {
                 $x = (int)(abs($delta) / 5);
 
-                $addons = Payment::where('customer_id', $customer->id)
-                    ->whereNotNull('appointment_id')
-                    ->where('amount', 5.00)
-                    ->where('tax', 'Y')
-                    ->where(function($q){
-                        $q->where('notes','like','[TAX_FIX_ADDON]%')
-                        ->orWhere('notes','like','%[TAX_FIX_ADDON]%');
-                    })
-                    ->orderByDesc('paid_at')
-                    ->orderByDesc('id')
-                    ->limit($x)
-                    ->lockForUpdate()
-                    ->get();
+                $logPaymentIds = json_decode($log->payment_ids ?? '[]', true);
+                if (!is_array($logPaymentIds)) {
+                    $logPaymentIds = [];
+                }
+                $logPaymentIds = array_values(array_unique(array_filter(array_map('intval', $logPaymentIds), fn ($v) => $v > 0)));
+
+                if (!empty($logPaymentIds)) {
+                    // ✅ Σβήσε πρώτα addons που ανήκουν ΣΤΟ ΣΥΓΚΕΚΡΙΜΕΝΟ log (order-independent)
+                    $addons = Payment::where('customer_id', $customer->id)
+                        ->whereIn('id', $logPaymentIds)
+                        ->whereNotNull('appointment_id')
+                        ->where('amount', 5.00)
+                        ->where('tax', 'Y')
+                        ->where(function($q){
+                            $q->where('notes','like','[TAX_FIX_ADDON]%')
+                            ->orWhere('notes','like','%[TAX_FIX_ADDON]%');
+                        })
+                        ->orderByDesc('paid_at')
+                        ->orderByDesc('id')
+                        ->limit($x)
+                        ->lockForUpdate()
+                        ->get();
+                } else {
+                    // fallback για παλιά logs που δεν είχαν payment_ids
+                    $addons = Payment::where('customer_id', $customer->id)
+                        ->whereNotNull('appointment_id')
+                        ->where('amount', 5.00)
+                        ->where('tax', 'Y')
+                        ->where(function($q){
+                            $q->where('notes','like','[TAX_FIX_ADDON]%')
+                            ->orWhere('notes','like','%[TAX_FIX_ADDON]%');
+                        })
+                        ->orderByDesc('paid_at')
+                        ->orderByDesc('id')
+                        ->limit($x)
+                        ->lockForUpdate()
+                        ->get();
+                }
 
                 if ($addons->isEmpty()) {
                     return;
@@ -1869,8 +1932,14 @@ class CustomerController extends Controller
 
                 foreach ($addons as $p) {
                     $affectedAppointmentIds[] = $p->appointment_id;
+                    $deletedId = (int)$p->id;
                     $p->delete();
                     $deletedAddons++;
+
+                    // remove deleted id from current log payment_ids
+                    if (!empty($logPaymentIds)) {
+                        $logPaymentIds = array_values(array_filter($logPaymentIds, fn($id) => (int)$id !== $deletedId));
+                    }
                 }
 
                 $affectedAppointmentIds = array_values(array_unique(array_filter($affectedAppointmentIds)));
@@ -1905,12 +1974,29 @@ class CustomerController extends Controller
 
                 $actuallyRemoved = $deletedAddons * 5;
 
+                // ✅ κράτα στο log μόνο τα appointments που έχουν ακόμη ενεργά addons του ίδιου log
+                $remainingAppointmentIds = [];
+                if (!empty($logPaymentIds)) {
+                    $remainingAppointmentIds = Payment::where('customer_id', $customer->id)
+                        ->whereIn('id', $logPaymentIds)
+                        ->whereNotNull('appointment_id')
+                        ->pluck('appointment_id')
+                        ->map(fn ($id) => (int)$id)
+                        ->filter(fn ($id) => $id > 0)
+                        ->unique()
+                        ->values()
+                        ->all();
+                }
+
                 DB::table('customer_tax_fix_logs')
                     ->where('id', $log->id)
                     ->update([
                         'fix_amount' => max($oldAmount - $actuallyRemoved, 0),
                         'x_payments' => (int)(max($oldAmount - $actuallyRemoved, 0) / 5),
+                        'changed_payments' => max((int)($log->changed_payments ?? 0) - (int)$deletedAddons, 0),
                         'changed_appointments' => (int)($log->changed_appointments ?? 0) + (int)$changedAppointments,
+                        'payment_ids' => json_encode($logPaymentIds, JSON_UNESCAPED_UNICODE),
+                        'appointment_ids' => json_encode($remainingAppointmentIds, JSON_UNESCAPED_UNICODE),
                         'updated_at' => now(),
                     ]);
 
@@ -1956,19 +2042,89 @@ class CustomerController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function updatePrepaymentAmount(Request $request, Customer $customer, CustomerPrepayment $prepayment)
+    {
+        if ((int)$prepayment->customer_id !== (int)$customer->id) {
+            return response()->json(['success' => false, 'message' => 'Η εγγραφή δεν βρέθηκε.'], 404);
+        }
+
+        $data = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $newTotal = round((float)$data['amount'], 2);
+
+        $oldCashY = round((float)($prepayment->cash_y_balance ?? 0), 2);
+        $oldCashN = round((float)($prepayment->cash_n_balance ?? 0), 2);
+        $oldCard  = round((float)($prepayment->card_balance ?? 0), 2);
+        $oldTotal = round($oldCashY + $oldCashN + $oldCard, 2);
+
+        if ($oldTotal > 0) {
+            $factor = $newTotal / $oldTotal;
+
+            $newCashY = round($oldCashY * $factor, 2);
+            $newCashN = round($oldCashN * $factor, 2);
+            $newCard  = round($oldCard * $factor, 2);
+
+            $sum = round($newCashY + $newCashN + $newCard, 2);
+            $diff = round($newTotal - $sum, 2);
+
+            if (abs($diff) > 0.0001) {
+                if ($newCard >= $newCashY && $newCard >= $newCashN) {
+                    $newCard = round($newCard + $diff, 2);
+                } elseif ($newCashN >= $newCashY && $newCashN >= $newCard) {
+                    $newCashN = round($newCashN + $diff, 2);
+                } else {
+                    $newCashY = round($newCashY + $diff, 2);
+                }
+            }
+        } else {
+            $newCashY = $newTotal;
+            $newCashN = 0.0;
+            $newCard  = 0.0;
+        }
+
+        $prepayment->update([
+            'cash_y_balance' => $newCashY,
+            'cash_n_balance' => $newCashN,
+            'card_balance'   => $newCard,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'value'   => $newTotal,
+            'label'   => number_format($newTotal, 2, ',', '.') . ' €',
+        ]);
+    }
+
+    public function updatePrepaymentDate(Request $request, Customer $customer, CustomerPrepayment $prepayment)
+    {
+        if ((int)$prepayment->customer_id !== (int)$customer->id) {
+            return response()->json(['success' => false, 'message' => 'Η εγγραφή δεν βρέθηκε.'], 404);
+        }
+
+        $data = $request->validate([
+            'paid_at' => ['required', 'date'],
+        ]);
+
+        $paidAt = Carbon::parse($data['paid_at'])->startOfDay();
+
+        $prepayment->update([
+            'last_paid_at' => $paidAt,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'value'   => $paidAt->toDateString(),
+            'label'   => $paidAt->format('d/m/Y'),
+        ]);
+    }
+
     public function destroyPrepayment(Request $request, Customer $customer)
     {
         $anchor = $request->input('_anchor', 'prepayment');
 
-        DB::transaction(function () use ($customer) {
-            $prepay = CustomerPrepayment::where('customer_id', $customer->id)
-                ->lockForUpdate()
-                ->first();
-
-            if ($prepay) {
-                $prepay->delete(); // ✅ πλήρης διαγραφή προπληρωμής
-            }
-        });
+        CustomerPrepayment::where('customer_id', $customer->id)->delete();
 
         return redirect()->back()
             ->withFragment($anchor)

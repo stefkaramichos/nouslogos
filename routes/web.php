@@ -138,6 +138,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/notifications/due', [NotificationController::class, 'due'])->name('notifications.due');
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('/notifications/{notification}/toggle-read', [NotificationController::class, 'toggleRead'])->name('notifications.toggleRead');
 
     Route::resource('notifications', NotificationController::class)->except(['show']);
  
@@ -184,6 +185,12 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/customers/{customer}/payments/update-day-date', [CustomerController::class, 'updateDayDate'])
     ->name('customers.payments.updateDayDate');
+
+    Route::post('/customers/{customer}/prepayments/{prepayment}/update-amount', [CustomerController::class, 'updatePrepaymentAmount'])
+        ->name('customers.prepayments.updateAmount');
+
+    Route::post('/customers/{customer}/prepayments/{prepayment}/update-date', [CustomerController::class, 'updatePrepaymentDate'])
+        ->name('customers.prepayments.updateDate');
 
     // Prepayment delete
     Route::delete('/customers/{customer}/prepayment', [CustomerController::class, 'destroyPrepayment'])

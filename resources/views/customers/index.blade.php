@@ -81,7 +81,7 @@
                         'active' => $activeFilter,
                     ]) }}"
                    class="btn btn-sm {{ empty($selectedCompany) ? 'btn-primary' : 'btn-outline-primary' }}">
-                    Όλοι
+                    ΟΛΟΙ
                 </a>
 
                 @foreach(($companies ?? collect()) as $company)
@@ -92,7 +92,7 @@
                                 'active' => $activeFilter,
                             ]) }}"
                         class="btn btn-sm {{ (string)$selectedCompany === (string)$company->id ? 'btn-primary' : 'btn-outline-primary' }}">
-                            {{ $company->name }}
+                            {{ mb_strtoupper($company->name, 'UTF-8') }}
                         </a>
 
                         {{-- delete button (opens modal) --}}

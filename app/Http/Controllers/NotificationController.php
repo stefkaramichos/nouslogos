@@ -22,10 +22,9 @@ class NotificationController extends Controller
      */
     private function visibleNotificationsQuery(Professional $me): Builder
     {
-        // ✅ ONLY FUTURE + ASC
+        // ✅ ALL + DESC (πιο πρόσφατη πρώτα)
         $q = Notification::query()
-            ->where('notify_at', '>=', now()->startOfDay())
-            ->orderBy('notify_at', 'asc');
+            ->orderBy('notify_at', 'desc');
  
         if ($me->role === 'grammatia') {
             $companyIds = $me->companies->pluck('id');
@@ -50,11 +49,28 @@ class NotificationController extends Controller
 
         $from = $request->get('from');
         $to   = $request->get('to');
-        $onlyUnread = $request->boolean('unread');
+        $onlyUnread  = $request->boolean('unread');
+        $quickFilter = $request->get('quick', 'today'); // default: σήμερα
 
         $q = $this->visibleNotificationsQuery($me);
 
-        // (optional) extra filters
+        // Quick filter buttons
+        if ($quickFilter === 'all') {
+            // χωρίς φίλτρο ημερομηνίας
+        } elseif ($quickFilter === 'today') {
+            $q->whereDate('notify_at', now()->toDateString());
+        } elseif ($quickFilter === 'tomorrow') {
+            $q->whereDate('notify_at', now()->addDay()->toDateString());
+        } elseif ($quickFilter === 'week') {
+            $q->whereBetween('notify_at', [now()->startOfWeek(), now()->endOfWeek()]);
+        } elseif ($quickFilter === 'past') {
+            $q->whereDate('notify_at', '<', now()->toDateString());
+        } elseif ($quickFilter === 'future') {
+            $q->whereDate('notify_at', '>=', now()->toDateString());
+            $q->reorder('notify_at', 'asc'); // αύξουσα: από σήμερα → μέλλον
+        }
+
+        // (optional) extra date filters from the form
         if ($from) {
             $q->whereDate('notify_at', '>=', $from);
         }
@@ -173,6 +189,23 @@ class NotificationController extends Controller
         ]);
 
         return response()->json(['ok' => true]);
+    }
+
+    public function toggleRead(Notification $notification)
+    {
+        $this->authorizeVisible($notification);
+
+        $newValue = !$notification->is_read;
+        $notification->update([
+            'is_read' => $newValue,
+            'read_at' => $newValue ? now() : null,
+        ]);
+
+        return response()->json([
+            'ok'      => true,
+            'is_read' => $newValue,
+            'label'   => $newValue ? 'Διαβασμένη' : 'Αδιάβαστη',
+        ]);
     }
 
     private function authorizeVisible(Notification $notification): void

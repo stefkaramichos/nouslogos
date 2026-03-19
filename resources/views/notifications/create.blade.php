@@ -15,16 +15,16 @@
         <form method="POST" action="{{ route('notifications.store') }}">
             @csrf
 
-            <div class="mb-3">
-                <label class="form-label">Σημείωση</label>
-                <textarea name="note" rows="4" class="form-control" required>{{ old('note') }}</textarea>
-            </div>
-
-            <div class="mb-3">
+            <div class="mb-3 col-md-3">
                 <label class="form-label">Ημερομηνία & Ώρα ειδοποίησης</label>
                 <input type="datetime-local" name="notify_at" class="form-control" required
                        value="{{ old('notify_at') }}">
             </div>
+            <div class="mb-3 col-md-6">
+                <label class="form-label">Σημείωση</label>
+                <textarea name="note" rows="4" class="form-control" required>{{ old('note') }}</textarea>
+            </div>
+
 
             <button class="btn btn-primary">Αποθήκευση</button>
         </form>

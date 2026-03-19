@@ -25,7 +25,7 @@
             <form method="GET" action="{{ route('documents.index') }}" class="row g-2 align-items-end">
                 <div class="col-md-5">
                     <label class="form-label">Περιστατικό</label>
-                    <select class="form-select" name="customer_id">
+                    <select class="form-select js-customer-select" name="customer_id">
                         <option value="">— Όλα —</option>
                         @foreach(($customers ?? []) as $c)
                             <option value="{{ $c->id }}" @selected(request('customer_id') == $c->id)>
@@ -178,3 +178,22 @@
         {{ $documents->links() }}
     </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof $ === 'undefined' || !$.fn.select2) return;
+
+    $('.js-customer-select').select2({
+        width: '100%',
+        placeholder: '— Όλα —',
+        allowClear: true,
+        minimumResultsForSearch: 0,
+        language: {
+            noResults: function () { return 'Δεν βρέθηκαν αποτελέσματα'; },
+            searching: function () { return 'Αναζήτηση...'; }
+        }
+    });
+});
+</script>
+@endpush

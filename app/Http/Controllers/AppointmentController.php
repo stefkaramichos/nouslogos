@@ -858,6 +858,7 @@ public function updatePaidTotal(Request $request, Appointment $appointment)
             $appointment->load('payments');
 
             $payments = $appointment->payments;
+            $taxFixAddonIds = [];
 
             if ($payments->count() > 0) {
                 // Βρες ή δημιούργησε prepayment record
@@ -879,6 +880,20 @@ public function updatePaidTotal(Request $request, Appointment $appointment)
                 foreach ($payments as $payment) {
                     $amount = (float)$payment->amount;
 
+                    // ✅ Αν είναι TAX_FIX_ADDON, δεν το βάζουμε σε προπληρωμή.
+                    // Θέλουμε να μειωθεί αυτόματα το αντίστοιχο tax-fix ποσό (π.χ. 15 -> 10).
+                    $isTaxFixAddon =
+                        $payment->appointment_id !== null
+                        && (float)$payment->amount === 5.0
+                        && (string)$payment->tax === 'Y'
+                        && is_string($payment->notes)
+                        && str_contains($payment->notes, '[TAX_FIX_ADDON]');
+
+                    if ($isTaxFixAddon) {
+                        $taxFixAddonIds[] = (int)$payment->id;
+                        continue;
+                    }
+
                     if ($payment->method === 'cash') {
                         if ($payment->tax === 'Y') {
                             $prepay->cash_y_balance += $amount;
@@ -895,6 +910,56 @@ public function updatePaidTotal(Request $request, Appointment $appointment)
 
                 $prepay->last_paid_at = now();
                 $prepay->save();
+
+                // ✅ Μείωσε αυτόματα τα tax-fix logs που περιέχουν τα διαγραμμένα addons
+                if (!empty($taxFixAddonIds)) {
+                    $logs = DB::table('customer_tax_fix_logs')
+                        ->where('customer_id', $appointment->customer_id)
+                        ->lockForUpdate()
+                        ->get();
+
+                    foreach ($logs as $log) {
+                        $logPaymentIds = json_decode($log->payment_ids ?? '[]', true);
+                        if (!is_array($logPaymentIds) || empty($logPaymentIds)) {
+                            continue;
+                        }
+
+                        $normalized = array_values(array_unique(array_filter(array_map('intval', $logPaymentIds), fn ($v) => $v > 0)));
+                        $removedCount = count(array_intersect($normalized, $taxFixAddonIds));
+
+                        if ($removedCount <= 0) {
+                            continue;
+                        }
+
+                        $remainingPaymentIds = array_values(array_diff($normalized, $taxFixAddonIds));
+
+                        $remainingAppointmentIds = [];
+                        if (!empty($remainingPaymentIds)) {
+                            $remainingAppointmentIds = Payment::where('customer_id', $appointment->customer_id)
+                                ->whereIn('id', $remainingPaymentIds)
+                                ->whereNotNull('appointment_id')
+                                ->pluck('appointment_id')
+                                ->map(fn ($id) => (int)$id)
+                                ->filter(fn ($id) => $id > 0)
+                                ->unique()
+                                ->values()
+                                ->all();
+                        }
+
+                        $newFixAmount = max((int)($log->fix_amount ?? 0) - ($removedCount * 5), 0);
+
+                        DB::table('customer_tax_fix_logs')
+                            ->where('id', (int)$log->id)
+                            ->update([
+                                'fix_amount' => $newFixAmount,
+                                'x_payments' => (int)($newFixAmount / 5),
+                                'changed_payments' => max((int)($log->changed_payments ?? 0) - $removedCount, 0),
+                                'payment_ids' => json_encode($remainingPaymentIds, JSON_UNESCAPED_UNICODE),
+                                'appointment_ids' => json_encode($remainingAppointmentIds, JSON_UNESCAPED_UNICODE),
+                                'updated_at' => now(),
+                            ]);
+                    }
+                }
 
                 // Διάγραψε όλες τις πληρωμές του ραντεβού
                 Payment::where('appointment_id', $appointment->id)->delete();
