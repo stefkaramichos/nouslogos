@@ -176,6 +176,8 @@ Route::middleware('auth')->group(function () {
           Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');
     Route::get('/documents/create', [DocumentController::class, 'create'])->name('documents.create');
     Route::post('/documents', [DocumentController::class, 'store'])->name('documents.store');
+        Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
+        Route::put('/documents/{document}', [DocumentController::class, 'update'])->name('documents.update');
 
     Route::get('/documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
     Route::get('/documents/{document}/view', [DocumentController::class, 'view'])->name('documents.view');

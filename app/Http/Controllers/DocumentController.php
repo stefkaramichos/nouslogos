@@ -11,6 +11,14 @@ use Illuminate\Support\Facades\Storage;
 
 class DocumentController extends Controller
 {
+    private function canEditDocument($user, Document $document): bool
+    {
+        $canEditAll = $user && in_array($user->role, ['owner', 'grammatia'], true);
+        $isOwnerOfDoc = $user && ((int)$document->professional_id === (int)$user->id);
+
+        return $canEditAll || $isOwnerOfDoc;
+    }
+
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -107,6 +115,76 @@ class DocumentController extends Controller
             ->with('success', 'Το αρχείο ανέβηκε επιτυχώς.');
     }
 
+    public function edit(Document $document)
+    {
+        $user = Auth::user();
+
+        if (!$this->canEditDocument($user, $document)) {
+            abort(403);
+        }
+
+        $customers = Customer::orderBy('last_name')->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name']);
+
+        $professionals = Professional::where('is_active', 1)
+            ->orderBy('last_name')->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name']);
+
+        return view('documents.edit', compact('document', 'customers', 'professionals'));
+    }
+
+    public function update(Request $request, Document $document)
+    {
+        $user = Auth::user();
+
+        if (!$this->canEditDocument($user, $document)) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'customer_id'             => 'required|exists:customers,id',
+            'visible_professional_id' => 'nullable|exists:professionals,id',
+            'file'                    => 'nullable|file|max:10240', // 10MB
+            'note'                    => 'nullable|string|max:5000',
+        ], [
+            'customer_id.required' => 'Επιλέξτε περιστατικό (customer).',
+            'file.file'            => 'Μη έγκυρο αρχείο.',
+            'file.max'             => 'Το αρχείο πρέπει να είναι έως 10MB.',
+        ]);
+
+        $visibleId = $request->filled('visible_professional_id')
+            ? (int)$request->input('visible_professional_id')
+            : null;
+
+        $updatePayload = [
+            'customer_id'             => (int)$data['customer_id'],
+            'visible_professional_id' => $visibleId,
+            'note'                    => $data['note'] ?? null,
+        ];
+
+        if ($request->hasFile('file')) {
+            $newFile = $request->file('file');
+            $storedPath = $newFile->store('documents', 'public');
+
+            if ($document->path && Storage::disk('public')->exists($document->path)) {
+                Storage::disk('public')->delete($document->path);
+            }
+
+            $updatePayload = array_merge($updatePayload, [
+                'original_name' => $newFile->getClientOriginalName(),
+                'stored_name'   => basename($storedPath),
+                'path'          => $storedPath,
+                'mime_type'     => $newFile->getClientMimeType(),
+                'size'          => $newFile->getSize(),
+            ]);
+        }
+
+        $document->update($updatePayload);
+
+        return redirect()->route('documents.index')
+            ->with('success', 'Το αρχείο ενημερώθηκε επιτυχώς.');
+    }
+
     public function download(Document $document)
     {
         if (!$document->canBeViewedBy(Auth::user())) {
@@ -148,12 +226,7 @@ class DocumentController extends Controller
         $user = Auth::user();
 
         // owner/grammatia -> delete all
-        $canDeleteAll = $user && in_array($user->role, ['owner', 'grammatia'], true);
-
-        // therapist -> μόνο ό,τι ανέβασε ο ίδιος
-        $isOwnerOfDoc = $user && ((int)$document->professional_id === (int)$user->id);
-
-        if (!$canDeleteAll && !$isOwnerOfDoc) {
+        if (!$this->canEditDocument($user, $document)) {
             abort(403);
         }
 

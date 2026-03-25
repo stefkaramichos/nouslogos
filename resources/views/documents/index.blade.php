@@ -143,11 +143,18 @@
                                     </a>
 
                                     @php
-                                        $canDeleteAll = $user && in_array($user->role, ['owner', 'grammatia'], true);
+                                        $canManageAll = $user && in_array($user->role, ['owner', 'grammatia'], true);
                                         $isOwnerOfDoc = $user && ((int)$doc->professional_id === (int)$user->id);
+                                        $canManage = $canManageAll || $isOwnerOfDoc;
                                     @endphp
 
-                                    @if($canDeleteAll || $isOwnerOfDoc)
+                                    @if($canManage)
+                                        <a class="btn btn-sm btn-outline-warning"
+                                           href="{{ route('documents.edit', $doc) }}"
+                                           title="Επεξεργασία">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+
                                         <form action="{{ route('documents.destroy', $doc) }}"
                                               method="POST"
                                               class="d-inline"
