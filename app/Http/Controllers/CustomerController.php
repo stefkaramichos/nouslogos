@@ -60,12 +60,12 @@ class CustomerController extends Controller
     public function uploadFile(Request $request, Customer $customer)
     {
         $request->validate([
-            'file'  => 'required|file|max:10240', // 10MB
+            'file'  => 'required|file|max:20480', // 20MB
             'notes' => 'nullable|string|max:1000',
         ], [
             'file.required' => 'Πρέπει να επιλέξετε αρχείο.',
             'file.file'     => 'Μη έγκυρο αρχείο.',
-            'file.max'      => 'Το αρχείο δεν μπορεί να ξεπερνά τα 10MB.',
+            'file.max'      => 'Το αρχείο δεν μπορεί να ξεπερνά τα 20MB.',
         ]);
 
         $uploaded = $request->file('file');

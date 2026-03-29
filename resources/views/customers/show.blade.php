@@ -1110,7 +1110,7 @@
     </div>
 
     {{-- ===================== ΑΡΧΕΙΑ ΠΕΛΑΤΗ ===================== --}}
-    <div class="card mt-3">
+    <div class="card mt-3" id="files-section">
                 <div class="card-header">
                     <h6 class="mb-0">Αρχεία Περιστατικού</h6>
                 </div>
@@ -1128,7 +1128,7 @@
                                             </div>
 
                                             <form method="POST"
-                                                action="{{ route('customers.files.store', $customer) }}"
+                                                action="{{ route('customers.files.store', $customer) }}#files-section"
                                                 enctype="multipart/form-data"
                                                 class="row g-2 align-items-end">
                                                 @csrf
@@ -1488,6 +1488,10 @@
                 el.innerHTML = '';
                 el.appendChild(input);
                 input.focus();
+                // Μετακίνηση κέρσορα στην αρχή για textarea
+                // if (type === 'textarea') {
+                //     input.setSelectionRange(0, 0);
+                // }
                 activeInput = input;
 
                 const restore = () => {

@@ -16,7 +16,7 @@
                 {{-- ✅ Customer --}}
                 <div class="mb-3">
                     <label class="form-label">Περιστατικό</label>
-                    <select name="customer_id" class="form-select" required>
+                    <select name="customer_id" class="form-select" >
                         <option value="">— Επιλογή —</option>
                         @foreach(($customers ?? []) as $c)
                             <option value="{{ $c->id }}" @selected(old('customer_id') == $c->id)>
@@ -49,7 +49,7 @@
                 <div class="mb-3">
                     <label class="form-label">Αρχείο</label>
                     <input type="file" name="file" class="form-control" required>
-                    <small class="text-muted">Έως 10MB.</small>
+                    <small class="text-muted">Έως 20MB.</small>
                     @error('file')
                         <div class="text-danger small mt-1">{{ $message }}</div>
                     @enderror

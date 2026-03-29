@@ -47,7 +47,7 @@
                 <div class="mb-3">
                     <label class="form-label">Αντικατάσταση αρχείου (προαιρετικό)</label>
                     <input type="file" name="file" class="form-control">
-                    <small class="text-muted">Άφησέ το κενό για να μείνει το ίδιο αρχείο. Έως 10MB.</small>
+                    <small class="text-muted">Άφησέ το κενό για να μείνει το ίδιο αρχείο. Έως 20MB.</small>
                     @error('file')
                         <div class="text-danger small mt-1">{{ $message }}</div>
                     @enderror

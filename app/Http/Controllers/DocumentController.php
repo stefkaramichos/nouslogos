@@ -77,15 +77,15 @@ class DocumentController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'customer_id'             => 'required|exists:customers,id',
+            'customer_id'             => 'nullable|exists:customers,id',
             'visible_professional_id' => 'nullable|exists:professionals,id',
-            'file'                    => 'required|file|max:10240', // 10MB
+            'file'                    => 'required|file|max:20480', // 20MB
             'note'                    => 'nullable|string|max:5000',
         ], [
             'customer_id.required' => 'Επιλέξτε περιστατικό (customer).',
             'file.required'        => 'Το αρχείο είναι υποχρεωτικό.',
             'file.file'            => 'Μη έγκυρο αρχείο.',
-            'file.max'             => 'Το αρχείο πρέπει να είναι έως 10MB.',
+            'file.max'             => 'Το αρχείο πρέπει να είναι έως 20MB.',
         ]);
 
         $file = $request->file('file');
@@ -93,13 +93,15 @@ class DocumentController extends Controller
         $storedPath = $file->store('documents', 'public'); // storage/app/public/documents/...
 
         // ✅ IMPORTANT:
-        // Αν το select επιστρέφει "" τότε το κάνουμε NULL (όχι 0) για να μην σκάει FK.
+        // Αν το select επιστρέφει "" ή 0 τότε το κάνουμε NULL (όχι 0) για να μην σκάει FK.
+        $customerId = $data['customer_id'] ? (int)$data['customer_id'] : null;
+
         $visibleId = $request->filled('visible_professional_id')
             ? (int)$request->input('visible_professional_id')
             : null;
 
         Document::create([
-            'customer_id'             => (int)$data['customer_id'],
+            'customer_id'             => $customerId,
             'professional_id'         => Auth::id(),   // uploader
             'visible_professional_id' => $visibleId,   // nullable
 
@@ -144,12 +146,12 @@ class DocumentController extends Controller
         $data = $request->validate([
             'customer_id'             => 'required|exists:customers,id',
             'visible_professional_id' => 'nullable|exists:professionals,id',
-            'file'                    => 'nullable|file|max:10240', // 10MB
+            'file'                    => 'nullable|file|max:20480', // 20MB
             'note'                    => 'nullable|string|max:5000',
         ], [
             'customer_id.required' => 'Επιλέξτε περιστατικό (customer).',
             'file.file'            => 'Μη έγκυρο αρχείο.',
-            'file.max'             => 'Το αρχείο πρέπει να είναι έως 10MB.',
+            'file.max'             => 'Το αρχείο πρέπει να είναι έως 20MB.',
         ]);
 
         $visibleId = $request->filled('visible_professional_id')
