@@ -95,7 +95,7 @@
             @endphp
 
             {{-- ===================== PERIOD FILTER (month/day/all + prev/next) ===================== --}}
-            <form method="GET" action="{{ route('professionals.show', $professional) }}" class="mb-2">
+            <form id="period-filter" method="GET" action="{{ route('professionals.show', $professional) }}" class="mb-2">
 
                 {{-- keep customer search --}}
                 <input type="hidden" name="customer" value="{{ $filters['customer'] ?? '' }}">

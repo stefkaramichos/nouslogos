@@ -525,7 +525,7 @@ class CustomerController extends Controller
                 $base = $nav === 'prev' ? $base->subDay() : $base->addDay();
                 $day = $base->toDateString();
             } elseif ($range === 'month') {
-                $base = Carbon::createFromFormat('Y-m', $month ?: now()->format('Y-m'))->startOfMonth();
+                $base = Carbon::createFromFormat('Y-m-d', ($month ?: now()->format('Y-m')) . '-01');
                 $base = $nav === 'prev' ? $base->subMonth() : $base->addMonth();
                 $month = $base->format('Y-m');
             }
@@ -538,7 +538,7 @@ class CustomerController extends Controller
             $from = Carbon::parse($day)->toDateString();
             $to   = Carbon::parse($day)->toDateString();
         } elseif ($range === 'month' && $month) {
-            $m = Carbon::createFromFormat('Y-m', $month);
+            $m = Carbon::createFromFormat('Y-m-d', $month . '-01');
             $from = $m->copy()->startOfMonth()->toDateString();
             $to   = $m->copy()->endOfMonth()->toDateString();
         }
@@ -761,7 +761,7 @@ class CustomerController extends Controller
         if ($range === 'day' && $day) {
             $selectedLabel = Carbon::parse($day)->locale('el')->translatedFormat('D d/m/Y');
         } elseif ($range === 'month' && $month) {
-            $selectedLabel = Carbon::createFromFormat('Y-m', $month)->locale('el')->translatedFormat('F Y');
+            $selectedLabel = Carbon::createFromFormat('Y-m-d', $month . '-01')->locale('el')->translatedFormat('F Y');
         }
 
         return view('customers.show', compact(
