@@ -482,8 +482,10 @@ class ProfessionalController extends Controller
             // =========================
             // 6) PAGINATION
             // =========================
-            $perPage = 25;
-            $currentPage = Paginator::resolveCurrentPage() ?: 1;
+            $perPageInput = $request->input('per_page', 25);
+            $showAll      = ($perPageInput === 'all');
+            $perPage      = $showAll ? $filteredAppointments->count() ?: 1 : (int)$perPageInput;
+            $currentPage  = $showAll ? 1 : (Paginator::resolveCurrentPage() ?: 1);
 
             $currentItems = $filteredAppointments
                 ->values()
@@ -509,6 +511,7 @@ class ProfessionalController extends Controller
 
                 'payment_status' => $paymentStatus ?? 'all',
                 'payment_method' => $paymentMethod ?? 'all',
+                'per_page'       => $perPageInput,
             ];
 
             return view('professionals.show', compact(

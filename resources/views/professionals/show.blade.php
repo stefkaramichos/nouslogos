@@ -168,7 +168,7 @@
                 </div>
             </form>
 
-            <div class="table-responsive">
+            <div id="appointments-table" class="table-responsive">
                 {{-- @include('../includes/selected_dates') --}}
                 {{-- το αντικαταστήσαμε με month/day/all επάνω --}}
 
@@ -306,8 +306,23 @@
                     </tbody>
                 </table>
 
-                <div class="d-flex justify-content-center mt-3">
-                    {{ $appointments->withQueryString()->links() }}
+                <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+                    {{-- Per-page selector --}}
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="text-muted small">Εμφάνιση:</span>
+                        @foreach(['25' => '25', '50' => '50', '100' => '100', 'all' => 'Όλα'] as $val => $label)
+                            @php $active = (string)($filters['per_page'] ?? '25') === (string)$val; @endphp
+                            <a href="{{ request()->fullUrlWithQuery(['per_page' => $val, 'page' => 1]) }}#appointments-table"
+                               class="btn btn-sm {{ $active ? 'btn-primary' : 'btn-outline-secondary' }}">
+                                {{ $label }}
+                            </a>
+                        @endforeach
+                    </div>
+
+                    {{-- Pagination links --}}
+                    <div>
+                        {{ $appointments->withQueryString()->fragment('appointments-table')->links() }}
+                    </div>
                 </div>
 
                 {{-- Ραντεβού που υπάρχουν ΜΟΝΟ στον πίνακα therapist_appointments --}}
