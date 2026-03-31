@@ -15,6 +15,12 @@
         if (!in_array((string)$activeFilter, ['1','0','all'], true)) {
             $activeFilter = '1';
         }
+
+        // ✅ completed filter (checked/selected)
+        $completedFilter = $completedFilter ?? $completed ?? request('completed', 'all');
+        if (!in_array((string)$completedFilter, ['1','0','all'], true)) {
+            $completedFilter = 'all';
+        }
     @endphp
 
     <style>
@@ -53,6 +59,7 @@
                 {{-- keep filters while searching --}}
                 <input type="hidden" name="company_id" value="{{ $selectedCompany }}">
                 <input type="hidden" name="active" value="{{ $activeFilter }}">
+                <input type="hidden" name="completed" value="{{ $completedFilter }}">
 
                 <div class="input-group">
                     <input type="text"
@@ -65,7 +72,7 @@
                         Αναζήτηση
                     </button>
 
-                    @if((isset($search) && $search !== '') || request('company_id') || request('active'))
+                    @if((isset($search) && $search !== '') || request('company_id') || request('active') || request('completed'))
                         <a href="{{ route('customers.index') }}" class="btn btn-outline-secondary">
                             Καθαρισμός
                         </a>
@@ -79,6 +86,7 @@
                         'search' => request('search'),
                         'clear_company' => 1,
                         'active' => $activeFilter,
+                        'completed' => $completedFilter,
                     ]) }}"
                    class="btn btn-sm {{ empty($selectedCompany) ? 'btn-primary' : 'btn-outline-primary' }}">
                     ΟΛΟΙ
@@ -90,6 +98,7 @@
                                 'search' => request('search'),
                                 'company_id' => $company->id,
                                 'active' => $activeFilter,
+                                'completed' => $completedFilter,
                             ]) }}"
                         class="btn btn-sm {{ (string)$selectedCompany === (string)$company->id ? 'btn-primary' : 'btn-outline-primary' }}">
                             {{ mb_strtoupper($company->name, 'UTF-8') }}
@@ -126,6 +135,7 @@
                         'search' => request('search'),
                         'company_id' => $selectedCompany,
                         'active' => 'all',
+                        'completed' => $completedFilter,
                     ]) }}"
                    class="btn btn-sm {{ (string)$activeFilter === 'all' ? 'btn-primary' : 'btn-outline-primary' }}">
                     ΟΛΑ
@@ -134,6 +144,7 @@
                         'search' => request('search'),
                         'company_id' => $selectedCompany,
                         'active' => '1',
+                        'completed' => $completedFilter,
                     ]) }}"
                    class="btn btn-sm {{ (string)$activeFilter === '1' ? 'btn-primary' : 'btn-outline-primary' }}">
                     ΕΝΕΡΓΟΙ
@@ -143,11 +154,45 @@
                         'search' => request('search'),
                         'company_id' => $selectedCompany,
                         'active' => '0',
+                        'completed' => $completedFilter,
                     ]) }}"
                    class="btn btn-sm {{ (string)$activeFilter === '0' ? 'btn-primary' : 'btn-outline-primary' }}">
                     ΑΝΕΝΕΡΓΟΙ
                 </a>
 
+            </div>
+
+            {{-- ✅ Completed filter buttons (checked/selected) --}}
+            <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
+                <a href="{{ route('customers.index', [
+                        'search' => request('search'),
+                        'company_id' => $selectedCompany,
+                        'active' => $activeFilter,
+                        'completed' => 'all',
+                    ]) }}"
+                   class="btn btn-sm {{ (string)$completedFilter === 'all' ? 'btn-primary' : 'btn-outline-primary' }}">
+                    ΟΛΑ
+                </a>
+
+                <a href="{{ route('customers.index', [
+                        'search' => request('search'),
+                        'company_id' => $selectedCompany,
+                        'active' => $activeFilter,
+                        'completed' => '1',
+                    ]) }}"
+                   class="btn btn-sm {{ (string)$completedFilter === '1' ? 'btn-primary' : 'btn-outline-primary' }}">
+                    ΕΠΙΛΕΓΜΕΝΑ
+                </a>
+
+                <a href="{{ route('customers.index', [
+                        'search' => request('search'),
+                        'company_id' => $selectedCompany,
+                        'active' => $activeFilter,
+                        'completed' => '0',
+                    ]) }}"
+                   class="btn btn-sm {{ (string)$completedFilter === '0' ? 'btn-primary' : 'btn-outline-primary' }}">
+                    ΜΗ
+                </a>
             </div>
         </div>
 

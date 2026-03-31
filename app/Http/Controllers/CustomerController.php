@@ -158,6 +158,19 @@ class CustomerController extends Controller
             $active = 'all';
         }
 
+        // completed filter (selected/checked)
+        if ($request->has('completed')) {
+            $request->session()->put('customers_completed_filter', $request->input('completed'));
+        }
+
+        $completed = $request->has('completed')
+            ? $request->input('completed')
+            : $request->session()->get('customers_completed_filter', 'all');
+
+        if (!in_array((string)$completed, ['all', '1', '0'], true)) {
+            $completed = 'all';
+        }
+
         // Parse print_fields from query string
         $printFieldsStr = $request->input('print_fields', '');
         $printFields = [];
@@ -182,6 +195,7 @@ class CustomerController extends Controller
             ])
             ->when($companyId, fn($q) => $q->where('company_id', $companyId))
             ->when($active !== 'all', fn($q) => $q->where('is_active', (int)$active))
+            ->when($completed !== 'all', fn($q) => $q->where('completed', (int)$completed))
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
                     $qq->where('first_name', 'like', "%{$search}%")
@@ -201,6 +215,7 @@ class CustomerController extends Controller
             'search'    => $search,
             'companyId' => $companyId,
             'active'    => $active,
+            'completed' => $completed,
             'printFields' => $printFields,
         ]);
     }
@@ -234,6 +249,19 @@ class CustomerController extends Controller
             $active = '1';
         }
 
+        // ✅ completed filter (selected/checked) with session memory
+        if ($request->has('completed')) {
+            $request->session()->put('customers_completed_filter', $request->input('completed'));
+        }
+
+        $completed = $request->has('completed')
+            ? $request->input('completed')
+            : $request->session()->get('customers_completed_filter', 'all');
+
+        if (!in_array((string)$completed, ['all', '1', '0'], true)) {
+            $completed = 'all';
+        }
+
         $customers = Customer::query()
             ->with([
                 'company',
@@ -247,6 +275,7 @@ class CustomerController extends Controller
             ])
             ->when($companyId, fn($q) => $q->where('company_id', $companyId))
             ->when($active !== 'all', fn($q) => $q->where('is_active', (int)$active))
+            ->when($completed !== 'all', fn($q) => $q->where('completed', (int)$completed))
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
                     $qq->where('first_name', 'like', "%{$search}%")
@@ -308,9 +337,11 @@ class CustomerController extends Controller
             'search'        => $search,
             'companyId'     => $companyId,
             'active'        => $active,
+            'completed'     => $completed,
 
             // για να ταιριάζει με το view που χρησιμοποιεί activeFilter:
             'activeFilter'  => $active,
+            'completedFilter' => $completed,
         ]);
     }
 
