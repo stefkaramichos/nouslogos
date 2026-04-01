@@ -1208,7 +1208,11 @@
                                                                     @if($canPreview)
                                                                         <a class="btn btn-sm btn-outline-secondary"
                                                                         target="_blank"
-                                                                        href="{{ route('customers.files.view', ['customer' => $customer->id, 'file' => $f->id]) }}">
+                                                                        href="{{ route('customers.files.view', [
+                                                                            'customer' => $customer->id,
+                                                                            'file' => $f->id,
+                                                                            'customerName' => trim(mb_strtoupper(trim(($customer->last_name ?? '') . ' ' . ($customer->first_name ?? '')), 'UTF-8')) ?: ('ΠΕΛΑΤΗΣ ' . $customer->id),
+                                                                        ]) }}">
                                                                             Άνοιγμα
                                                                         </a>
                                                                     @endif

@@ -38,10 +38,26 @@ class CustomerController extends Controller
      |  FILES
      ========================================================= */
 
-    public function view(Customer $customer, CustomerFile $file)
+    public function view(Request $request, Customer $customer, CustomerFile $file, ?string $customerName = null)
     {
         if ((int)$file->customer_id !== (int)$customer->id) {
             abort(403);
+        }
+
+        $canonicalCustomerName = trim(mb_strtoupper(
+            trim(($customer->last_name ?? '') . ' ' . ($customer->first_name ?? '')),
+            'UTF-8'
+        ));
+        $canonicalCustomerName = $canonicalCustomerName !== ''
+            ? $canonicalCustomerName
+            : ('ΠΕΛΑΤΗΣ ' . $customer->id);
+
+        if ($customerName !== $canonicalCustomerName) {
+            return redirect()->route('customers.files.view', [
+                'customer' => $customer->id,
+                'file' => $file->id,
+                'customerName' => $canonicalCustomerName,
+            ]);
         }
 
         $disk = $file->disk ?? 'local';
@@ -50,10 +66,21 @@ class CustomerController extends Controller
             abort(404, 'Το αρχείο δεν βρέθηκε.');
         }
 
+        $extension = pathinfo((string) $file->original_name, PATHINFO_EXTENSION);
+        $customerDocumentName = $canonicalCustomerName;
+        $inlineFilename = $extension !== ''
+            ? $customerDocumentName . '.' . $extension
+            : $customerDocumentName;
+
+        $asciiFilename = Str::ascii($inlineFilename);
+        $asciiFilename = $asciiFilename !== '' ? $asciiFilename : 'document';
+
         return Storage::disk($disk)->response(
             $file->path,
-            $file->original_name,
-            ['Content-Disposition' => 'inline']
+            $inlineFilename,
+            [
+                'Content-Disposition' => 'inline; filename="' . $asciiFilename . '"; filename*=UTF-8\'\'' . rawurlencode($inlineFilename),
+            ]
         );
     }
 

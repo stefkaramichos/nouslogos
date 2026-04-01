@@ -152,7 +152,7 @@ Route::middleware('auth')->group(function () {
         ->name('customers.files.destroy');
        
     Route::get(
-        '/customers/{customer}/files/{file}/view',
+        '/customers/{customer}/files/{file}/view/{customerName?}',
         [CustomerController::class, 'view']
     )->name('customers.files.view');
 
