@@ -79,18 +79,20 @@ class DocumentController extends Controller
         $data = $request->validate([
             'customer_id'             => 'nullable|exists:customers,id',
             'visible_professional_id' => 'nullable|exists:professionals,id',
-            'file'                    => 'required|file|max:20480', // 20MB
+            'file'                    => 'required',
+            'file.*'                  => 'file|max:20480', // 20MB ανά αρχείο
             'note'                    => 'nullable|string|max:5000',
         ], [
             'customer_id.required' => 'Επιλέξτε περιστατικό (customer).',
             'file.required'        => 'Το αρχείο είναι υποχρεωτικό.',
-            'file.file'            => 'Μη έγκυρο αρχείο.',
-            'file.max'             => 'Το αρχείο πρέπει να είναι έως 20MB.',
+            'file.*.file'          => 'Κάποιο από τα αρχεία δεν είναι έγκυρο.',
+            'file.*.max'           => 'Κάθε αρχείο πρέπει να είναι έως 20MB.',
         ]);
 
-        $file = $request->file('file');
-
-        $storedPath = $file->store('documents', 'public'); // storage/app/public/documents/...
+        $files = $request->file('file');
+        if (!is_array($files)) {
+            $files = $files ? [$files] : [];
+        }
 
         // ✅ IMPORTANT:
         // Αν το select επιστρέφει "" ή 0 τότε το κάνουμε NULL (όχι 0) για να μην σκάει FK.
@@ -100,21 +102,37 @@ class DocumentController extends Controller
             ? (int)$request->input('visible_professional_id')
             : null;
 
-        Document::create([
-            'customer_id'             => $customerId,
-            'professional_id'         => Auth::id(),   // uploader
-            'visible_professional_id' => $visibleId,   // nullable
+        $uploadedCount = 0;
 
-            'note'          => $data['note'] ?? null,
-            'original_name' => $file->getClientOriginalName(),
-            'stored_name'   => basename($storedPath),
-            'path'          => $storedPath,
-            'mime_type'     => $file->getClientMimeType(),
-            'size'          => $file->getSize(),
-        ]);
+        foreach ($files as $file) {
+            if (!$file) continue;
+
+            $storedPath = $file->store('documents', 'public'); // storage/app/public/documents/...
+
+            Document::create([
+                'customer_id'             => $customerId,
+                'professional_id'         => Auth::id(),   // uploader
+                'visible_professional_id' => $visibleId,   // nullable
+
+                'note'          => $data['note'] ?? null,
+                'original_name' => $file->getClientOriginalName(),
+                'stored_name'   => basename($storedPath),
+                'path'          => $storedPath,
+                'mime_type'     => $file->getClientMimeType(),
+                'size'          => $file->getSize(),
+            ]);
+
+            $uploadedCount++;
+        }
+
+        if ($uploadedCount === 0) {
+            return redirect()->back()->with('error', 'Δεν βρέθηκαν αρχεία για ανέβασμα.');
+        }
 
         return redirect()->route('documents.index')
-            ->with('success', 'Το αρχείο ανέβηκε επιτυχώς.');
+            ->with('success', $uploadedCount === 1
+                ? 'Το αρχείο ανέβηκε επιτυχώς.'
+                : "Ανέβηκαν επιτυχώς {$uploadedCount} αρχεία.");
     }
 
     public function edit(Document $document)

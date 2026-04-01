@@ -1134,10 +1134,13 @@
                                                 @csrf
 
                                                 <div class="col-md-4">
-                                                    <input id="customerFileInput" type="file" name="file" class="form-control d-none"
-                                                        onchange="document.getElementById('customerFileName').value = this.files?.[0]?.name ?? '';">
+                                                    <input id="customerFileInput" type="file" name="file[]" multiple class="form-control d-none"
+                                                        onchange="(function(el){ const files = el.files || []; const text = files.length === 0 ? '' : (files.length === 1 ? files[0].name : 'Επιλέχθηκαν ' + files.length + ' αρχεία'); document.getElementById('customerFileName').value = text; })(this);">
                                                     <input id="customerFileName" type="text" class="form-control" placeholder="Δεν επιλέχθηκε αρχείο" readonly>
                                                     @error('file')
+                                                        <div class="text-danger small mt-1">{{ $message }}</div>
+                                                    @enderror
+                                                    @error('file.*')
                                                         <div class="text-danger small mt-1">{{ $message }}</div>
                                                     @enderror
                                                 </div>
@@ -1489,9 +1492,15 @@
                 el.appendChild(input);
                 input.focus();
                 // Μετακίνηση κέρσορα στην αρχή για textarea
-                // if (type === 'textarea') {
-                //     input.setSelectionRange(0, 0);
-                // }
+                if (type === 'textarea') {
+                    input.setSelectionRange(0, 0);
+                    input.scrollTop = 0;
+                    input.scrollLeft = 0;
+                    requestAnimationFrame(() => {
+                        input.scrollTop = 0;
+                        input.scrollLeft = 0;
+                    });
+                }
                 activeInput = input;
 
                 const restore = () => {
@@ -1501,6 +1510,19 @@
 
                 const save = () => {
                     const newValue = input.value;
+
+                    // Για textarea: επιτρέπεται προσθήκη στην αρχή/τέλος, αλλά όχι διαγραφή του υπάρχοντος κειμένου
+                    if (type === 'textarea') {
+                        const baseValue = (originalValue ?? '').toString();
+                        const candidate = (newValue ?? '').toString();
+
+                        // Το αρχικό κείμενο πρέπει να παραμένει αυτούσιο μέσα στο νέο
+                        if (baseValue !== '' && !candidate.includes(baseValue)) {
+                            alert('Δεν επιτρέπεται διαγραφή του υπάρχοντος κειμένου. Μπορείτε να προσθέσετε μόνο στην αρχή ή/και στο τέλος.');
+                            restore();
+                            return;
+                        }
+                    }
 
                     el.innerHTML = '<span class="text-muted">Αποθήκευση…</span>';
 

@@ -60,39 +60,56 @@ class CustomerController extends Controller
     public function uploadFile(Request $request, Customer $customer)
     {
         $request->validate([
-            'file'  => 'required|file|max:20480', // 20MB
+            'file'    => 'required',
+            'file.*'  => 'file|max:20480', // 20MB ανά αρχείο
             'notes' => 'nullable|string|max:1000',
         ], [
-            'file.required' => 'Πρέπει να επιλέξετε αρχείο.',
-            'file.file'     => 'Μη έγκυρο αρχείο.',
-            'file.max'      => 'Το αρχείο δεν μπορεί να ξεπερνά τα 20MB.',
+            'file.required'   => 'Πρέπει να επιλέξετε τουλάχιστον ένα αρχείο.',
+            'file.*.file'     => 'Κάποιο από τα αρχεία δεν είναι έγκυρο.',
+            'file.*.max'      => 'Κάθε αρχείο δεν μπορεί να ξεπερνά τα 20MB.',
         ]);
 
-        $uploaded = $request->file('file');
-
-        $originalName = $uploaded->getClientOriginalName();
-        $mime         = $uploaded->getClientMimeType();
-        $size         = $uploaded->getSize();
+        $uploadedFiles = $request->file('file');
+        if (!is_array($uploadedFiles)) {
+            $uploadedFiles = $uploadedFiles ? [$uploadedFiles] : [];
+        }
 
         $disk = 'local';
+        $dir  = "customer-files/{$customer->id}";
+        $uploadedCount = 0;
 
-        $storedName = Str::random(12) . '_' . time() . '_' . preg_replace('/\s+/', '_', $originalName);
-        $dir        = "customer-files/{$customer->id}";
-        $path       = $uploaded->storeAs($dir, $storedName, $disk);
+        foreach ($uploadedFiles as $uploaded) {
+            if (!$uploaded) continue;
 
-        CustomerFile::create([
-            'customer_id'   => $customer->id,
-            'uploaded_by'   => Auth::user()?->id,
-            'original_name' => $originalName,
-            'stored_name'   => $storedName,
-            'path'          => $path,
-            'disk'          => $disk,
-            'mime_type'     => $mime,
-            'size'          => $size,
-            'notes'         => $request->input('notes'),
-        ]);
+            $originalName = $uploaded->getClientOriginalName();
+            $mime         = $uploaded->getClientMimeType();
+            $size         = $uploaded->getSize();
 
-        return back()->with('success', 'Το αρχείο ανέβηκε επιτυχώς.');
+            $storedName = Str::random(12) . '_' . time() . '_' . preg_replace('/\s+/', '_', $originalName);
+            $path       = $uploaded->storeAs($dir, $storedName, $disk);
+
+            CustomerFile::create([
+                'customer_id'   => $customer->id,
+                'uploaded_by'   => Auth::user()?->id,
+                'original_name' => $originalName,
+                'stored_name'   => $storedName,
+                'path'          => $path,
+                'disk'          => $disk,
+                'mime_type'     => $mime,
+                'size'          => $size,
+                'notes'         => $request->input('notes'),
+            ]);
+
+            $uploadedCount++;
+        }
+
+        if ($uploadedCount === 0) {
+            return back()->with('error', 'Δεν βρέθηκαν αρχεία για ανέβασμα.');
+        }
+
+        return back()->with('success', $uploadedCount === 1
+            ? 'Το αρχείο ανέβηκε επιτυχώς.'
+            : "Ανέβηκαν επιτυχώς {$uploadedCount} αρχεία.");
     }
 
     public function downloadFile(Customer $customer, CustomerFile $file)

@@ -48,9 +48,12 @@
                 {{-- File --}}
                 <div class="mb-3">
                     <label class="form-label">Αρχείο</label>
-                    <input type="file" name="file" class="form-control" required>
-                    <small class="text-muted">Έως 20MB.</small>
+                    <input type="file" name="file[]" class="form-control" multiple required>
+                    <small class="text-muted">Έως 20MB ανά αρχείο.</small>
                     @error('file')
+                        <div class="text-danger small mt-1">{{ $message }}</div>
+                    @enderror
+                    @error('file.*')
                         <div class="text-danger small mt-1">{{ $message }}</div>
                     @enderror
                 </div>
