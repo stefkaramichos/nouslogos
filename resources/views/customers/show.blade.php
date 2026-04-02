@@ -1515,8 +1515,8 @@
                 const save = () => {
                     const newValue = input.value;
 
-                    // Για textarea: επιτρέπεται προσθήκη στην αρχή/τέλος, αλλά όχι διαγραφή του υπάρχοντος κειμένου
-                    if (type === 'textarea') {
+                    // Για textarea: ο περιορισμός "χωρίς διαγραφή" ισχύει ΜΟΝΟ για customer.informations
+                    if (type === 'textarea' && model === 'customer' && field === 'informations') {
                         const baseValue = (originalValue ?? '').toString();
                         const candidate = (newValue ?? '').toString();
 
