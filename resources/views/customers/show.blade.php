@@ -113,7 +113,39 @@
                 <div class="col-md-4">
                     <p><strong>Ιστορικό Πληρωμών:</strong></p>
 
-                    <div class="border rounded p-2"
+                    @php
+                    $dayColorPalette = [
+                        '#ffe8a3', '#bfefff', '#c8f2d7', '#f8c9cf',
+                        '#dccbff', '#ffd9b3', '#bff3ea', '#d8dde3',
+                        '#fce4ec', '#e8f5e9', '#e3f2fd', '#fff9c4',
+                    ];
+                    $paymentDateColors = [];
+                    $pdIdx = 0;
+                    foreach (($paymentsByDate ?? collect())->keys() as $pdKey) {
+                        $paymentDateColors[$pdKey] = $dayColorPalette[$pdIdx % count($dayColorPalette)];
+                        $pdIdx++;
+                    }
+                    // appointment_id => color (from most recent payment date, which comes first in desc order)
+                    $appointmentPaymentColors = [];
+                    // dateKey => [appointment_ids]
+                    $dateAppointmentIds = [];
+                    foreach (($paymentsByDate ?? collect()) as $pdKey => $pdPayments) {
+                        foreach ($pdPayments as $pdPayment) {
+                            $pdAid = (int)($pdPayment->appointment_id ?? 0);
+                            if ($pdAid > 0 && !isset($appointmentPaymentColors[$pdAid])) {
+                                $appointmentPaymentColors[$pdAid] = $paymentDateColors[$pdKey] ?? null;
+                            }
+                            if ($pdAid > 0) {
+                                $dateAppointmentIds[$pdKey][] = $pdAid;
+                            }
+                        }
+                    }
+                    // deduplicate
+                    foreach ($dateAppointmentIds as $k => $v) {
+                        $dateAppointmentIds[$k] = array_values(array_unique($v));
+                    }
+                @endphp
+                <div class="border rounded p-2"
                          style="max-height: 180px; overflow-y: auto; font-size: 0.8rem; background-color: #f8f9fa;">
                         @forelse($paymentsByDate as $dateKey => $dayPayments)
                             @php
@@ -127,7 +159,12 @@
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
-                                        <strong
+                                        @php $dotApptIds = implode(',', $dateAppointmentIds[$dateKey] ?? []); @endphp
+                                        <span class="payment-dot-link"
+                                              data-appt-ids="{{ $dotApptIds }}"
+                                              data-color="{{ $paymentDateColors[$dateKey] ?? '#ccc' }}"
+                                              style="display:inline-block;width:13px;height:13px;border-radius:50%;background:{{ $paymentDateColors[$dateKey] ?? '#ccc' }};border:1px solid rgba(0,0,0,0.25);margin-right:5px;vertical-align:middle;flex-shrink:0;cursor:pointer;"
+                                              title="Κλικ για εμφάνιση σχετικών ραντεβού"></span><strong
                                             class="payment-day-date-edit"
                                             data-day-key="{{ $dateKey === 'Χωρίς ημερομηνία' ? 'no-date' : $dateKey }}"
                                             data-customer-id="{{ $customer->id }}"
@@ -939,6 +976,7 @@
                             </td>
 
 
+                            @php $apptPriceColor = $appointmentPaymentColors[(int)$appointment->id] ?? null; @endphp
                             <td class="editable-price"
                                 data-id="{{ $appointment->id }}"
                                 style="cursor:pointer;">
@@ -953,7 +991,7 @@
                                 data-original="{{ number_format($paidTotal, 2, ',', '.') }}"
                                 data-default-method="{{ $lastPay->method ?? 'cash' }}"
                                 data-default-tax="{{ $lastPay->tax ?? 'Y' }}"
-                                style="cursor:pointer;">
+                                style="cursor:pointer;{{ $apptPriceColor ? 'background-color:' . $apptPriceColor . ';' : '' }}">
 
                                 {{-- το υπάρχον σου UI (badges/labels) ΜΕΣΑ εδώ όπως είναι --}}
                                 @php $isZeroPrice = $total <= 0; @endphp
@@ -1247,6 +1285,43 @@
 
 
     <script>
+        // ✅ Payment dot click → highlight related appointment rows
+        document.addEventListener('DOMContentLoaded', function () {
+            document.addEventListener('click', function (e) {
+                const dot = e.target.closest('.payment-dot-link');
+                if (!dot) return;
+
+                const ids = (dot.dataset.apptIds || '').split(',').map(s => s.trim()).filter(Boolean);
+                const color = dot.dataset.color || '#ffe8a3';
+
+                if (!ids.length) return;
+
+                // scroll to appointments section
+                const section = document.getElementById('appointments-section');
+                if (section) {
+                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+
+                // flash-highlight the matching rows
+                ids.forEach(id => {
+                    // find the price cell (appointment-paid-edit) for this appointment
+                    const cell = document.querySelector(`.appointment-paid-edit[data-appointment-id="${id}"]`);
+                    if (!cell) return;
+                    const row = cell.closest('tr');
+                    if (!row) return;
+
+                    const prevBg = row.style.outline || '';
+                    row.style.transition = 'outline 0.1s';
+                    row.style.outline = `3px solid ${color}`;
+                    row.style.outlineOffset = '-2px';
+
+                    setTimeout(() => {
+                        row.style.outline = 'none';
+                    }, 2200);
+                });
+            });
+        });
+
         // Select all + delete button visibility
         document.addEventListener('DOMContentLoaded', function () {
             const selectAll  = document.getElementById('select_all');
