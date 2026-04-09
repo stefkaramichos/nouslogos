@@ -125,15 +125,18 @@
                         $paymentDateColors[$pdKey] = $dayColorPalette[$pdIdx % count($dayColorPalette)];
                         $pdIdx++;
                     }
-                    // appointment_id => color (from most recent payment date, which comes first in desc order)
+                    // appointment_id => [colors] (με σειρά: πιο πρόσφατη ημερομηνία πρώτα)
                     $appointmentPaymentColors = [];
                     // dateKey => [appointment_ids]
                     $dateAppointmentIds = [];
                     foreach (($paymentsByDate ?? collect()) as $pdKey => $pdPayments) {
                         foreach ($pdPayments as $pdPayment) {
                             $pdAid = (int)($pdPayment->appointment_id ?? 0);
-                            if ($pdAid > 0 && !isset($appointmentPaymentColors[$pdAid])) {
-                                $appointmentPaymentColors[$pdAid] = $paymentDateColors[$pdKey] ?? null;
+                            if ($pdAid > 0) {
+                                $c = $paymentDateColors[$pdKey] ?? null;
+                                if ($c && !in_array($c, $appointmentPaymentColors[$pdAid] ?? [], true)) {
+                                    $appointmentPaymentColors[$pdAid][] = $c;
+                                }
                             }
                             if ($pdAid > 0) {
                                 $dateAppointmentIds[$pdKey][] = $pdAid;
@@ -976,7 +979,21 @@
                             </td>
 
 
-                            @php $apptPriceColor = $appointmentPaymentColors[(int)$appointment->id] ?? null; @endphp
+                            @php
+                                $apptColors = $appointmentPaymentColors[(int)$appointment->id] ?? [];
+                                $apptPaidBgStyle = '';
+
+                                if (count($apptColors) === 1) {
+                                    $apptPaidBgStyle = 'background-color:' . $apptColors[0] . ';';
+                                } elseif (count($apptColors) >= 2) {
+                                    // διπλό background για ραντεβού που έχουν πληρωμές από >1 ημερομηνία
+                                    $apptPaidBgStyle = 'background:linear-gradient(90deg,'
+                                        . $apptColors[0] . ' 0%,'
+                                        . $apptColors[0] . ' 50%,'
+                                        . $apptColors[1] . ' 50%,'
+                                        . $apptColors[1] . ' 100%);';
+                                }
+                            @endphp
                             <td class="editable-price"
                                 data-id="{{ $appointment->id }}"
                                 style="cursor:pointer;">
@@ -991,7 +1008,7 @@
                                 data-original="{{ number_format($paidTotal, 2, ',', '.') }}"
                                 data-default-method="{{ $lastPay->method ?? 'cash' }}"
                                 data-default-tax="{{ $lastPay->tax ?? 'Y' }}"
-                                style="cursor:pointer;{{ $apptPriceColor ? 'background-color:' . $apptPriceColor . ';' : '' }}">
+                                style="cursor:pointer;{{ $apptPaidBgStyle }}">
 
                                 {{-- το υπάρχον σου UI (badges/labels) ΜΕΣΑ εδώ όπως είναι --}}
                                 @php $isZeroPrice = $total <= 0; @endphp
