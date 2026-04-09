@@ -1296,10 +1296,18 @@
 
                 if (!ids.length) return;
 
-                // scroll to appointments section
-                const section = document.getElementById('appointments-section');
-                if (section) {
-                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // smooth scroll στο πρώτο σχετικό ραντεβού
+                const firstCell = document.querySelector(`.appointment-paid-edit[data-appointment-id="${ids[0]}"]`);
+                const firstRow = firstCell ? firstCell.closest('tr') : null;
+
+                if (firstRow) {
+                    firstRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    // fallback
+                    const section = document.getElementById('appointments-section');
+                    if (section) {
+                        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                 }
 
                 // flash-highlight the matching rows
@@ -1310,7 +1318,6 @@
                     const row = cell.closest('tr');
                     if (!row) return;
 
-                    const prevBg = row.style.outline || '';
                     row.style.transition = 'outline 0.1s';
                     row.style.outline = `3px solid ${color}`;
                     row.style.outlineOffset = '-2px';
