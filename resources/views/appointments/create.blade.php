@@ -20,16 +20,25 @@
 
             {{-- ΠΕΛΑΤΗΣ --}}
             <div class="mb-3">
-                <label class="form-label">Περιστατικό</label>
-                <select name="customer_id" id="customer_select" class="form-select select2" required>
-                    <option value="">-- Επιλέξτε περιστατικό --</option>
+                <label class="form-label">Περιστατικά</label>
+                @php
+                    $incomingCustomerIds = request()->has('customer_ids')
+                        ? (array) request('customer_ids', [])
+                        : (request('customer_id') ? [request('customer_id')] : []);
+
+                    $selectedCustomerIds = collect(old('customer_ids', $incomingCustomerIds))
+                        ->map(fn ($id) => (string) $id)
+                        ->all();
+                @endphp
+                <select name="customer_ids[]" id="customer_select" class="form-select select2" multiple required>
                     @foreach($customers as $customer)
                         <option value="{{ $customer->id }}"
-                            @selected(old('customer_id', request('customer_id')) == $customer->id)>
+                            @selected(in_array((string) $customer->id, $selectedCustomerIds, true))>
                             {{ $customer->last_name }} {{ $customer->first_name }} ({{ $customer->phone }})
                         </option>
                     @endforeach
                 </select>
+                <small class="text-muted">Κράτα πατημένο Ctrl (ή ⌘ σε Mac) για επιλογή πολλών πελατών.</small>
             </div>
 
             <hr>
@@ -277,7 +286,12 @@ $(function () {
     }
 
     // init customer select2
-    $('#customer_select').select2({ width: '100%', placeholder: '-- Επιλέξτε --', allowClear: true });
+    $('#customer_select').select2({
+        width: '100%',
+        placeholder: '-- Επιλέξτε περιστατικά --',
+        allowClear: true,
+        closeOnSelect: false
+    });
 
     // ✅ ΜΟΝΟ 1 αρχική γραμμή
     addRow();
@@ -293,8 +307,12 @@ $(function () {
 
     // ✅ auto-complete από τελευταίο ραντεβού πελάτη
     $('#customer_select').on('change', function () {
-        const customerId = $(this).val();
-        if (!customerId) return;
+        const customerIds = $(this).val() || [];
+
+        // Για auto-fill πρώτης γραμμής δουλεύουμε μόνο όταν έχει επιλεγεί 1 πελάτης
+        if (customerIds.length !== 1) return;
+
+        const customerId = customerIds[0];
 
         const $row = getFirstRow();
         if (!$row.length) return;
@@ -331,7 +349,7 @@ $(function () {
             });
     });
 
-    if ($('#customer_select').val()) {
+    if (($('#customer_select').val() || []).length === 1) {
         $('#customer_select').trigger('change');
     }
 });

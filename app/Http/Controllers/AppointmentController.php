@@ -493,7 +493,8 @@ class AppointmentController extends Controller
     public function storeMultiple(Request $request)
     {
         $data = $request->validate([
-            'customer_id' => 'required|exists:customers,id',
+            'customer_ids'   => 'required|array|min:1',
+            'customer_ids.*' => 'required|exists:customers,id',
             'rows' => 'required|array|min:1',
 
             'rows.*.professional_id' => 'required|exists:professionals,id',
@@ -509,48 +510,50 @@ class AppointmentController extends Controller
             'rows.*.notes'               => 'nullable|string',
         ]);
 
-        $customerId = (int)$data['customer_id'];
+        $customerIds = array_map('intval', $data['customer_ids']);
         $rows = $data['rows'];
 
         $created = 0;
 
-        foreach ($rows as $row) {
-            $professional = Professional::findOrFail($row['professional_id']);
+        foreach ($customerIds as $customerId) {
+            foreach ($rows as $row) {
+                $professional = Professional::findOrFail($row['professional_id']);
 
-            $weeks = (int)($row['weeks'] ?? 1);
+                $weeks = (int)($row['weeks'] ?? 1);
 
-            $statusCsv = isset($row['status'])
-                ? implode(',', array_values(array_filter($row['status'])))
-                : null;
+                $statusCsv = isset($row['status'])
+                    ? implode(',', array_values(array_filter($row['status'])))
+                    : null;
 
-            $total = $row['total_price'] ?? $professional->service_fee;
+                $total = $row['total_price'] ?? $professional->service_fee;
 
-            $professionalAmount = (float)($professional->percentage_cut ?? 0);
-            if (array_key_exists('professional_amount', $row) && $row['professional_amount'] !== null) {
-                $professionalAmount = (float)$row['professional_amount'];
-            }
+                $professionalAmount = (float)($professional->percentage_cut ?? 0);
+                if (array_key_exists('professional_amount', $row) && $row['professional_amount'] !== null) {
+                    $professionalAmount = (float)$row['professional_amount'];
+                }
 
-            $companyAmount = $total - $professionalAmount;
+                $companyAmount = $total - $professionalAmount;
 
-            $startTime = Carbon::parse($row['start_time']);
+                $startTime = Carbon::parse($row['start_time']);
 
-            for ($i = 0; $i < $weeks; $i++) {
-                $appointment = Appointment::create([
-                    'customer_id'          => $customerId,
-                    'professional_id'      => (int)$row['professional_id'],
-                    'company_id'           => (int)$row['company_id'],
-                    'start_time'           => $startTime->copy()->addWeeks($i),
-                    'status'               => $statusCsv,
-                    'total_price'          => (float)$total,
-                    'professional_amount'  => (float)$professionalAmount,
-                    'company_amount'       => (float)$companyAmount,
-                    'notes'                => $row['notes'] ?? null,
-                    'created_by'           => Auth::id(),
-                ]);
+                for ($i = 0; $i < $weeks; $i++) {
+                    $appointment = Appointment::create([
+                        'customer_id'          => $customerId,
+                        'professional_id'      => (int)$row['professional_id'],
+                        'company_id'           => (int)$row['company_id'],
+                        'start_time'           => $startTime->copy()->addWeeks($i),
+                        'status'               => $statusCsv,
+                        'total_price'          => (float)$total,
+                        'professional_amount'  => (float)$professionalAmount,
+                        'company_amount'       => (float)$companyAmount,
+                        'notes'                => $row['notes'] ?? null,
+                        'created_by'           => Auth::id(),
+                    ]);
 
-                $this->ensureZeroPricePaid($appointment);
-                $this->applyPrepaymentToAppointment($appointment); // ✅ ΕΔΩ ΕΛΕΙΠΕ
-                $created++;
+                    $this->ensureZeroPricePaid($appointment);
+                    $this->applyPrepaymentToAppointment($appointment); // ✅ ΕΔΩ ΕΛΕΙΠΕ
+                    $created++;
+                }
             }
         }
 
