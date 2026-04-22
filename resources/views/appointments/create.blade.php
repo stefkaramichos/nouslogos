@@ -191,7 +191,7 @@ $(function () {
 
     function renumberRows() {
         $('#rowsContainer .appointment-row').each(function(i){
-            $(this).find('.row-title').text('Ραντεβού #' + (i + 1));
+            $(this).find('.row-title').text('Ραντεβού #' + (i + 1)); 
         });
     }
 
