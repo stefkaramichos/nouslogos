@@ -1705,6 +1705,10 @@ class CustomerController extends Controller
                 ]);
 
             // 3) Create addon +5€ (1 ανά appointment)
+            $safeCreatedBy = Auth::id() && DB::table('users')->where('id', Auth::id())->exists()
+                ? Auth::id()
+                : null;
+
             foreach ($appointmentIds as $apptId) {
                 $created = Payment::create([
                     'appointment_id' => $apptId,
@@ -1717,7 +1721,7 @@ class CustomerController extends Controller
                     'bank'           => null,
                     'notes'          => '[TAX_FIX_ADDON] +5€ για διόρθωση παλαιού cash χωρίς απόδειξη.'
                                     . (!empty($data['comment']) ? ' ' . $data['comment'] : ''),
-                    'created_by'     => Auth::id(),
+                    'created_by'     => $safeCreatedBy,
                 ]);
                 $createdPaymentIds[] = (int)$created->id;
                 $createdAddons++;
@@ -1734,7 +1738,7 @@ class CustomerController extends Controller
             // 5) Log
             $insertData = [
                 'customer_id' => $customer->id,
-                'created_by'  => Auth::id(),
+                'created_by'  => $safeCreatedBy,
 
                 'fix_amount'  => (int)$actualFixAmount,
                 'x_payments'  => (int)$actualX,
