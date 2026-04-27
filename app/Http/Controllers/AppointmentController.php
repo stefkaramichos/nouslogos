@@ -873,27 +873,14 @@ public function updatePaidTotal(Request $request, Appointment $appointment)
             $taxFixAddonIds = [];
 
             if ($payments->count() > 0) {
-                // Βρες ή δημιούργησε prepayment record
-                $prepay = CustomerPrepayment::where('customer_id', $appointment->customer_id)
-                    ->lockForUpdate()
-                    ->first();
+                // ✅ Ομαδοποίησε πληρωμές ανά paid_at (ημερομηνία) ώστε κάθε ημερομηνία
+                // να δημιουργήσει ξεχωριστή εγγραφή προπληρωμής με τη σωστή ημερομηνία.
+                $refundGroups = []; // key: "Y-m-d" ή "__null__", value: ['cash_y'=>0,'cash_n'=>0,'card'=>0,'card_bank'=>null,'paid_at'=>?]
 
-                if (!$prepay) {
-                    $prepay = CustomerPrepayment::create([
-                        'customer_id'      => $appointment->customer_id,
-                        'cash_y_balance'   => 0,
-                        'cash_n_balance'   => 0,
-                        'card_balance'     => 0,
-                        'last_paid_at'     => now(),
-                    ]);
-                }
-
-                // Ομαδοποίησε πληρωμές ανά method/tax και πρόσθεσε στο prepayment
                 foreach ($payments as $payment) {
                     $amount = (float)$payment->amount;
 
                     // ✅ Αν είναι TAX_FIX_ADDON, δεν το βάζουμε σε προπληρωμή.
-                    // Θέλουμε να μειωθεί αυτόματα το αντίστοιχο tax-fix ποσό (π.χ. 15 -> 10).
                     $isTaxFixAddon =
                         $payment->appointment_id !== null
                         && (float)$payment->amount === 5.0
@@ -906,22 +893,51 @@ public function updatePaidTotal(Request $request, Appointment $appointment)
                         continue;
                     }
 
+                    // group key: ημερομηνία (χωρίς ώρα) ή "__null__"
+                    $groupKey = $payment->paid_at
+                        ? \Carbon\Carbon::parse($payment->paid_at)->toDateString()
+                        : '__null__';
+
+                    if (!isset($refundGroups[$groupKey])) {
+                        $refundGroups[$groupKey] = [
+                            'cash_y'    => 0.0,
+                            'cash_n'    => 0.0,
+                            'card'      => 0.0,
+                            'card_bank' => null,
+                            'paid_at'   => $payment->paid_at,
+                        ];
+                    }
+
                     if ($payment->method === 'cash') {
                         if ($payment->tax === 'Y') {
-                            $prepay->cash_y_balance += $amount;
+                            $refundGroups[$groupKey]['cash_y'] += $amount;
                         } else {
-                            $prepay->cash_n_balance += $amount;
+                            $refundGroups[$groupKey]['cash_n'] += $amount;
                         }
                     } elseif ($payment->method === 'card') {
-                        $prepay->card_balance += $amount;
+                        $refundGroups[$groupKey]['card'] += $amount;
                         if ($payment->bank) {
-                            $prepay->card_bank = $payment->bank;
+                            $refundGroups[$groupKey]['card_bank'] = $payment->bank;
                         }
                     }
                 }
 
-                $prepay->last_paid_at = now();
-                $prepay->save();
+                // ✅ Δημιούργησε ξεχωριστή εγγραφή προπληρωμής για κάθε ημερομηνία
+                foreach ($refundGroups as $group) {
+                    $hasAmount = ($group['cash_y'] + $group['cash_n'] + $group['card']) > 0.0001;
+                    if (!$hasAmount) continue;
+
+                    CustomerPrepayment::create([
+                        'customer_id'    => $appointment->customer_id,
+                        'cash_y_balance' => $group['cash_y'],
+                        'cash_n_balance' => $group['cash_n'],
+                        'card_balance'   => $group['card'],
+                        'card_bank'      => $group['card_bank'],
+                        'last_paid_at'   => $group['paid_at'],
+                        'created_by'     => Auth::id(),
+                        'notes'          => '[REFUND] Επιστροφή από διαγραφή ραντεβού #' . $appointment->id . '.',
+                    ]);
+                }
 
                 // ✅ Μείωσε αυτόματα τα tax-fix logs που περιέχουν τα διαγραμμένα addons
                 if (!empty($taxFixAddonIds)) {

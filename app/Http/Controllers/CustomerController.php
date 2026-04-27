@@ -1587,11 +1587,125 @@ class CustomerController extends Controller
             return back()->with('error', 'Δεν βρέθηκαν έγκυρα ραντεβού για διαγραφή.');
         }
 
-        foreach ($appointments as $appointment) {
-            $appointment->delete(); // soft delete
-        }
+        DB::transaction(function () use ($appointments) {
+            foreach ($appointments as $appointment) {
+                $appointment->load('payments');
+                $payments = $appointment->payments;
+                $taxFixAddonIds = [];
 
-        return back()->with('success', 'Τα επιλεγμένα ραντεβού διαγράφηκαν επιτυχώς.');
+                if ($payments->count() > 0) {
+                    // Ομαδοποίησε πληρωμές ανά paid_at ώστε κάθε ημερομηνία να δημιουργήσει
+                    // ξεχωριστή εγγραφή προπληρωμής με τη σωστή ημερομηνία.
+                    $refundGroups = [];
+
+                    foreach ($payments as $payment) {
+                        $amount = (float)$payment->amount;
+
+                        $isTaxFixAddon =
+                            $payment->appointment_id !== null
+                            && (float)$payment->amount === 5.0
+                            && (string)$payment->tax === 'Y'
+                            && is_string($payment->notes)
+                            && str_contains($payment->notes, '[TAX_FIX_ADDON]');
+
+                        if ($isTaxFixAddon) {
+                            $taxFixAddonIds[] = (int)$payment->id;
+                            continue;
+                        }
+
+                        $groupKey = $payment->paid_at
+                            ? \Carbon\Carbon::parse($payment->paid_at)->toDateString()
+                            : '__null__';
+
+                        if (!isset($refundGroups[$groupKey])) {
+                            $refundGroups[$groupKey] = [
+                                'cash_y'    => 0.0,
+                                'cash_n'    => 0.0,
+                                'card'      => 0.0,
+                                'card_bank' => null,
+                                'paid_at'   => $payment->paid_at,
+                            ];
+                        }
+
+                        if ($payment->method === 'cash') {
+                            if ($payment->tax === 'Y') {
+                                $refundGroups[$groupKey]['cash_y'] += $amount;
+                            } else {
+                                $refundGroups[$groupKey]['cash_n'] += $amount;
+                            }
+                        } elseif ($payment->method === 'card') {
+                            $refundGroups[$groupKey]['card'] += $amount;
+                            if ($payment->bank) {
+                                $refundGroups[$groupKey]['card_bank'] = $payment->bank;
+                            }
+                        }
+                    }
+
+                    foreach ($refundGroups as $group) {
+                        $hasAmount = ($group['cash_y'] + $group['cash_n'] + $group['card']) > 0.0001;
+                        if (!$hasAmount) continue;
+
+                        \App\Models\CustomerPrepayment::create([
+                            'customer_id'    => $appointment->customer_id,
+                            'cash_y_balance' => $group['cash_y'],
+                            'cash_n_balance' => $group['cash_n'],
+                            'card_balance'   => $group['card'],
+                            'card_bank'      => $group['card_bank'],
+                            'last_paid_at'   => $group['paid_at'],
+                            'created_by'     => Auth::id(),
+                            'notes'          => '[REFUND] Επιστροφή από διαγραφή ραντεβού #' . $appointment->id . '.',
+                        ]);
+                    }
+
+                    // Μείωσε τα tax-fix logs που περιέχουν τα διαγραμμένα addons
+                    if (!empty($taxFixAddonIds)) {
+                        $logs = DB::table('customer_tax_fix_logs')
+                            ->where('customer_id', $appointment->customer_id)
+                            ->lockForUpdate()
+                            ->get();
+
+                        foreach ($logs as $log) {
+                            $logPaymentIds = json_decode($log->payment_ids ?? '[]', true);
+                            if (!is_array($logPaymentIds) || empty($logPaymentIds)) continue;
+
+                            $normalized = array_values(array_unique(array_filter(array_map('intval', $logPaymentIds), fn ($v) => $v > 0)));
+                            $removedCount = count(array_intersect($normalized, $taxFixAddonIds));
+                            if ($removedCount <= 0) continue;
+
+                            $remainingPaymentIds = array_values(array_diff($normalized, $taxFixAddonIds));
+                            $remainingAppointmentIds = [];
+                            if (!empty($remainingPaymentIds)) {
+                                $remainingAppointmentIds = Payment::where('customer_id', $appointment->customer_id)
+                                    ->whereIn('id', $remainingPaymentIds)
+                                    ->whereNotNull('appointment_id')
+                                    ->pluck('appointment_id')
+                                    ->map(fn ($id) => (int)$id)
+                                    ->filter(fn ($id) => $id > 0)
+                                    ->unique()->values()->all();
+                            }
+
+                            $newFixAmount = max((int)($log->fix_amount ?? 0) - ($removedCount * 5), 0);
+                            DB::table('customer_tax_fix_logs')
+                                ->where('id', (int)$log->id)
+                                ->update([
+                                    'fix_amount'        => $newFixAmount,
+                                    'x_payments'        => (int)($newFixAmount / 5),
+                                    'changed_payments'  => max((int)($log->changed_payments ?? 0) - $removedCount, 0),
+                                    'payment_ids'       => json_encode($remainingPaymentIds, JSON_UNESCAPED_UNICODE),
+                                    'appointment_ids'   => json_encode($remainingAppointmentIds, JSON_UNESCAPED_UNICODE),
+                                    'updated_at'        => now(),
+                                ]);
+                        }
+                    }
+
+                    Payment::where('appointment_id', $appointment->id)->delete();
+                }
+
+                $appointment->delete();
+            }
+        });
+
+        return back()->with('success', 'Τα επιλεγμένα ραντεβού διαγράφηκαν και τα ποσά επιστράφηκαν στην προπληρωμή.');
     }
 
     public function toggleActive(Request $request, Customer $customer)
