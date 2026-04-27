@@ -604,108 +604,117 @@ class AppointmentController extends Controller
             $due  = max(0, $total - $paid);
             if ($due <= 0.0001) return;
 
-            $prepay = CustomerPrepayment::where('customer_id', $appointment->customer_id)
-                ->lockForUpdate()
-                ->first();
-
-            if (!$prepay) return;
-
-            $paidAt = $prepay->last_paid_at ?? now();
-
-            // ✅ ΠΑΡΕ BALANCES ΣΕ LOCAL VARS (ΟΧΙ & σε model properties)
-            $cashY = (float)($prepay->cash_y_balance ?? 0);
-            $cashN = (float)($prepay->cash_n_balance ?? 0);
-            $card  = (float)($prepay->card_balance ?? 0);
-
             $consume = function (float $available, float $need): float {
                 if ($available <= 0 || $need <= 0) return 0.0;
                 return min($available, $need);
             };
 
-            // 1) cash Y
-            if ($due > 0.0001 && $cashY > 0.0001) {
-                $use = $consume($cashY, $due);
-                if ($use > 0.0001) {
-                    $payment = Payment::create([
-                        'appointment_id' => $appointment->id,
-                        'customer_id'    => $appointment->customer_id,
-                        'amount'         => $use,
-                        'is_full'        => 0,
-                        'paid_at'        => $paidAt,
-                        'method'         => 'cash',
-                        'tax'            => 'Y',
-                        'bank'           => null,
-                        'notes'          => '[PREPAY] Αυτόματη χρέωση από προπληρωμή.',
-                        'created_by'     => Auth::id(),
-                    ]);
-                    $appointment->payments->push($payment);
+            // ✅ Κατανάλωση από την παλαιότερη προπληρωμή προς τη νεότερη
+            $prepayments = CustomerPrepayment::where('customer_id', $appointment->customer_id)
+                ->lockForUpdate()
+                ->orderByRaw('COALESCE(last_paid_at, created_at) ASC')
+                ->orderBy('id', 'asc')
+                ->get();
 
-                    $cashY -= $use;
-                    $due   -= $use;
+            if ($prepayments->isEmpty()) return;
+
+            foreach ($prepayments as $prepay) {
+                if ($due <= 0.0001) {
+                    break;
                 }
-            }
 
-            // 2) cash N
-            if ($due > 0.0001 && $cashN > 0.0001) {
-                $use = $consume($cashN, $due);
-                if ($use > 0.0001) {
-                    $payment = Payment::create([
-                        'appointment_id' => $appointment->id,
-                        'customer_id'    => $appointment->customer_id,
-                        'amount'         => $use,
-                        'is_full'        => 0,
-                        'paid_at'        => $paidAt,
-                        'method'         => 'cash',
-                        'tax'            => 'N',
-                        'bank'           => null,
-                        'notes'          => '[PREPAY] Αυτόματη χρέωση από προπληρωμή.',
-                        'created_by'     => Auth::id(),
-                    ]);
-                    $appointment->payments->push($payment);
+                $paidAt = $prepay->last_paid_at ?? $prepay->created_at ?? now();
 
-                    $cashN -= $use;
-                    $due   -= $use;
+                // ✅ ΠΑΡΕ BALANCES ΣΕ LOCAL VARS (ΟΧΙ & σε model properties)
+                $cashY = (float)($prepay->cash_y_balance ?? 0);
+                $cashN = (float)($prepay->cash_n_balance ?? 0);
+                $card  = (float)($prepay->card_balance ?? 0);
+
+                // 1) cash Y
+                if ($due > 0.0001 && $cashY > 0.0001) {
+                    $use = $consume($cashY, $due);
+                    if ($use > 0.0001) {
+                        $payment = Payment::create([
+                            'appointment_id' => $appointment->id,
+                            'customer_id'    => $appointment->customer_id,
+                            'amount'         => $use,
+                            'is_full'        => 0,
+                            'paid_at'        => $paidAt,
+                            'method'         => 'cash',
+                            'tax'            => 'Y',
+                            'bank'           => null,
+                            'notes'          => '[PREPAY] Αυτόματη χρέωση από προπληρωμή.',
+                            'created_by'     => Auth::id(),
+                        ]);
+                        $appointment->payments->push($payment);
+
+                        $cashY -= $use;
+                        $due   -= $use;
+                    }
                 }
-            }
 
-            // 3) card
-            if ($due > 0.0001 && $card > 0.0001) {
-                $use = $consume($card, $due);
-                if ($use > 0.0001) {
-                    $payment = Payment::create([
-                        'appointment_id' => $appointment->id,
-                        'customer_id'    => $appointment->customer_id,
-                        'amount'         => $use,
-                        'is_full'        => 0,
-                        'paid_at'        => $paidAt,
-                        'method'         => 'card',
-                        'tax'            => 'Y',
-                        'bank'           => $prepay->card_bank,
-                        'notes'          => '[PREPAY] Αυτόματη χρέωση από προπληρωμή.',
-                        'created_by'     => Auth::id(),
-                    ]);
-                    $appointment->payments->push($payment);
+                // 2) cash N
+                if ($due > 0.0001 && $cashN > 0.0001) {
+                    $use = $consume($cashN, $due);
+                    if ($use > 0.0001) {
+                        $payment = Payment::create([
+                            'appointment_id' => $appointment->id,
+                            'customer_id'    => $appointment->customer_id,
+                            'amount'         => $use,
+                            'is_full'        => 0,
+                            'paid_at'        => $paidAt,
+                            'method'         => 'cash',
+                            'tax'            => 'N',
+                            'bank'           => null,
+                            'notes'          => '[PREPAY] Αυτόματη χρέωση από προπληρωμή.',
+                            'created_by'     => Auth::id(),
+                        ]);
+                        $appointment->payments->push($payment);
 
-                    $card -= $use;
-                    $due  -= $use;
+                        $cashN -= $use;
+                        $due   -= $use;
+                    }
                 }
-            }
 
-            // ✅ cleanup tiny negatives
-            if ($cashY < 0.0001) $cashY = 0;
-            if ($cashN < 0.0001) $cashN = 0;
-            if ($card  < 0.0001) $card  = 0;
+                // 3) card
+                if ($due > 0.0001 && $card > 0.0001) {
+                    $use = $consume($card, $due);
+                    if ($use > 0.0001) {
+                        $payment = Payment::create([
+                            'appointment_id' => $appointment->id,
+                            'customer_id'    => $appointment->customer_id,
+                            'amount'         => $use,
+                            'is_full'        => 0,
+                            'paid_at'        => $paidAt,
+                            'method'         => 'card',
+                            'tax'            => 'Y',
+                            'bank'           => $prepay->card_bank,
+                            'notes'          => '[PREPAY] Αυτόματη χρέωση από προπληρωμή.',
+                            'created_by'     => Auth::id(),
+                        ]);
+                        $appointment->payments->push($payment);
 
-            // ✅ γράψε πίσω στο model
-            $prepay->cash_y_balance = $cashY;
-            $prepay->cash_n_balance = $cashN;
-            $prepay->card_balance   = $card;
+                        $card -= $use;
+                        $due  -= $use;
+                    }
+                }
 
-            // ✅ αν όλα μηδέν -> delete record
-            if ($cashY <= 0.0001 && $cashN <= 0.0001 && $card <= 0.0001) {
-                $prepay->delete();
-            } else {
-                $prepay->save();
+                // ✅ cleanup tiny negatives
+                if ($cashY < 0.0001) $cashY = 0;
+                if ($cashN < 0.0001) $cashN = 0;
+                if ($card  < 0.0001) $card  = 0;
+
+                // ✅ γράψε πίσω στο model
+                $prepay->cash_y_balance = $cashY;
+                $prepay->cash_n_balance = $cashN;
+                $prepay->card_balance   = $card;
+
+                // ✅ αν η εγγραφή μηδενίσει -> delete, αλλιώς save
+                if ($cashY <= 0.0001 && $cashN <= 0.0001 && $card <= 0.0001) {
+                    $prepay->delete();
+                } else {
+                    $prepay->save();
+                }
             }
 
             // ✅ recalc is_full
