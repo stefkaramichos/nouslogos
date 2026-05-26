@@ -563,9 +563,12 @@ class CustomerController extends Controller
 
         /**
          * 🔹 Ιστορικό πληρωμών (ομαδοποίηση ανά paid_at)
-         * (μένει όπως ήταν: αφορά ΟΛΕΣ τις πληρωμές του πελάτη)
+         * ΜΟΝΟ πληρωμές που ανήκουν σε μη διαγραμμένα ραντεβού και έχουν ποσό > 0.
          */
         $payments = Payment::where('customer_id', $customer->id)
+            ->where('amount', '>', 0)
+            ->whereNotNull('appointment_id')
+            ->whereHas('appointment')
             ->orderByDesc('paid_at')
             ->orderByDesc('id')
             ->get();
