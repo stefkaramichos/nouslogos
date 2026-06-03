@@ -140,6 +140,7 @@ class SettlementController extends Controller
         $unpaidAppointments = Appointment::with(['professional','customer'])
             ->where('start_time', '>=', $rangeStart)
             ->where('start_time', '<',  $rangeEndExclusive)
+            ->where('company_id', '!=', 12)
             ->whereNull('deleted_at')
             ->whereDoesntHave('payments')
             ->where(function ($q) {
@@ -287,7 +288,7 @@ class SettlementController extends Controller
                 $q->where('start_time', '>=', $rangeStart)
                 ->where('start_time', '<',  $rangeEndExclusive)
                 ->whereNull('deleted_at')
-                ->where('company_id', '!=', 11);   // 👈 exclude company 9
+                ->where('company_id', '!=', 12);   // 👈 exclude company 9
             })
             ->get();
 
