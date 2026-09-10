@@ -783,11 +783,42 @@ public function updatePaidTotal(Request $request, Appointment $appointment)
         // =========================
         if ($delta < -0.0001) {
             $toRemove = abs($delta);
+            $refundGroups = [];
 
             foreach ($payments as $p) {
                 if ($toRemove <= 0) break;
 
                 $amt = (float)$p->amount;
+                $removedAmount = min($amt, $toRemove);
+
+                if ($removedAmount > 0.0001) {
+                    $groupKey = $p->paid_at
+                        ? Carbon::parse($p->paid_at)->toDateString()
+                        : '__null__';
+
+                    if (!isset($refundGroups[$groupKey])) {
+                        $refundGroups[$groupKey] = [
+                            'cash_y'    => 0.0,
+                            'cash_n'    => 0.0,
+                            'card'      => 0.0,
+                            'card_bank' => null,
+                            'paid_at'   => $p->paid_at,
+                        ];
+                    }
+
+                    if ($p->method === 'cash') {
+                        if ($p->tax === 'Y') {
+                            $refundGroups[$groupKey]['cash_y'] += $removedAmount;
+                        } else {
+                            $refundGroups[$groupKey]['cash_n'] += $removedAmount;
+                        }
+                    } elseif ($p->method === 'card') {
+                        $refundGroups[$groupKey]['card'] += $removedAmount;
+                        if ($p->bank) {
+                            $refundGroups[$groupKey]['card_bank'] = $p->bank;
+                        }
+                    }
+                }
 
                 if ($amt <= $toRemove + 0.0001) {
                     $toRemove -= $amt;
@@ -797,6 +828,22 @@ public function updatePaidTotal(Request $request, Appointment $appointment)
                     $p->save();
                     $toRemove = 0;
                 }
+            }
+
+            foreach ($refundGroups as $group) {
+                $refundTotal = $group['cash_y'] + $group['cash_n'] + $group['card'];
+                if ($refundTotal <= 0.0001) continue;
+
+                CustomerPrepayment::create([
+                    'customer_id'    => $appointment->customer_id,
+                    'cash_y_balance' => $group['cash_y'],
+                    'cash_n_balance' => $group['cash_n'],
+                    'card_balance'   => $group['card'],
+                    'card_bank'      => $group['card_bank'],
+                    'last_paid_at'   => $group['paid_at'],
+                    'created_by'     => Auth::id(),
+                    'notes'          => '[REFUND] Επιστροφή από μείωση πληρωμένου ποσού ραντεβού #' . $appointment->id . '.',
+                ]);
             }
         }
 
