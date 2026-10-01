@@ -58,6 +58,28 @@
                 align-items: center;
                 justify-content: center;
             }
+
+            th.sortable {
+                cursor: pointer;
+                user-select: none;
+            }
+
+            th.sortable::after {
+                content: '↕';
+                margin-left: .35rem;
+                color: #adb5bd;
+                font-size: .8em;
+            }
+
+            th.sortable.sort-asc::after {
+                content: '↑';
+                color: inherit;
+            }
+
+            th.sortable.sort-desc::after {
+                content: '↓';
+                color: inherit;
+            }
     </style>
 
     <div class="card">
@@ -246,13 +268,13 @@
                                    class="form-check-input"
                                    title="Επιλογή/αποεπιλογή όλων">
                         </th>
-                        <th>Ονοματεπώνυμο</th>
-                        <th>Τηλέφωνο</th>
-                        <th>Email</th>
+                        <th class="sortable" data-sort-key="name">Ονοματεπώνυμο</th>
+                        <th class="sortable" data-sort-key="phone">Τηλέφωνο</th>
+                        <th class="sortable" data-sort-key="outstanding">Χρωστούμενο</th>
                         {{-- <th>Θεραπευτές</th> --}}
-                        <th>Πληροφορίες</th>
-                        <th>Αποδείξεις (ΟΧΙ ΚΟΜΜΕΝΕΣ)</th>
-                        <th class="text-center">Κατάσταση</th>
+                        <th class="sortable" data-sort-key="information">Πληροφορίες</th>
+                        <th class="sortable" data-sort-key="receipt_date">Αποδείξεις (ΟΧΙ ΚΟΜΜΕΝΕΣ)</th>
+                        <th class="sortable text-center" data-sort-key="active">Κατάσταση</th>
                         <th class="text-end">Ενέργειες</th>
                     </tr>
                     </thead>
@@ -262,6 +284,13 @@
                         @php
                             $isActive = (int)($customer->is_active ?? 1) === 1;
                              $isCompleted = (int)($customer->completed ?? 0) === 1;
+                            $unissued = $customer->receipts ?? collect();
+                            $firstReceiptDate = $unissued
+                                ->pluck('receipt_date')
+                                ->filter()
+                                ->map(fn($date) => \Carbon\Carbon::parse($date)->format('Y-m-d'))
+                                ->sort()
+                                ->first();
                         @endphp
 
                         <tr
@@ -296,7 +325,7 @@
                             </td>
 
 
-                            <td>
+                            <td data-sort-value="{{ strtolower(trim($customer->last_name . ' ' . $customer->first_name)) }}">
                                 <a href="{{ route('customers.show', $customer) }}"
                                    style="text-decoration: none; color: inherit;">
                                     {{ $customer->last_name }} {{ $customer->first_name }}
@@ -306,11 +335,15 @@
                                 @endif
                             </td>
 
-                            <td>{{ $customer->phone ?? '-' }}</td>
+                            <td data-sort-value="{{ $customer->phone ?? '' }}">{{ $customer->phone ?? '-' }}</td>
 
-                            <td>{{ $customer->email ?? '-' }}</td>
+                            <td data-sort-value="{{ $customer->outstanding_amount }}">
+                                <span class="badge {{ $customer->outstanding_amount > 0 ? 'bg-danger' : 'bg-secondary' }}">
+                                    {{ number_format($customer->outstanding_amount, 2, ',', '.') }} €
+                                </span>
+                            </td>
 {{-- 
-                            <td>
+                            <td data-sort-value="{{ strtolower($customer->informations ?? '') }}">
                                 @php $pros = $customer->professionals ?? collect(); @endphp
 
                                 @if($pros->isEmpty())
@@ -330,9 +363,8 @@
                                 @endif
                             </td>
 
-                            <td>
+                            <td data-sort-value="{{ $firstReceiptDate ?? '' }}">
                                     @php
-                                        $unissued = $customer->receipts ?? collect(); // ήδη φορτωμένες ΜΟΝΟ is_issued=0
                                         $unissuedCount = $unissued->count();
                                         $unissuedSum = (float)$unissued->sum('amount');
                                     @endphp
@@ -364,7 +396,7 @@
 
 
                             {{-- ✅ SWITCH enable/disable --}}
-                            <td class="text-center">
+                            <td class="text-center" data-sort-value="{{ $isActive ? 1 : 0 }}">
                                 <form method="POST"
                                       action="{{ route('customers.toggleActive', $customer) }}"
                                       class="d-inline">
@@ -629,6 +661,63 @@ window.addEventListener("load", function () {
     window.history.replaceState({}, document.title, url.toString());
 });
 </script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const customersTable = document.querySelector('.table-responsive table');
+    if (!customersTable) return;
+
+    const sortableHeaders = Array.from(customersTable.querySelectorAll('th.sortable'));
+    const tableBody = customersTable.querySelector('tbody');
+    const sortDirections = {};
+
+    sortableHeaders.forEach(function (header) {
+        header.addEventListener('click', function () {
+            const sortKey = header.dataset.sortKey;
+            const ascending = sortDirections[sortKey] !== 'asc';
+            sortDirections[sortKey] = ascending ? 'asc' : 'desc';
+
+            sortableHeaders.forEach(function (otherHeader) {
+                otherHeader.classList.remove('sort-asc', 'sort-desc');
+            });
+            header.classList.add(ascending ? 'sort-asc' : 'sort-desc');
+
+            const rows = Array.from(tableBody.querySelectorAll('tr'))
+                .filter(row => row.querySelector('td[data-sort-value]'))
+                .map((row, originalIndex) => ({
+                    row,
+                    originalIndex,
+                    value: row.querySelector(`td[data-sort-value]`)?.dataset.sortValue ?? '',
+                }));
+
+            rows.sort(function (left, right) {
+                const leftCell = left.row.querySelectorAll('td')[header.cellIndex];
+                const rightCell = right.row.querySelectorAll('td')[header.cellIndex];
+                const leftValue = leftCell?.dataset.sortValue ?? '';
+                const rightValue = rightCell?.dataset.sortValue ?? '';
+                const leftEmpty = leftValue === '';
+                const rightEmpty = rightValue === '';
+
+                if (leftEmpty || rightEmpty) {
+                    if (leftEmpty && rightEmpty) return left.originalIndex - right.originalIndex;
+                    return leftEmpty ? 1 : -1;
+                }
+
+                let comparison;
+                if (sortKey === 'outstanding' || sortKey === 'active') {
+                    comparison = Number(leftValue) - Number(rightValue);
+                } else {
+                    comparison = leftValue.localeCompare(rightValue, 'el', { sensitivity: 'base' });
+                }
+
+                return (ascending ? comparison : -comparison) || (left.originalIndex - right.originalIndex);
+            });
+
+            rows.forEach(({ row }) => tableBody.appendChild(row));
+        });
+    });
+});
+</script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const backToTop = document.getElementById('backToTop');

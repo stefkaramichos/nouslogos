@@ -324,6 +324,7 @@ class CustomerController extends Controller
             ->with([
                 'company',
                 'professionals',
+                'appointments.payments',
                 // ✅ ONLY unissued receipts
                 'receipts' => function ($q) {
                     $q->where('is_issued', 0)
@@ -347,6 +348,17 @@ class CustomerController extends Controller
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get();
+
+        $customers->transform(function ($customer) {
+            $customer->outstanding_amount = round($customer->appointments->sum(function ($appointment) {
+                $total = (float) ($appointment->total_price ?? 0);
+                $paid = (float) $appointment->payments->sum('amount');
+
+                return $total > 0 ? max($total - $paid, 0) : 0;
+            }), 2);
+
+            return $customer;
+        });
 
         // ✅ companies list
         $companies = Company::where('is_active', 1)->orderBy('id')->get();
