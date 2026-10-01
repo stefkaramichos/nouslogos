@@ -431,6 +431,11 @@
                                             · {{ $appointment->company?->name ?? '-' }}
                                             @if($serviceLabel) · {{ $serviceLabel }} @endif
                                         </div>
+                                        @if($appointment->notes)
+                                            <div class="text-muted small">
+                                                <strong>Σημειώσεις:</strong> {{ $appointment->notes }}
+                                            </div>
+                                        @endif
                                     </div>
                                     <div class="text-end">
                                         <span class="badge bg-dark">{{ number_format($total,2,',','.') }} €</span>

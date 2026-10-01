@@ -56,6 +56,9 @@
         @if(in_array('phone', $printFields))
             <th style="width: 10%;">Τηλέφωνο</th>
         @endif
+        @if(in_array('email', $printFields))
+            <th style="width: 15%;">Email</th>
+        @endif
         @if(in_array('company', $printFields))
             <th style="width: 12%;">Εταιρεία</th>
         @endif
@@ -94,6 +97,12 @@
             @if(in_array('phone', $printFields))
                 <td class="compact">
                     {{ $c->phone ?? '-' }}
+                </td>
+            @endif
+
+            @if(in_array('email', $printFields))
+                <td class="compact">
+                    {{ $c->email ?? '-' }}
                 </td>
             @endif
 

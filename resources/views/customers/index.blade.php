@@ -248,6 +248,7 @@
                         </th>
                         <th>Ονοματεπώνυμο</th>
                         <th>Τηλέφωνο</th>
+                        <th>Email</th>
                         {{-- <th>Θεραπευτές</th> --}}
                         <th>Πληροφορίες</th>
                         <th>Αποδείξεις (ΟΧΙ ΚΟΜΜΕΝΕΣ)</th>
@@ -267,11 +268,21 @@
                             class="{{ !$isActive ? 'text-muted' : '' }} {{ $isCompleted ? 'completed-row' : '' }}"
                             @if(!$isActive) style="opacity:0.65;" @endif id="customer_row_{{ $customer->id }}"
                         >
+                            @php
+                                $baseQuery = request()->except('flash_row');
+                                $baseRedirect = request()->url();
+                                if (!empty($baseQuery)) {
+                                    $baseRedirect .= '?' . http_build_query($baseQuery);
+                                }
+                                $sep = str_contains($baseRedirect, '?') ? '&' : '?';
+                                $redirectWithFlash = $baseRedirect . $sep . 'flash_row=customer_row_' . $customer->id;
+                            @endphp
                                                     {{-- <td>{{ $customer->company->name ?? '-' }}</td> --}}
 
                             <td class="text-center">
                                 <form method="POST" action="{{ route('customers.toggleCompleted', $customer) }}" class="d-inline">
                                     @csrf
+                                    <input type="hidden" name="redirect" value="{{ $redirectWithFlash }}">
 
                                     <div class="form-check m-0 d-inline-flex align-items-center justify-content-center">
                                         <input class="form-check-input customer-completed-checkbox"
@@ -296,6 +307,8 @@
                             </td>
 
                             <td>{{ $customer->phone ?? '-' }}</td>
+
+                            <td>{{ $customer->email ?? '-' }}</td>
 {{-- 
                             <td>
                                 @php $pros = $customer->professionals ?? collect(); @endphp
@@ -356,6 +369,7 @@
                                       action="{{ route('customers.toggleActive', $customer) }}"
                                       class="d-inline">
                                     @csrf
+                                                                        <input type="hidden" name="redirect" value="{{ $redirectWithFlash }}">
 
                                     <div class="form-check form-switch d-inline-flex align-items-center justify-content-center m-0">
                                         <input class="form-check-input customer-active-switch"
@@ -377,12 +391,6 @@
                                     </div>
                                 </form>
                             </td>
-                            @php
-                                $baseRedirect = request()->fullUrl();
-                                $sep = str_contains($baseRedirect, '?') ? '&' : '?';
-                                $redirectWithFlash = $baseRedirect . $sep . 'flash_row=customer_row_' . $customer->id;
-                            @endphp
-
                             <td class="text-end">
                                                             {{-- Add Appointment --}}
                                 <a href="{{ route('appointments.create', [
@@ -416,7 +424,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-muted py-4">
+                            <td colspan="9" class="text-center text-muted py-4">
                                 Δεν υπάρχουν πελάτες για εμφάνιση.
                             </td>
                         </tr>
@@ -546,6 +554,13 @@
                     <input class="form-check-input print-field" type="checkbox" id="field_phone" value="phone" checked>
                     <label class="form-check-label" for="field_phone">
                         Τηλέφωνο
+                    </label>
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input print-field" type="checkbox" id="field_email" value="email">
+                    <label class="form-check-label" for="field_email">
+                        Email
                     </label>
                 </div>
 

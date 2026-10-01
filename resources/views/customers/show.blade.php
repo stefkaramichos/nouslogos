@@ -55,6 +55,17 @@
                     </p>
 
                     <p>
+                        <strong>Email:</strong>
+                        <span class="inline-edit"
+                            data-model="customer"
+                            data-id="{{ $customer->id }}"
+                            data-field="email"
+                            data-type="text">
+                            {{ $customer->email ?? '-' }}
+                        </span>
+                    </p>
+
+                    <p>
                         <strong>Πληροφορίες:</strong><br>
                         <span class="inline-edit"
                             data-model="customer"

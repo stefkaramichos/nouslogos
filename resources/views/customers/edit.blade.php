@@ -65,7 +65,7 @@
                 </div>
 
 
-                {{-- <div class="mb-3">
+                <div class="mb-3">
                     <label class="form-label">Email (προαιρετικό)</label>
                     <input
                         type="email"
@@ -74,7 +74,7 @@
                         value="{{ old('email', $customer->email) }}"
                     >
                 </div>
-                <div class="mb-3">
+                {{-- <div class="mb-3">
                 <label class="form-label">ΑΦΜ</label>
                 <input
                     type="text"

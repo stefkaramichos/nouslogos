@@ -28,14 +28,14 @@
                     <input type="text" name="phone" class="form-control"
                            value="{{ old('phone') }}" >
                 </div>
-{{-- 
+
                 <div class="mb-3">
                     <label class="form-label">Email (προαιρετικό)</label>
                     <input type="email" name="email" class="form-control"
                            value="{{ old('email') }}">
                 </div>
 
-             
+{{--
                 <div class="mb-3">
                     <label class="form-label">ΔΟΥ</label>
                     <input type="text" name="tax_office" class="form-control"

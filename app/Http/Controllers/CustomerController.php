@@ -1508,7 +1508,8 @@ class CustomerController extends Controller
         $customer->completed = (int)$data['completed'];
         $customer->save();
 
-        return back()->with('success', 'Ενημερώθηκε η κατάσταση Completed.');
+        return redirect()->to($request->input('redirect', url()->previous()))
+            ->with('success', 'Ενημερώθηκε η κατάσταση Completed.');
     }
 
     public function toggleCompletedBulk(Request $request)
@@ -1754,7 +1755,7 @@ class CustomerController extends Controller
         $customer->is_active = (int)$data['is_active'];
         $customer->save();
 
-        return back()->with(
+        return redirect()->to($request->input('redirect', url()->previous()))->with(
             'success',
             $customer->is_active ? 'Το περιστατικό ενεργοποιήθηκε.' : 'Το περιστατικό απενεργοποιήθηκε.'
         );
