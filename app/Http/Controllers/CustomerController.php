@@ -188,12 +188,19 @@ class CustomerController extends Controller
             $request->session()->put('customers_company_id', $request->input('company_id'));
         }
 
-        $companyId = $request->has('company_id')
+        $rawCompanyIds = $request->has('company_id')
             ? $request->input('company_id')
             : $request->session()->get('customers_company_id');
 
-        if ($companyId === '' || $companyId === null) {
-            $companyId = null;
+        $companyIds = collect((array) $rawCompanyIds)
+            ->filter(fn($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($request->has('company_id')) {
+            $request->session()->put('customers_company_id', $companyIds);
         }
 
         // active filter
@@ -237,7 +244,7 @@ class CustomerController extends Controller
                 'professionals',
                 'company',
             ])
-            ->when($companyId, fn($q) => $q->where('company_id', $companyId))
+            ->when($companyIds, fn($q) => $q->whereIn('company_id', $companyIds))
             ->when($active !== 'all', fn($q) => $q->where('is_active', (int)$active))
             ->when($completed !== 'all', fn($q) => $q->where('completed', (int)$completed))
             ->when($search, function ($q) use ($search) {
@@ -257,7 +264,7 @@ class CustomerController extends Controller
         return view('customers.print', [
             'customers' => $customers,
             'search'    => $search,
-            'companyId' => $companyId,
+            'companyIds' => $companyIds,
             'active'    => $active,
             'completed' => $completed,
             'printFields' => $printFields,
@@ -279,12 +286,19 @@ class CustomerController extends Controller
             $request->session()->put('customers_company_id', $request->input('company_id'));
         }
 
-        $companyId = $request->has('company_id')
+        $rawCompanyIds = $request->has('company_id')
             ? $request->input('company_id')
             : $request->session()->get('customers_company_id');
 
-        if ($companyId === '' || $companyId === null) {
-            $companyId = null;
+        $companyIds = collect((array) $rawCompanyIds)
+            ->filter(fn($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($request->has('company_id')) {
+            $request->session()->put('customers_company_id', $companyIds);
         }
 
         // ✅ active filter
@@ -317,7 +331,7 @@ class CustomerController extends Controller
                     ->orderByDesc('id');
                 },
             ])
-            ->when($companyId, fn($q) => $q->where('company_id', $companyId))
+            ->when($companyIds, fn($q) => $q->whereIn('company_id', $companyIds))
             ->when($active !== 'all', fn($q) => $q->where('is_active', (int)$active))
             ->when($completed !== 'all', fn($q) => $q->where('completed', (int)$completed))
             ->when($search, function ($q) use ($search) {
@@ -379,7 +393,7 @@ class CustomerController extends Controller
             'customers'     => $customers,
             'companies'     => $companies,
             'search'        => $search,
-            'companyId'     => $companyId,
+            'companyIds'    => $companyIds,
             'active'        => $active,
             'completed'     => $completed,
 
@@ -581,7 +595,7 @@ class CustomerController extends Controller
         /**
          * 🔹 Date filter για ραντεβού λίστας
          */
-        $range = $request->input('range', 'month'); // month/day/all
+        $range = $request->input('range', 'month'); // month/day/academic_year/all
         $nav   = $request->input('nav');
         $day   = $request->input('day');   // Y-m-d
         $month = $request->input('month'); // Y-m
@@ -592,7 +606,11 @@ class CustomerController extends Controller
         } elseif ($range === 'month') {
             $month = $month ?: now()->format('Y-m');
             $day = null;
+        } elseif ($range === 'academic_year') {
+            $day = null;
+            $month = null;
         } else {
+            $range = 'all';
             $day = null;
             $month = null;
         }
@@ -619,6 +637,13 @@ class CustomerController extends Controller
             $m = Carbon::createFromFormat('Y-m-d', $month . '-01');
             $from = $m->copy()->startOfMonth()->toDateString();
             $to   = $m->copy()->endOfMonth()->toDateString();
+        } elseif ($range === 'academic_year') {
+            $academicYearStart = now()->month >= 8
+                ? now()->startOfYear()->month(8)->startOfDay()
+                : now()->subYear()->startOfYear()->month(8)->startOfDay();
+
+            $from = $academicYearStart->toDateString();
+            $to = $academicYearStart->copy()->addYear()->subDay()->toDateString();
         }
 
         // ✅ Existing filters
@@ -791,7 +816,7 @@ class CustomerController extends Controller
         $prevUrl = null;
         $nextUrl = null;
 
-        if ($range !== 'all') {
+        if (!in_array($range, ['all', 'academic_year'], true)) {
             $baseQuery = $request->query();
             unset($baseQuery['nav']);
 
@@ -840,6 +865,12 @@ class CustomerController extends Controller
             $selectedLabel = Carbon::parse($day)->locale('el')->translatedFormat('D d/m/Y');
         } elseif ($range === 'month' && $month) {
             $selectedLabel = Carbon::createFromFormat('Y-m-d', $month . '-01')->locale('el')->translatedFormat('F Y');
+        } elseif ($range === 'academic_year') {
+            $academicYearStart = now()->month >= 8
+                ? now()->startOfYear()->month(8)
+                : now()->subYear()->startOfYear()->month(8);
+            $academicYearEnd = $academicYearStart->copy()->addYear()->subDay();
+            $selectedLabel = 'Ακαδημαϊκό έτος ' . $academicYearStart->format('Y') . '-' . $academicYearEnd->format('Y');
         }
 
         return view('customers.show', compact(

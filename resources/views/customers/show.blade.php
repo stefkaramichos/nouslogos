@@ -1,8 +1,9 @@
 @extends('layouts.app')
 
-@section('title', 'Περιστατικό: ' . $customer->last_name . ' ' . $customer->first_name)
+@section('title', 'Περιστατικό: ' . $customer->last_name . ' ' . $customer->first_name . ' - ' . $customer->company->name)
 
 @section('content')
+
     <style>
         tr.tax-fix-colored-row td {
             background-color: var(--tax-fix-color) !important;
@@ -65,6 +66,12 @@
                 </div>
 
                 <div class="col-md-4">
+                    <p>
+                        <strong>Επιλεγμένη περίοδος υπολογισμών:</strong><br>
+                        <span class="badge bg-dark fs-6">
+                            {{ $selectedLabel ?? 'Όλα' }}
+                        </span>
+                    </p>
                     <p>
                         <strong>Ραντεβού (επιλεγμένη περίοδος):</strong><br>
                         <span class="badge bg-dark fs-6">
@@ -797,6 +804,7 @@
                         <select name="range" class="form-select" onchange="this.form.submit()">
                             <option value="month" @selected($range === 'month')>Μήνας</option>
                             <option value="day"   @selected($range === 'day')>Ημέρα</option>
+                            <option value="academic_year" @selected($range === 'academic_year')>Όλα φέτος</option>
                             <option value="all"   @selected($range === 'all')>Όλα</option>
                         </select>
                     </div>
@@ -842,7 +850,7 @@
                     </div>
 
                     <div class="col-md-12 d-flex gap-2 justify-content-start">
-                        @if($range !== 'all')
+                        @if(!in_array($range, ['all', 'academic_year'], true))
                             <a href="{{ $prevUrl }}#appointments-section" class="btn btn-outline-secondary">← Προηγούμενο</a>
                             <a href="{{ $nextUrl }}#appointments-section" class="btn btn-outline-secondary">Επόμενο →</a>
                         @endif

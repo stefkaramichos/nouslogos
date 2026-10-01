@@ -7,8 +7,15 @@
     @php
         $search = $search ?? request('search');
 
-        // session-aware
-        $selectedCompany = $companyId ?? request('company_id');
+        // session-aware multi-company filter
+        $selectedCompanies = $companyIds ?? request('company_id', []);
+        $selectedCompanies = is_array($selectedCompanies) ? $selectedCompanies : [$selectedCompanies];
+        $selectedCompanies = collect($selectedCompanies)
+            ->filter(fn($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn($id) => (string) (int) $id)
+            ->unique()
+            ->values()
+            ->all();
 
         // ✅ active filter (1 / 0 / all)
         $activeFilter = $activeFilter ?? request('active', '1');
@@ -31,6 +38,25 @@
             @keyframes flashRow {
                 0%   { background-color: rgba(255, 230, 150, 0.95); }
                 100% { background-color: transparent; }
+            }
+
+            #backToTop {
+                position: fixed;
+                right: 1.25rem;
+                bottom: 1.25rem;
+                z-index: 1030;
+                display: none;
+                width: 2.75rem;
+                height: 2.75rem;
+                padding: 0;
+                font-size: 1.4rem;
+                line-height: 1;
+            }
+
+            #backToTop.is-visible {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
             }
     </style>
 
@@ -57,7 +83,9 @@
             {{-- Search bar --}}
             <form method="GET" action="{{ route('customers.index') }}" class="mt-3">
                 {{-- keep filters while searching --}}
-                <input type="hidden" name="company_id" value="{{ $selectedCompany }}">
+                @foreach($selectedCompanies as $selectedCompany)
+                    <input type="hidden" name="company_id[]" value="{{ $selectedCompany }}">
+                @endforeach
                 <input type="hidden" name="active" value="{{ $activeFilter }}">
                 <input type="hidden" name="completed" value="{{ $completedFilter }}">
 
@@ -88,19 +116,26 @@
                         'active' => $activeFilter,
                         'completed' => $completedFilter,
                     ]) }}"
-                   class="btn btn-sm {{ empty($selectedCompany) ? 'btn-primary' : 'btn-outline-primary' }}">
+                   class="btn btn-sm {{ empty($selectedCompanies) ? 'btn-primary' : 'btn-outline-primary' }}">
                     ΟΛΟΙ
                 </a>
 
                 @foreach(($companies ?? collect()) as $company)
                     <div class="btn-group" role="group">
+                        @php
+                            $companyId = (string) $company->id;
+                            $isCompanySelected = in_array($companyId, $selectedCompanies, true);
+                            $nextCompanies = $isCompanySelected
+                                ? array_values(array_diff($selectedCompanies, [$companyId]))
+                                : array_values(array_merge($selectedCompanies, [$companyId]));
+                        @endphp
                         <a href="{{ route('customers.index', [
                                 'search' => request('search'),
-                                'company_id' => $company->id,
+                                'company_id' => $nextCompanies,
                                 'active' => $activeFilter,
                                 'completed' => $completedFilter,
                             ]) }}"
-                        class="btn btn-sm {{ (string)$selectedCompany === (string)$company->id ? 'btn-primary' : 'btn-outline-primary' }}">
+                        class="btn btn-sm {{ $isCompanySelected ? 'btn-primary' : 'btn-outline-primary' }}">
                             {{ mb_strtoupper($company->name, 'UTF-8') }}
                         </a>
 
@@ -129,11 +164,15 @@
 
             </div>
 
+            <div class="mt-2 text-muted small">
+                Σύνολο αποτελεσμάτων: <strong>{{ $customers->count() }}</strong>
+            </div>
+
             {{-- ✅ Active filter buttons (SAME COLORS as companies) --}}
             <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
                 <a href="{{ route('customers.index', [
                         'search' => request('search'),
-                        'company_id' => $selectedCompany,
+                        'company_id' => $selectedCompanies,
                         'active' => 'all',
                         'completed' => $completedFilter,
                     ]) }}"
@@ -142,7 +181,7 @@
                 </a>
                 <a href="{{ route('customers.index', [
                         'search' => request('search'),
-                        'company_id' => $selectedCompany,
+                        'company_id' => $selectedCompanies,
                         'active' => '1',
                         'completed' => $completedFilter,
                     ]) }}"
@@ -152,7 +191,7 @@
 
                 <a href="{{ route('customers.index', [
                         'search' => request('search'),
-                        'company_id' => $selectedCompany,
+                        'company_id' => $selectedCompanies,
                         'active' => '0',
                         'completed' => $completedFilter,
                     ]) }}"
@@ -166,7 +205,7 @@
             <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
                 <a href="{{ route('customers.index', [
                         'search' => request('search'),
-                        'company_id' => $selectedCompany,
+                        'company_id' => $selectedCompanies,
                         'active' => $activeFilter,
                         'completed' => 'all',
                     ]) }}"
@@ -176,7 +215,7 @@
 
                 <a href="{{ route('customers.index', [
                         'search' => request('search'),
-                        'company_id' => $selectedCompany,
+                        'company_id' => $selectedCompanies,
                         'active' => $activeFilter,
                         'completed' => '1',
                     ]) }}"
@@ -186,7 +225,7 @@
 
                 <a href="{{ route('customers.index', [
                         'search' => request('search'),
-                        'company_id' => $selectedCompany,
+                        'company_id' => $selectedCompanies,
                         'active' => $activeFilter,
                         'completed' => '0',
                     ]) }}"
@@ -396,6 +435,14 @@
         --}}
     </div>
 
+    <button type="button"
+            id="backToTop"
+            class="btn btn-primary rounded-circle shadow"
+            aria-label="Επιστροφή στην κορυφή"
+            title="Επιστροφή στην κορυφή">
+        ↑
+    </button>
+
     <form id="bulkCompletedForm" method="POST" action="{{ route('customers.toggleCompletedBulk') }}" class="d-none">
         @csrf
         <input type="hidden" name="completed" id="bulk_completed_value" value="0">
@@ -567,6 +614,22 @@ window.addEventListener("load", function () {
     window.history.replaceState({}, document.title, url.toString());
 });
 </script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const backToTop = document.getElementById('backToTop');
+
+    if (!backToTop) return;
+
+    window.addEventListener('scroll', function () {
+        backToTop.classList.toggle('is-visible', window.scrollY > 300);
+    }, { passive: true });
+
+    backToTop.addEventListener('click', function () {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+});
+</script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const modalEl = document.getElementById('deleteCompanyModal');
