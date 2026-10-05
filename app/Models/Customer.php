@@ -18,6 +18,8 @@ class Customer extends Model
         'tax_office', 
         'vat_number', 
         'informations', 
+        'draft',
+        'proposed',
     ];
 
     public function company()

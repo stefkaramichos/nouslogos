@@ -1175,7 +1175,7 @@ class CustomerController extends Controller
 
         // allow-list fields (ΠΟΛΥ ΣΗΜΑΝΤΙΚΟ)
         $allowed = [
-            'customer' => ['first_name','last_name','phone','email','tax_office','vat_number','informations'],
+            'customer' => ['first_name','last_name','phone','email','tax_office','vat_number','informations','draft','proposed'],
             'appointment' => ['total_price','notes','status','start_time'],
         ];
 
@@ -1195,6 +1195,8 @@ class CustomerController extends Controller
                 'tax_office'   => 'nullable|string|max:100',
                 'vat_number'   => 'nullable|string|max:20',
                 'informations' => 'nullable|string',
+                'draft'        => 'nullable|string',
+                'proposed'     => 'nullable|string',
             ];
             $request->validate(['value' => $rulesPerField[$data['field']] ?? 'nullable']);
 

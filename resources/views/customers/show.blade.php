@@ -8,11 +8,121 @@
         tr.tax-fix-colored-row td {
             background-color: var(--tax-fix-color) !important;
         }
+
+        #proposedPanel {
+            position: fixed;
+            top: 6rem;
+            right: 1.25rem;
+            width: 320px;
+            max-width: calc(100vw - 1rem);
+            z-index: 1035;
+            background: #fff;
+            border: 1px solid #ced4da;
+            border-radius: .5rem;
+            box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15);
+        }
+
+        #proposedPanelHandle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: .35rem .6rem;
+            background: #f8f9fa;
+            border-radius: .5rem .5rem 0 0;
+            cursor: move;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #proposedPanel.is-minimized #proposedPanelHandle {
+            border-radius: .5rem;
+        }
+
+        #proposedPanel.is-minimized #proposedPanelBody {
+            display: none;
+        }
     </style>
 
     <div class="mb-3">
         <a href="{{ route('customers.index') }}#customer_row_{{ $customer->id }}" class="btn btn-secondary btn-sm">← Πίσω στη λίστα περιστατικών</a>
     </div>
+
+    {{-- Floating πάνελ: Τι έχει προταθεί --}}
+    <div id="proposedPanel">
+        <div id="proposedPanelHandle">
+            <strong>Τι έχει προταθεί</strong>
+            <button type="button" id="proposedPanelToggle" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                    title="Ελαχιστοποίηση" aria-label="Ελαχιστοποίηση">&minus;</button>
+        </div>
+        <div id="proposedPanelBody" class="p-2">
+            <span class="inline-edit"
+                data-model="customer"
+                data-id="{{ $customer->id }}"
+                data-field="proposed"
+                data-type="textarea"
+                style="white-space: pre-wrap; display:block; width:100%; min-height:3rem; max-height:220px; overflow-y:auto; border:1px solid #ced4da; border-radius:0.25rem; padding:0.375rem 0.75rem;">{{ $customer->proposed ?? '-' }}</span>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const panel = document.getElementById('proposedPanel');
+            const handle = document.getElementById('proposedPanelHandle');
+            const toggle = document.getElementById('proposedPanelToggle');
+            const storageKey = 'proposedPanelState';
+
+            let state = {};
+            try { state = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch (e) { state = {}; }
+            const persist = () => localStorage.setItem(storageKey, JSON.stringify(state));
+
+            function moveTo(left, top) {
+                const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
+                const maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
+                state.left = Math.min(Math.max(0, left), maxLeft);
+                state.top = Math.min(Math.max(0, top), maxTop);
+                panel.style.left = state.left + 'px';
+                panel.style.top = state.top + 'px';
+                panel.style.right = 'auto';
+            }
+
+            function setMinimized(minimized) {
+                state.minimized = minimized;
+                panel.classList.toggle('is-minimized', minimized);
+                toggle.innerHTML = minimized ? '+' : '&minus;';
+                toggle.title = minimized ? 'Ανάπτυξη' : 'Ελαχιστοποίηση';
+                if (state.left !== undefined) moveTo(state.left, state.top);
+                persist();
+            }
+
+            if (state.left !== undefined) moveTo(state.left, state.top);
+            setMinimized(!!state.minimized);
+
+            toggle.addEventListener('click', () => setMinimized(!panel.classList.contains('is-minimized')));
+
+            handle.addEventListener('pointerdown', function (e) {
+                if (e.target.closest('button')) return;
+
+                const rect = panel.getBoundingClientRect();
+                const offsetX = e.clientX - rect.left;
+                const offsetY = e.clientY - rect.top;
+                handle.setPointerCapture(e.pointerId);
+
+                const onMove = ev => moveTo(ev.clientX - offsetX, ev.clientY - offsetY);
+                const onUp = () => {
+                    handle.removeEventListener('pointermove', onMove);
+                    handle.removeEventListener('pointerup', onUp);
+                    persist();
+                };
+
+                handle.addEventListener('pointermove', onMove);
+                handle.addEventListener('pointerup', onUp);
+            });
+
+            window.addEventListener('resize', () => {
+                if (state.left !== undefined) moveTo(state.left, state.top);
+            });
+        })();
+    </script>
 
     {{-- Στοιχεία Πελάτη + Οικονομική εικόνα --}}
     <div class="card mb-4">
@@ -73,6 +183,16 @@
                             data-field="informations"
                             data-type="textarea"
                             style="white-space: pre-wrap; display:inline-block; width:100%; max-height:150px; overflow-y:auto; border:1px solid #ced4da; border-radius:0.25rem; padding:0.375rem 0.75rem;">{{ $customer->informations ?? '-' }}</span>
+                    </p>
+
+                    <p>
+                        <strong>Προχειρο:</strong><br>
+                        <span class="inline-edit"
+                            data-model="customer"
+                            data-id="{{ $customer->id }}"
+                            data-field="draft"
+                            data-type="textarea"
+                            style="white-space: pre-wrap; display:inline-block; width:100%; max-height:150px; overflow-y:auto; border:1px solid #ced4da; border-radius:0.25rem; padding:0.375rem 0.75rem;">{{ $customer->draft ?? '-' }}</span>
                     </p>
                 </div>
 
