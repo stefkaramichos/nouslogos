@@ -51,8 +51,8 @@ class AppointmentController extends Controller
     public function index(Request $request)
 {
     // dropdown lists
-    $customers     = Customer::orderBy('last_name')->get();
-    $professionals = Professional::orderBy('last_name')->get();
+    $customers     = Customer::where('is_active', 1)->orderBy('last_name')->get();
+    $professionals = Professional::where('is_active', 1)->orderBy('last_name')->get();
     $companies     = Company::orderBy('name')->get();
 
     $savedFilters = $request->session()->get('appointments_filters', []);
