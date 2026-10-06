@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="mb-3">
-        <a href="{{ route('appointments.index') }}" class="btn btn-secondary btn-sm">← Πίσω στη λίστα ραντεβού</a>
+        <a href="{{ request('redirect', route('appointments.index')) }}" class="btn btn-secondary btn-sm">← Πίσω στη λίστα ραντεβού</a>
     </div>
 
     <div class="card">
@@ -16,7 +16,7 @@
                 @csrf
                 @method('PUT')
 
-                <input type="hidden" name="redirect_to" value="{{ request('redirect') }}">
+                <input type="hidden" name="redirect_to" value="{{ request('redirect', route('appointments.index')) }}">
 
                 {{-- Περιστατικό --}}
                 <div class="mb-3">
@@ -126,7 +126,7 @@
                 </div>
 
                 <button class="btn btn-primary">Αποθήκευση Αλλαγών</button>
-                <a href="{{ route('appointments.index') }}" class="btn btn-secondary">Ακύρωση</a>
+                <a href="{{ request('redirect', route('appointments.index')) }}" class="btn btn-secondary">Ακύρωση</a>
             </form>
         </div>
     </div>

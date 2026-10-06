@@ -7,6 +7,8 @@
 @php
     use Carbon\Carbon;
 
+    $updatedAppointmentId = session('updated_appointment_id');
+
     // Controller filters
     $view = $filters['view'] ?? request('view', 'week'); // week|day|month|table
     if (!in_array($view, ['week','day','month','table'], true)) $view = 'week';
@@ -97,6 +99,29 @@
     .gc-event.paid { border-color: rgba(25,135,84,.35); background: rgba(25,135,84,.10); }
     .gc-event.unpaid{ border-color: rgba(220,53,69,.35); background: rgba(220,53,69,.10); }
     .gc-event.partial{ border-color: rgba(255,193,7,.55); background: rgba(255,193,7,.12); }
+    .appointment-updated { animation: appointment-highlight 3s ease-out; }
+    tr.appointment-updated > td { animation: appointment-highlight 3s ease-out; }
+
+    @keyframes appointment-highlight {
+        0%, 65% { background-color: #d1e7dd; box-shadow: inset 0 0 0 2px #198754; }
+        100% { box-shadow: inset 0 0 0 0 transparent; }
+    }
+
+    @media print {
+        @page { size: landscape; margin: 12mm; }
+        body { background: #fff !important; color: #000 !important; font-size: 10pt; }
+        .sidebar, .navbar, .offcanvas, .no-print, .alert, .modal, .modal-backdrop { display: none !important; }
+        #desktopMainCol { width: 100% !important; max-width: 100% !important; flex: 0 0 100% !important; }
+        .card { border: 0 !important; box-shadow: none !important; }
+        .card-header, .card-body { padding: 0 0 .5rem !important; }
+        .table-responsive { overflow: visible !important; }
+        .gc-grid { overflow: visible !important; border: 0 !important; }
+        .gc-hour, .gc-cell { height: 80px !important; overflow: visible !important; }
+        .gc-event { white-space: normal; overflow: visible; text-overflow: clip; }
+        .appointment-updated, tr.appointment-updated > td { animation: none !important; box-shadow: none !important; }
+        a { color: #000 !important; text-decoration: none !important; }
+        tr { break-inside: avoid; }
+    }
     
 </style>
 
@@ -104,7 +129,8 @@
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <span>Ραντεβού</span>
 
-        <div class="d-flex align-items-center flex-wrap gc-toolbar">
+        <div class="d-flex align-items-center flex-wrap gap-2">
+            <div class="d-flex align-items-center flex-wrap gc-toolbar no-print">
             {{-- View mode --}}
             <div class="btn-group btn-group-sm" role="group" aria-label="View mode">
                 <a class="btn {{ $view==='week' ? 'btn-primary' : 'btn-outline-primary' }}"
@@ -118,13 +144,19 @@
             <a href="{{ route('appointments.create') }}" class="btn btn-primary btn-sm">
                 + Προσθήκη Ραντεβού
             </a>
+            </div>
+
+            <button type="button" class="btn btn-outline-secondary btn-sm no-print" onclick="window.print()" title="Εκτύπωση ραντεβού">
+                <i class="bi bi-printer"></i>
+                <span class="ms-1">Εκτύπωση</span>
+            </button>
         </div>
     </div>
 
     <div class="card-body">
 
         {{-- ===================== FILTERS ===================== --}}
-        <form method="GET" action="{{ route('appointments.index') }}">
+        <form method="GET" action="{{ route('appointments.index') }}" class="no-print">
             <input type="hidden" name="view" value="{{ $view }}">
 
             <div class="row g-2">
@@ -206,7 +238,17 @@
 
                 <div class="col-md-6 d-flex justify-content-end align-items-end">
                     <button class="btn btn-outline-primary me-2">Εφαρμογή Φίλτρων</button>
-                    <a href="{{ route('appointments.index', ['view' => $view]) }}" class="btn btn-outline-secondary">
+                    <a href="{{ route('appointments.index', [
+                        'view' => $view,
+                        'day' => $day,
+                        'month' => $month,
+                        'customer_id' => '',
+                        'professional_id' => '',
+                        'company_id' => '',
+                        'status' => 'all',
+                        'payment_status' => 'all',
+                        'payment_method' => 'all',
+                    ]) }}" class="btn btn-outline-secondary">
                         Καθαρισμός
                     </a>
                 </div>
@@ -215,14 +257,14 @@
 
         {{-- ===================== PERIOD BAR (uses controller URLs) ===================== --}}
         <div class="mb-2 mt-3">
-            <hr>
+            <hr class="no-print">
             <div class="row g-2 align-items-end">
                 <div class="col-md-8">
-                    <label class="form-label">Περίοδος</label>
+                    <label class="form-label no-print">Περίοδος</label>
 
                     {{-- Αν είσαι σε month view, δείξε month input. Αν είσαι day/week δείξε date --}}
                     @if($view === 'month')
-                        <form method="GET" action="{{ route('appointments.index') }}">
+                        <form method="GET" action="{{ route('appointments.index') }}" class="no-print">
                             @foreach(request()->except(['month','nav']) as $k=>$v)
                                 <input type="hidden" name="{{ $k }}" value="{{ $v }}">
                             @endforeach
@@ -232,7 +274,7 @@
                                    onchange="this.form.submit()">
                         </form>
                     @else
-                        <form method="GET" action="{{ route('appointments.index') }}">
+                        <form method="GET" action="{{ route('appointments.index') }}" class="no-print">
                             @foreach(request()->except(['day','nav']) as $k=>$v)
                                 <input type="hidden" name="{{ $k }}" value="{{ $v }}">
                             @endforeach
@@ -244,7 +286,7 @@
                     @endif
                 </div>
 
-                <div class="col-md-4 d-flex gap-2 justify-content-end">
+                <div class="col-md-4 d-flex gap-2 justify-content-end no-print">
                     @if(isset($prevUrl) && isset($nextUrl))
                         <a href="{{ $prevUrl }}" class="btn btn-outline-secondary btn-sm">← Προηγούμενο</a>
                         <a href="{{ $nextUrl }}" class="btn btn-outline-secondary btn-sm">Επόμενο →</a>
@@ -273,7 +315,7 @@
                         <th>Σύνολο (€)</th>
                         <th>Πληρωμή</th>
                         <th>Σημειώσεις</th>
-                        <th>Ενέργειες</th>
+                        <th class="no-print">Ενέργειες</th>
                     </tr>
                     </thead>
 
@@ -293,7 +335,7 @@
                             $serviceLabel = $statusTokens->map(fn($t)=>$statusMap[$t] ?? mb_strtoupper($t))->implode(', ');
                         @endphp
 
-                        <tr>
+                        <tr class="{{ (string) $updatedAppointmentId === (string) $appointment->id ? 'appointment-updated' : '' }}">
                             <td>{{ $appointment->start_time?->format('d/m/Y H:i') }}</td>
 
                             <td>
@@ -368,8 +410,8 @@
                                 {{ $appointment->notes ? \Illuminate\Support\Str::limit($appointment->notes, 30) : '-' }}
                             </td>
 
-                            <td>
-                                <a href="{{ route('appointments.edit', $appointment) }}"
+                            <td class="no-print">
+                                <a href="{{ route('appointments.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
                                    class="btn btn-sm btn-secondary mb-1"
                                    title="Επεξεργασία ραντεβού">
                                     <i class="bi bi-pencil-square"></i>
@@ -418,8 +460,8 @@
                                 $serviceLabel = $statusTokens->map(fn($t)=>$statusMap[$t] ?? mb_strtoupper($t))->implode(', ');
                             @endphp
 
-                            <a href="{{ route('appointments.edit', $appointment) }}"
-                               class="list-group-item list-group-item-action">
+                            <a href="{{ route('appointments.edit', ['appointment' => $appointment, 'redirect' => request()->fullUrl()]) }}"
+                                         class="list-group-item list-group-item-action {{ (string) $updatedAppointmentId === (string) $appointment->id ? 'appointment-updated' : '' }}">
                                 <div class="d-flex justify-content-between">
                                     <div>
                                         <div class="fw-semibold">
@@ -510,7 +552,7 @@
                                             $sub   = trim(($a->professional?->last_name ?? '').' '.($a->professional?->first_name ?? ''));
                                         @endphp
 
-                                        <div class="gc-event {{ $cls }}"
+                                        <div class="gc-event {{ $cls }} {{ (string) $updatedAppointmentId === (string) $a->id ? 'appointment-updated' : '' }}"
                                              data-bs-toggle="modal"
                                              data-bs-target="#apptModal"
                                              data-id="{{ $a->id }}"
@@ -522,7 +564,7 @@
                                              data-total="{{ number_format($total,2,',','.') }} €"
                                              data-paid="{{ number_format($paid,2,',','.') }} €"
                                              data-notes="{{ $a->notes ?? '' }}"
-                                             data-edit-url="{{ route('appointments.edit', $a) }}"
+                                             data-edit-url="{{ route('appointments.edit', ['appointment' => $a, 'redirect' => request()->fullUrl()]) }}"
                                         >
                                             <span class="t">{{ $a->start_time?->format('H:i') }} {{ $title }}</span>
                                             <span class="s"> · {{ $sub }}</span>

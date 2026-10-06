@@ -55,17 +55,26 @@ class AppointmentController extends Controller
     $professionals = Professional::orderBy('last_name')->get();
     $companies     = Company::orderBy('name')->get();
 
+    $savedFilters = $request->session()->get('appointments_filters', []);
+    $rememberedFilters = array_merge(
+        is_array($savedFilters) ? $savedFilters : [],
+        $request->only([
+            'view', 'day', 'month', 'customer_id', 'professional_id', 'company_id',
+            'status', 'payment_status', 'payment_method',
+        ])
+    );
+
     // -----------------------------
     // VIEW + PERIOD (day/week/month/all)
     // -----------------------------
-    $view = $request->input('view', 'week'); // week | day | month | table
+    $view = $rememberedFilters['view'] ?? 'week'; // week | day | month | table
     if (!in_array($view, ['week','day','month','table'], true)) {
         $view = 'week';
     }
 
     $nav   = $request->input('nav');         // prev | next
-    $day   = $request->input('day');         // Y-m-d (base date for day/week)
-    $month = $request->input('month');       // Y-m
+    $day   = $rememberedFilters['day'] ?? null;   // Y-m-d (base date for day/week)
+    $month = $rememberedFilters['month'] ?? null; // Y-m
 
     // default base date
     $baseDate = $day ? Carbon::parse($day) : now();
@@ -133,12 +142,12 @@ class AppointmentController extends Controller
     // -----------------------------
     // Other filters
     // -----------------------------
-    $customerId     = $request->input('customer_id');
-    $professionalId = $request->input('professional_id');
-    $companyId      = $request->input('company_id');
-    $status         = $request->input('status', 'all');
-    $paymentStatus  = $request->input('payment_status', 'all');
-    $paymentMethod  = $request->input('payment_method', 'all');
+    $customerId     = $rememberedFilters['customer_id'] ?? null;
+    $professionalId = $rememberedFilters['professional_id'] ?? null;
+    $companyId      = $rememberedFilters['company_id'] ?? null;
+    $status         = $rememberedFilters['status'] ?? 'all';
+    $paymentStatus  = $rememberedFilters['payment_status'] ?? 'all';
+    $paymentMethod  = $rememberedFilters['payment_method'] ?? 'all';
 
     // -----------------------------
     // Query appointments
@@ -265,6 +274,18 @@ class AppointmentController extends Controller
         'payment_status'  => $paymentStatus ?? 'all',
         'payment_method'  => $paymentMethod ?? 'all',
     ];
+
+    $request->session()->put('appointments_filters', [
+        'view'            => $view,
+        'day'             => $day,
+        'month'           => $month,
+        'customer_id'     => $customerId,
+        'professional_id' => $professionalId,
+        'company_id'      => $companyId,
+        'status'          => $status ?? 'all',
+        'payment_status'  => $paymentStatus ?? 'all',
+        'payment_method'  => $paymentMethod ?? 'all',
+    ]);
 
     return view('appointments.index', compact(
         'appointments',
@@ -484,10 +505,14 @@ class AppointmentController extends Controller
         $redirectTo = $request->input('redirect_to');
 
         if ($redirectTo) {
-            return redirect($redirectTo)->with('success', 'Το ραντεβού ενημερώθηκε επιτυχώς.');
+            return redirect($redirectTo)
+                ->with('success', 'Το ραντεβού ενημερώθηκε επιτυχώς.')
+                ->with('updated_appointment_id', $appointment->id);
         }
 
-        return redirect()->route('appointments.index')->with('success', 'Το ραντεβού ενημερώθηκε επιτυχώς.');
+        return redirect()->route('appointments.index')
+            ->with('success', 'Το ραντεβού ενημερώθηκε επιτυχώς.')
+            ->with('updated_appointment_id', $appointment->id);
     }
 
     public function storeMultiple(Request $request)
